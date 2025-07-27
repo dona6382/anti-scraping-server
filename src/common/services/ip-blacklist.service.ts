@@ -8,12 +8,14 @@ export class IpBlacklistService {
 
   add(ip: string) {
     if (!this.blacklist.has(ip)) {
-      this.logger.log(`[Blacklisted] IP: ${ip} has been added to the blacklist.`);
+      this.logger.log(
+        `[Blacklisted] IP: ${ip} has been added to the blacklist.`,
+      );
       this.blacklist.add(ip);
     }
   }
 
-  isBlacklisted(ip: string): boolean {
-    return this.blacklist.has(ip);
+  isBlacklisted(ip: string | undefined): boolean {
+    return this.blacklist.has(<string>ip);
   }
 }

@@ -8,13 +8,18 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 
+// 설정 타입 정의
+interface UserAgentConfig {
+  blockedUserAgents: string[];
+}
+
 @Injectable()
 export class UserAgentGuard implements CanActivate {
   private readonly logger = new Logger(UserAgentGuard.name);
   private readonly blockedUserAgents: Set<string>;
 
   constructor(
-    @Inject('CONFIG') private readonly config: { blockedUserAgents: string[] }
+    @Inject('CONFIG') private readonly config: UserAgentConfig
   ) {
     this.blockedUserAgents = new Set(
       config.blockedUserAgents.map(agent => agent.toLowerCase())
@@ -32,8 +37,9 @@ export class UserAgentGuard implements CanActivate {
       throw new ForbiddenException('Invalid request');
     }
 
-    if (this.isBlockedUserAgent(userAgent.toLowerCase())) {
-      this.logger.warn('Blocked request');
+    const normalizedUserAgent = userAgent.toLowerCase();
+    if (this.isBlockedUserAgent(normalizedUserAgent)) {
+      this.logger.warn(`Blocked request from user agent: ${userAgent}`);
       throw new ForbiddenException('Invalid request');
     }
 
@@ -41,7 +47,8 @@ export class UserAgentGuard implements CanActivate {
   }
 
   private isBlockedUserAgent(userAgent: string): boolean {
-    return this.blockedUserAgents.has(userAgent) ||
-      Array.from(this.blockedUserAgents).some(blocked => userAgent.includes(blocked));
+    return Array.from(this.blockedUserAgents).some(blocked => 
+      userAgent === blocked || userAgent.includes(blocked)
+    );
   }
 }

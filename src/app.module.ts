@@ -4,7 +4,6 @@ import { AppService } from './app.service';
 import { ApiModule } from './api/api.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 
 @Module({
   imports: [

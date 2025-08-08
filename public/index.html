@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anti-Scraping Server - Test Forms</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+        }
+        .error {
+            background: #fee;
+            border-left-color: #f66;
+        }
+        .success {
+            background: #efe;
+            border-left-color: #6c6;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .info-box {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        /* Honeypot 필드를 숨기는 여러 가지 방법 */
+        .hidden-field {
+            position: absolute;
+            left: -9999px;
+        }
+        .invisible-field {
+            display: none !important;
+        }
+        .opacity-field {
+            opacity: 0;
+            height: 0;
+            width: 0;
+            overflow: hidden;
+        }
+    </style>
+    <!-- Google reCAPTCHA v3 -->
+    <script src="https://www.google.com/recaptcha/api.js?render=YOUR_SITE_KEY_HERE"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Anti-Scraping Server Test Interface</h1>
+        
+        <div class="info-box">
+            <h3>ℹ️ Information</h3>
+            <p>This page demonstrates various anti-scraping techniques implemented in the NestJS server:</p>
+            <ul>
+                <li><strong>Rate Limiting:</strong> Limits the number of requests from an IP</li>
+                <li><strong>User-Agent Filtering:</strong> Blocks suspicious or known bot user agents</li>
+                <li><strong>IP Blacklisting:</strong> Blocks requests from blacklisted IPs</li>
+                <li><strong>Honeypot Fields:</strong> Hidden fields that only bots would fill</li>
+                <li><strong>reCAPTCHA v3:</strong> Google's invisible bot detection</li>
+                <li><strong>Headless Browser Detection:</strong> Detects automated browsers</li>
+            </ul>
+        </div>
+
+        <!-- Test 1: Public Data -->
+        <div class="test-section">
+            <h2>📊 Test 1: Public Data (Basic Protection)</h2>
+            <p>This endpoint has only basic rate limiting.</p>
+            <button onclick="fetchPublicData()">Fetch Public Data</button>
+            <div id="public-response" class="response" style="display:none;"></div>
+        </div>
+
+        <!-- Test 2: Protected Data -->
+        <div class="test-section">
+            <h2>🔒 Test 2: Protected Data (Full Protection)</h2>
+            <p>This endpoint uses IP blacklist, User-Agent, and Headless browser detection.</p>
+            <button onclick="fetchProtectedData()">Fetch Protected Data</button>
+            <div id="protected-response" class="response" style="display:none;"></div>
+        </div>
+
+        <!-- Test 3: Contact Form with Honeypot -->
+        <div class="test-section">
+            <h2>📧 Test 3: Contact Form (Honeypot + reCAPTCHA)</h2>
+            <p>This form includes hidden honeypot fields and reCAPTCHA protection.</p>
+            
+            <form id="contact-form" data-recaptcha data-recaptcha-action="contact">
+                <div class="form-group">
+                    <label for="name">Name *</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                
+                <!-- Honeypot Field 1: Hidden with CSS -->
+                <div class="hidden-field" aria-hidden="true">
+                    <label for="email_confirm">Please leave this field empty</label>
+                    <input type="text" name="email_confirm" id="email_confirm" tabindex="-1" autocomplete="off">
+                </div>
+                
+                <!-- Honeypot Field 2: Display none -->
+                <div class="invisible-field">
+                    <input type="text" name="website" placeholder="Your website">
+                </div>
+                
+                <!-- Honeypot Field 3: Zero opacity -->
+                <div class="opacity-field">
+                    <input type="text" name="phone_verify" placeholder="Phone verification">
+                </div>
+                
+                <div class="form-group">
+                    <label for="message">Message *</label>
+                    <textarea id="message" name="message" rows="4" required></textarea>
+                </div>
+                
+                <button type="submit">Send Message</button>
+            </form>
+            
+            <div id="contact-response" class="response" style="display:none;"></div>
+        </div>
+
+        <!-- Test 4: Rate Limit Test -->
+        <div class="test-section">
+            <h2>⏱️ Test 4: Rate Limit Test</h2>
+            <p>Click rapidly to test rate limiting (3 requests per 10 seconds).</p>
+            <button onclick="testRateLimit()">Test Rate Limit</button>
+            <div>Requests made: <span id="rate-counter">0</span></div>
+            <div id="rate-response" class="response" style="display:none;"></div>
+        </div>
+
+        <!-- Test 5: Search (Headless Detection) -->
+        <div class="test-section">
+            <h2>🔍 Test 5: Search API (Headless Detection)</h2>
+            <p>This endpoint detects headless browsers and automation tools.</p>
+            <div class="form-group">
+                <input type="text" id="search-query" placeholder="Enter search query...">
+            </div>
+            <button onclick="performSearch()">Search</button>
+            <div id="search-response" class="response" style="display:none;"></div>
+        </div>
+
+        <!-- Admin Section -->
+        <div class="test-section">
+            <h2>⚙️ Admin: Blacklist Management</h2>
+            
+            <div class="form-group">
+                <button onclick="getBlacklistStats()">Get Blacklist Stats</button>
+            </div>
+            
+            <div class="form-group">
+                <label>Add IP to Blacklist:</label>
+                <input type="text" id="blacklist-ip" placeholder="192.168.1.100">
+                <input type="text" id="blacklist-reason" placeholder="Reason (optional)">
+                <input type="number" id="blacklist-ttl" placeholder="TTL in seconds (optional)">
+                <button onclick="addToBlacklist()">Add to Blacklist</button>
+            </div>
+            
+            <div id="admin-response" class="response" style="display:none;"></div>
+        </div>
+
+        <div class="warning-box">
+            <h3>⚠️ Testing Tips</h3>
+            <ul>
+                <li>Open Developer Tools to see network requests and console logs</li>
+                <li>Try using curl or Postman to see how the server blocks non-browser clients</li>
+                <li>Use a VPN to test IP-based restrictions</li>
+                <li>Try automated testing tools like Puppeteer to trigger headless detection</li>
+                <li>Fill in the honeypot fields (if you can find them) to trigger bot detection</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+        const RECAPTCHA_SITE_KEY = 'YOUR_SITE_KEY_HERE'; // Replace with your actual site key
+        
+        // Browser fingerprinting and headless detection
+        (function() {
+            // Detect headless browser characteristics
+            function detectHeadlessBrowser() {
+                const results = {
+                    webdriver: navigator.webdriver || false,
+                    headless: /HeadlessChrome/.test(navigator.userAgent),
+                    plugins: navigator.plugins.length,
+                    languages: navigator.languages || [],
+                    screen: {
+                        width: window.screen.width,
+                        height: window.screen.height,
+                        colorDepth: window.screen.colorDepth
+                    }
+                };
+                
+                // Add fingerprint to all requests
+                window._browserFingerprint = results;
+                return results;
+            }
+            
+            // Run detection on page load
+            const fingerprint = detectHeadlessBrowser();
+            console.log('Browser fingerprint:', fingerprint);
+            
+            // Add timestamp to forms for timing-based honeypot
+            document.addEventListener('DOMContentLoaded', function() {
+                const forms = document.querySelectorAll('form');
+                forms.forEach(form => {
+                    const timestampField = document.createElement('input');
+                    timestampField.type = 'hidden';
+                    timestampField.name = '_timestamp';
+                    timestampField.value = Date.now();
+                    form.appendChild(timestampField);
+                });
+            });
+        })();
+        
+        // Helper function to display responses
+        function displayResponse(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `response ${isError ? 'error' : 'success'}`;
+            
+            if (typeof data === 'object') {
+                element.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } else {
+                element.innerHTML = data;
+            }
+        }
+        
+        // Helper function for fetch with browser fingerprint
+        async function fetchWithFingerprint(url, options = {}) {
+            const headers = options.headers || {};
+            headers['X-Browser-Fingerprint'] = JSON.stringify(window._browserFingerprint);
+            
+            return fetch(url, {
+                ...options,
+                headers
+            });
+        }
+        
+        // Test functions
+        async function fetchPublicData() {
+            try {
+                const response = await fetchWithFingerprint(`${API_BASE}/api/public-data`);
+                const data = await response.json();
+                displayResponse('public-response', data, !response.ok);
+            } catch (error) {
+                displayResponse('public-response', error.message, true);
+            }
+        }
+        
+        async function fetchProtectedData() {
+            try {
+                const response = await fetchWithFingerprint(`${API_BASE}/api/protected-data`);
+                const data = await response.json();
+                displayResponse('protected-response', data, !response.ok);
+            } catch (error) {
+                displayResponse('protected-response', error.message, true);
+            }
+        }
+        
+        // Contact form submission
+        document.getElementById('contact-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            // Add browser properties for headless detection
+            data._browserProps = window._browserFingerprint;
+            
+            // Get reCAPTCHA token if configured
+            if (RECAPTCHA_SITE_KEY !== 'YOUR_SITE_KEY_HERE') {
+                try {
+                    const token = await grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'contact'});
+                    data.recaptchaToken = token;
+                } catch (error) {
+                    console.error('reCAPTCHA error:', error);
+                }
+            }
+            
+            try {
+                const response = await fetchWithFingerprint(`${API_BASE}/api/contact`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                displayResponse('contact-response', result, !response.ok);
+                
+                if (response.ok) {
+                    e.target.reset();
+                }
+            } catch (error) {
+                displayResponse('contact-response', error.message, true);
+            }
+        });
+        
+        // Rate limit test
+        let rateCounter = 0;
+        async function testRateLimit() {
+            rateCounter++;
+            document.getElementById('rate-counter').textContent = rateCounter;
+            
+            try {
+                const response = await fetchWithFingerprint(`${API_BASE}/test/rate-limit`);
+                const data = await response.json();
+                displayResponse('rate-response', data, !response.ok);
+            } catch (error) {
+                displayResponse('rate-response', error.message, true);
+            }
+        }
+        
+        // Search function
+        async function performSearch() {
+            const query = document.getElementById('search-query').value;
+            if (!query) {
+                alert('Please enter a search query');
+                return;
+            }
+            
+            try {
+                const response = await fetchWithFingerprint(`${API_BASE}/api/search/${encodeURIComponent(query)}`);
+                const data = await response.json();
+                displayResponse('search-response', data, !response.ok);
+            } catch (error) {
+                displayResponse('search-response', error.message, true);
+            }
+        }
+        
+        // Admin functions
+        async function getBlacklistStats() {
+            try {
+                const response = await fetchWithFingerprint(`${API_BASE}/admin/blacklist/stats`);
+                const data = await response.json();
+                displayResponse('admin-response', data, !response.ok);
+            } catch (error) {
+                displayResponse('admin-response', error.message, true);
+            }
+        }
+        
+        async function addToBlacklist() {
+            const ip = document.getElementById('blacklist-ip').value;
+            if (!ip) {
+                alert('Please enter an IP address');
+                return;
+            }
+            
+            const data = {
+                ip,
+                reason: document.getElementById('blacklist-reason').value || 'manual',
+                ttl: parseInt(document.getElementById('blacklist-ttl').value) || undefined
+            };
+            
+            try {
+                const response = await fetchWithFingerprint(`${API_BASE}/admin/blacklist/ip`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                displayResponse('admin-response', result, !response.ok);
+                
+                if (response.ok) {
+                    document.getElementById('blacklist-ip').value = '';
+                    document.getElementById('blacklist-reason').value = '';
+                    document.getElementById('blacklist-ttl').value = '';
+                }
+            } catch (error) {
+                displayResponse('admin-response', error.message, true);
+            }
+        }
+    </script>
+</body>
+</html>

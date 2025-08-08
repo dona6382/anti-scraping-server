@@ -1,0 +1,37 @@
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# Test coverage
+coverage/
+
+# Environment
+.env
+.env.*
+
+# Config files
+.eslintrc.js
+jest.config.js
+webpack.config.js
+
+# Documentation
+docs/
+*.md
+
+# Public assets
+public/
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/

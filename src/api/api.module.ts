@@ -1,15 +1,13 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ApiController } from './api.controller';
 import { ApiService } from './api.service';
-import { IpBlacklistService } from '../common/services/ip-blacklist.service';
-import { IpBlacklistMiddleware } from '../common/middleware/ip-blacklist.middleware';
 
+/**
+ * API Module
+ * 비즈니스 로직 API 엔드포인트를 관리하는 모듈
+ */
 @Module({
   controllers: [ApiController],
-  providers: [ApiService, IpBlacklistService], // IpBlacklistService를 providers에 추가
+  providers: [ApiService],
 })
-export class ApiModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(IpBlacklistMiddleware).forRoutes('api'); // /api 경로에 미들웨어 적용
-  }
-}
+export class ApiModule {}

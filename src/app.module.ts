@@ -1,32 +1,34 @@
-import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { ApiModule } from './api/api.module';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
+
+// Modules
+import { ConfigModule } from './common/config.module';
+import { CommonModule } from './common/common.module';
+import { ApiModule } from './api/api.module';
+
+// Controllers
+import { AppController } from './app.controller';
+
+// Services
+import { AppService } from './app.service';
+
+// Middleware
+import { IpBlacklistMiddleware } from './common/middleware/ip-blacklist.middleware';
 
 @Module({
-  imports: [
-    // 1분에 20번으로 요청 제한
-    ThrottlerModule.forRoot({
-      ttl: 60,
-      limit: 20,
-      // (선택) Redis Storage 사용
-      // storage: new ThrottlerStorageRedisService({
-      //   host: 'localhost',
-      //   port: 6379,
-      // }),
-    }),
-    ApiModule,
-  ],
+  imports: [ConfigModule, CommonModule, ApiModule],
   controllers: [AppController],
   providers: [
     AppService,
-    // ThrottlerGuard를 전역 가드로 설정
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(IpBlacklistMiddleware).forRoutes('*');
+  }
+}

@@ -1,54 +1,67 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Logger,
-  Inject,
-} from '@nestjs/common';
-import { Observable } from 'rxjs';
+import { Injectable, ExecutionContext, Logger } from '@nestjs/common';
+import { ConfigService } from '../services/config.service';
+import { BaseGuard } from './base.guard';
+import { RequestContext } from '../types/request.types';
+import { UserAgentValidationStrategy } from '../strategies/security.strategies';
+import { BLOCKED_USER_AGENTS, SUSPICIOUS_PATTERNS } from '../constants/security.constants';
+import { GuardType } from '../types/security.types';
 
-// 설정 타입 정의
-interface UserAgentConfig {
-  blockedUserAgents: string[];
-}
-
+/**
+ * User-Agent 기반 차단 Guard (Strategy Pattern 적용)
+ */
 @Injectable()
-export class UserAgentGuard implements CanActivate {
-  private readonly logger = new Logger(UserAgentGuard.name);
-  private readonly blockedUserAgents: Set<string>;
+export class UserAgentGuard extends BaseGuard {
+  protected readonly logger = new Logger(UserAgentGuard.name);
+  protected readonly guardName = GuardType.USER_AGENT;
 
-  constructor(
-    @Inject('CONFIG') private readonly config: UserAgentConfig
-  ) {
-    this.blockedUserAgents = new Set(
-      config.blockedUserAgents.map(agent => agent.toLowerCase())
+  private readonly strategy: UserAgentValidationStrategy;
+
+  constructor(private readonly configService: ConfigService) {
+    super();
+
+    const configuredAgents = this.configService.get<string[]>('app.blockedUserAgents', []);
+    const blockedAgents = new Set(
+      [...BLOCKED_USER_AGENTS, ...configuredAgents].map((agent) => agent.toLowerCase()),
+    );
+
+    const strictMode = this.configService.get<boolean>('app.security.strictMode', false);
+
+    this.strategy = new UserAgentValidationStrategy(
+      blockedAgents,
+      [...SUSPICIOUS_PATTERNS],
+      strictMode,
+    );
+
+    this.logger.log(
+      `Initialized with ${blockedAgents.size} blocked agents, strict mode: ${strictMode}`,
     );
   }
 
-  canActivate(
-    context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const userAgent = request.headers['user-agent'];
+  canActivate(context: ExecutionContext): boolean {
+    const request = this.getRequest(context);
+    const requestContext = RequestContext.fromExpressRequest(request);
 
-    if (!userAgent) {
-      this.logger.warn('Missing User-Agent header');
-      throw new ForbiddenException('Invalid request');
+    const result = this.strategy.validate(requestContext);
+
+    if (!result.passed) {
+      this.block(result.reason || 'Validation failed', {
+        ip: requestContext.getMaskedIp(),
+        path: requestContext.path,
+        ...result.details,
+      });
     }
 
-    const normalizedUserAgent = userAgent.toLowerCase();
-    if (this.isBlockedUserAgent(normalizedUserAgent)) {
-      this.logger.warn(`Blocked request from user agent: ${userAgent}`);
-      throw new ForbiddenException('Invalid request');
-    }
+    // Store validation result in metadata
+    this.setRequestMetadata(context, 'userAgentValidation', {
+      passed: true,
+      userAgent: requestContext.userAgent,
+    });
+
+    this.debug('User-Agent validation passed', {
+      ip: requestContext.getMaskedIp(),
+      path: requestContext.path,
+    });
 
     return true;
-  }
-
-  private isBlockedUserAgent(userAgent: string): boolean {
-    return Array.from(this.blockedUserAgents).some(blocked => 
-      userAgent === blocked || userAgent.includes(blocked)
-    );
   }
 }

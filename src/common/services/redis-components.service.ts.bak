@@ -1,0 +1,149 @@
+import { Injectable } from '@nestjs/common';
+
+/**
+ * Redis 연결 통계 관리
+ */
+@Injectable()
+export class RedisStatsService {
+  private stats = {
+    commandsSent: 0,
+    commandsFailed: 0,
+    reconnections: 0,
+    lastError: null as Date | null,
+    connectedAt: null as Date | null,
+  };
+
+  incrementCommandsSent(): void {
+    this.stats.commandsSent++;
+  }
+
+  incrementCommandsFailed(): void {
+    this.stats.commandsFailed++;
+  }
+
+  incrementReconnections(): void {
+    this.stats.reconnections++;
+  }
+
+  setLastError(date: Date): void {
+    this.stats.lastError = date;
+  }
+
+  setConnectedAt(date: Date): void {
+    this.stats.connectedAt = date;
+  }
+
+  getStats(): any {
+    return {
+      ...this.stats,
+      uptime: this.stats.connectedAt ? Date.now() - this.stats.connectedAt.getTime() : 0,
+    };
+  }
+
+  reset(): void {
+    this.stats = {
+      commandsSent: 0,
+      commandsFailed: 0,
+      reconnections: 0,
+      lastError: null,
+      connectedAt: null,
+    };
+  }
+}
+
+/**
+ * Redis 연결 관리 (단일 책임)
+ */
+@Injectable()
+export class RedisConnectionManager {
+  private client: any = null;
+  private status: string = 'closed';
+
+  setClient(client: any): void {
+    this.client = client;
+  }
+
+  getClient(): any {
+    return this.client;
+  }
+
+  setStatus(status: string): void {
+    this.status = status;
+  }
+
+  getStatus(): string {
+    return this.status;
+  }
+
+  isConnected(): boolean {
+    return this.status === 'ready';
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.client) {
+      await this.client.quit();
+      this.client = null;
+      this.status = 'closed';
+    }
+  }
+}
+
+/**
+ * Redis 명령 실행 (단일 책임)
+ */
+@Injectable()
+export class RedisCommandExecutor {
+  constructor(
+    private readonly connectionManager: RedisConnectionManager,
+    private readonly statsService: RedisStatsService,
+  ) {}
+
+  async execute<T>(command: () => Promise<T>): Promise<T> {
+    if (!this.connectionManager.isConnected()) {
+      throw new Error('Redis not connected');
+    }
+
+    try {
+      const result = await command();
+      this.statsService.incrementCommandsSent();
+      return result;
+    } catch (error) {
+      this.statsService.incrementCommandsFailed();
+      throw error;
+    }
+  }
+
+  async set(key: string, value: string, ttl?: number): Promise<void> {
+    const client = this.connectionManager.getClient();
+    if (!client) throw new Error('No Redis client');
+
+    return this.execute(async () => {
+      if (ttl) {
+        await client.setEx(key, ttl, value);
+      } else {
+        await client.set(key, value);
+      }
+    });
+  }
+
+  async get(key: string): Promise<string | null> {
+    const client = this.connectionManager.getClient();
+    if (!client) return null;
+
+    return this.execute(() => client.get(key));
+  }
+
+  async del(keys: string[]): Promise<number> {
+    const client = this.connectionManager.getClient();
+    if (!client) return 0;
+
+    return this.execute(() => client.del(keys));
+  }
+
+  async ttl(key: string): Promise<number> {
+    const client = this.connectionManager.getClient();
+    if (!client) return -1;
+
+    return this.execute(() => client.ttl(key));
+  }
+}

@@ -1,102 +1,311 @@
-https://aistudio.google.com/prompts/1TFd7gkLf5YC85IL3I4oYomWSQxbk_apD
+# 🛡️ NestJS Anti-Scraping Server
 
+Production-ready anti-scraping solution with multiple protection layers.
 
+## 🚀 Quick Start
 
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
-
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
+### Using Script (Recommended)
 ```bash
-$ npm install
+# Make scripts executable
+chmod +x make-executable.sh
+./make-executable.sh
+
+# Check code
+./check-code.sh
+
+# Start server
+./start.sh
 ```
 
-## Compile and run the project
-
+### Manual Setup
 ```bash
-# development
-$ npm run start
+# Install dependencies
+npm install
 
-# watch mode
-$ npm run start:dev
+# Copy environment file
+cp .env.example .env
 
-# production mode
-$ npm run start:prod
+# Start development server
+npm run start:dev
+
+# Production build
+npm run build
+npm run start:prod
 ```
 
-## Run tests
-
+### Using Docker
 ```bash
-# unit tests
-$ npm run test
+# Start all services
+docker-compose up -d
 
-# e2e tests
-$ npm run test:e2e
+# View logs
+docker-compose logs -f app
 
-# test coverage
-$ npm run test:cov
+# Stop services
+docker-compose down
 ```
 
-## Deployment
+## 🛡️ Protection Features
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### 1. **IP Blacklisting**
+- Dynamic IP blocking
+- Redis-backed persistence
+- TTL support
+- Manual block/unblock API
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 2. **User-Agent Filtering**
+- Blocks known bots and scrapers
+- Customizable block list
+- Pattern matching
+- Strict mode option
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+### 3. **Rate Limiting**
+- Request throttling per IP
+- Configurable limits
+- Redis storage support
+- Bypass for admin endpoints
+
+### 4. **Headless Browser Detection**
+- Detects Puppeteer, Playwright, Selenium
+- Chrome DevTools Protocol detection
+- Missing header analysis
+- Browser fingerprinting
+
+### 5. **Honeypot Fields**
+- Hidden form fields
+- Timing analysis
+- Bot trap endpoints
+- Automatic blocking
+
+### 6. **reCAPTCHA v3**
+- Google reCAPTCHA integration
+- Score-based validation
+- Configurable thresholds
+- Fail-open support
+
+## 📁 Project Structure
+
+```
+src/
+├── api/                    # Business logic endpoints
+├── common/                 # Shared modules
+│   ├── guards/            # Security guards
+│   ├── middleware/        # Express middleware
+│   ├── services/          # Core services
+│   ├── strategies/        # Security strategies
+│   ├── types/            # TypeScript types
+│   └── utils/            # Utility functions
+├── app.module.ts          # Root module
+└── main.ts               # Application entry
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## 🔧 Configuration
 
-## Resources
+### Environment Variables
+```env
+# Server
+PORT=3000
+NODE_ENV=development
 
-Check out a few resources that may come in handy when working with NestJS:
+# Security
+SECURITY_STRICT_MODE=false
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+# Rate Limiting
+THROTTLE_TTL=10
+THROTTLE_LIMIT=20
 
-## Support
+# Redis (Optional)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+# IP Blacklist
+IP_BLACKLIST_TTL=86400
 
-## Stay in touch
+# User Agent Blocking
+BLOCKED_USER_AGENTS=scrapy,python-requests,curl
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+# Honeypot
+HONEYPOT_FIELD_NAME=email_confirm
 
-## License
+# reCAPTCHA (Optional)
+RECAPTCHA_SECRET_KEY=your_key_here
+RECAPTCHA_SCORE_THRESHOLD=0.5
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## 📊 API Endpoints
+
+### Health Check
+```bash
+GET /health
+GET /health/redis
+```
+
+### IP Blacklist Management
+```bash
+POST   /admin/blacklist/ip        # Add IP to blacklist
+DELETE /admin/blacklist/ip/:ip    # Remove IP
+GET    /admin/blacklist           # List all blocked IPs
+GET    /admin/blacklist/ip/:ip    # Get IP info
+```
+
+### Test Endpoints
+```bash
+GET  /test/protected    # Test all guards
+POST /test/honeypot     # Test honeypot
+POST /test/user-agent   # Test user-agent blocking
+```
+
+### Business API
+```bash
+GET  /api/data          # Protected data endpoint
+POST /api/contact       # Contact form with protections
+GET  /api/search        # Search with rate limiting
+```
+
+## 🧪 Testing
+
+### Run Tests
+```bash
+# Unit tests
+npm test
+
+# Test coverage
+npm run test:cov
+
+# E2E tests
+npm run test:e2e
+```
+
+### Test Interface
+Open browser to: `http://localhost:3000/public/index.html`
+
+## 🐳 Docker Deployment
+
+### Build Image
+```bash
+docker build -t anti-scraping-server .
+```
+
+### Run Container
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e REDIS_HOST=redis \
+  --name anti-scraping-server \
+  anti-scraping-server
+```
+
+### Docker Compose
+```bash
+# Start all services
+docker-compose up -d
+
+# Scale application
+docker-compose up -d --scale app=3
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+## 📈 Monitoring
+
+### Metrics Available
+- Request rate per IP
+- Blocked requests count
+- Guard trigger statistics
+- Redis connection status
+- Memory usage
+- Response times
+
+### Health Endpoints
+```json
+GET /health
+
+{
+  "status": "healthy",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "uptime": 3600,
+  "services": {
+    "database": { "status": "healthy" },
+    "redis": { "status": "healthy", "connected": true },
+    "memory": { "status": "healthy", "percentage": "45%" }
+  }
+}
+```
+
+## 🔒 Security Best Practices
+
+1. **Environment Variables**
+   - Never commit `.env` files
+   - Use secrets management in production
+   - Rotate keys regularly
+
+2. **Rate Limiting**
+   - Adjust limits based on traffic
+   - Monitor for false positives
+   - Implement gradual blocking
+
+3. **IP Blocking**
+   - Review blocked IPs regularly
+   - Implement appeals process
+   - Consider geographic restrictions
+
+4. **Monitoring**
+   - Set up alerts for high block rates
+   - Monitor performance impact
+   - Track false positive rates
+
+## 📝 Development
+
+### Code Style
+```bash
+# Lint code
+npm run lint
+
+# Fix lint issues
+npm run lint:fix
+
+# Format code
+npm run format
+```
+
+### Git Hooks
+Pre-commit hooks automatically:
+- Run ESLint
+- Format with Prettier
+- Check TypeScript types
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch
+3. Commit changes
+4. Push to branch
+5. Open pull request
+
+## 📄 License
+
+MIT License - see LICENSE file for details
+
+## 🆘 Support
+
+- GitHub Issues: [Report bugs](https://github.com/your-repo/issues)
+- Documentation: [Wiki](https://github.com/your-repo/wiki)
+- Email: support@example.com
+
+## 🏆 Credits
+
+Built with:
+- [NestJS](https://nestjs.com/) - Node.js framework
+- [Redis](https://redis.io/) - In-memory data store
+- [TypeScript](https://www.typescriptlang.org/) - Type safety
+- [Docker](https://www.docker.com/) - Containerization
+
+---
+
+Made with ❤️ by Your Team

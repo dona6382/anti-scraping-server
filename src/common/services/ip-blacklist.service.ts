@@ -1,314 +1,223 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from './config.service';
-import { createClient } from 'redis';
-import { SECURITY_CONSTANTS } from '../constants/security.constants';
-import { IpInfo, BlacklistStats, BlockReason } from '../types/security.types';
+import { Injectable, Inject, Logger } from '@nestjs/common';
+import { ICacheService } from './base-cache.service';
+import { ConfigurationService } from '../../modules/configuration/configuration.service';
 
 /**
- * IP 블랙리스트 관리 서비스 (리팩토링)
+ * IP Blacklist Entry
+ */
+interface BlacklistEntry {
+  ip: string;
+  reason: string;
+  blockedAt: Date;
+  expiresAt?: Date;
+  count: number;
+}
+
+/**
+ * IP Blacklist Service
+ * IP 차단 목록을 관리하는 서비스
  */
 @Injectable()
-export class IpBlacklistService implements OnModuleInit, OnModuleDestroy {
+export class IpBlacklistService {
   private readonly logger = new Logger(IpBlacklistService.name);
-  private redisClient: any;
-  private connected = false;
-  private readonly memoryCache = new Map<string, IpInfo>();
+  private readonly ttl: number;
+  private readonly keyPrefix = 'blacklist';
 
-  private readonly config = {
-    prefix: SECURITY_CONSTANTS.IP_BLACKLIST.PREFIX,
-    setKey: SECURITY_CONSTANTS.IP_BLACKLIST.SET_KEY,
-    defaultTtl: SECURITY_CONSTANTS.IP_BLACKLIST.DEFAULT_TTL,
-  };
-
-  constructor(private readonly configService: ConfigService) {}
-
-  async onModuleInit(): Promise<void> {
-    await this.initializeRedis();
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    await this.cleanup();
+  constructor(
+    @Inject('ICacheService') private readonly cache: ICacheService,
+    private readonly configService: ConfigurationService,
+  ) {
+    this.ttl = this.configService.app.ipBlacklist.ttl;
+    this.logger.log(`Initialized with TTL: ${this.ttl} seconds`);
   }
 
   /**
-   * Initialize Redis connection
+   * IP 차단
    */
-  private async initializeRedis(): Promise<void> {
-    const redisConfig = this.configService.get('app.redis');
-
-    if (!redisConfig?.host) {
-      this.logger.warn('Redis not configured, using in-memory storage only');
-      return;
-    }
-
-    try {
-      this.redisClient = createClient({
-        socket: {
-          host: redisConfig.host,
-          port: redisConfig.port,
-        },
-        password: redisConfig.password,
-        database: redisConfig.db,
-      });
-
-      this.redisClient.on('error', (err: Error) => this.handleRedisError(err));
-      this.redisClient.on('connect', () => this.handleRedisConnect());
-      this.redisClient.on('ready', () => this.handleRedisReady());
-
-      await this.redisClient.connect();
-    } catch (error) {
-      this.logger.error('Failed to initialize Redis:', error);
-      this.connected = false;
-    }
-  }
-
-  /**
-   * Handle Redis connection events
-   */
-  private handleRedisError(error: Error): void {
-    this.logger.error('Redis error:', error);
-    this.connected = false;
-  }
-
-  private handleRedisConnect(): void {
-    this.logger.log('Redis connected');
-  }
-
-  private handleRedisReady(): void {
-    this.logger.log('Redis ready');
-    this.connected = true;
-  }
-
-  /**
-   * Add IP to blacklist
-   */
-  async blacklistIp(
-    ip: string,
-    reason: BlockReason | string = BlockReason.MANUAL,
-    ttl?: number,
-  ): Promise<void> {
-    const actualTtl = ttl || this.config.defaultTtl;
-    const info: IpInfo = {
+  async blockIp(ip: string, reason: string, ttl?: number): Promise<void> {
+    const key = this.getKey(ip);
+    const existingEntry = await this.cache.get<BlacklistEntry>(key);
+    
+    const entry: BlacklistEntry = {
       ip,
-      reason: reason.toString(),
-      timestamp: new Date().toISOString(),
-      ttl: actualTtl,
+      reason,
+      blockedAt: new Date(),
+      expiresAt: ttl ? new Date(Date.now() + ttl * 1000) : undefined,
+      count: existingEntry ? existingEntry.count + 1 : 1,
     };
+    
+    await this.cache.set(key, entry, ttl || this.ttl);
+    
+    this.logger.warn(`Blocked IP: ${ip}, Reason: ${reason}, Count: ${entry.count}`);
+  }
 
-    // Always add to memory cache
-    this.memoryCache.set(ip, info);
+  /**
+   * IP 차단 해제
+   */
+  async unblockIp(ip: string): Promise<void> {
+    const key = this.getKey(ip);
+    await this.cache.delete(key);
+    this.logger.log(`Unblocked IP: ${ip}`);
+  }
 
-    // Clean up old entries in memory cache
-    this.cleanupMemoryCache();
+  /**
+   * IP 차단 여부 확인
+   */
+  async isBlocked(ip: string): Promise<boolean> {
+    const key = this.getKey(ip);
+    const entry = await this.cache.get<BlacklistEntry>(key);
+    
+    if (!entry) {
+      return false;
+    }
+    
+    // 만료 시간 확인
+    if (entry.expiresAt && new Date(entry.expiresAt) < new Date()) {
+      await this.cache.delete(key);
+      return false;
+    }
+    
+    return true;
+  }
 
-    // Try to add to Redis
-    if (this.connected && this.redisClient) {
-      try {
-        const key = `${this.config.prefix}${ip}`;
-        const data = JSON.stringify(info);
+  /**
+   * 차단 이유 조회
+   */
+  async getBlockReason(ip: string): Promise<string | null> {
+    const key = this.getKey(ip);
+    const entry = await this.cache.get<BlacklistEntry>(key);
+    return entry ? entry.reason : null;
+  }
 
-        await this.redisClient.setEx(key, actualTtl, data);
-        await this.redisClient.sAdd(this.config.setKey, ip);
+  /**
+   * 차단 정보 조회
+   */
+  async getBlockInfo(ip: string): Promise<BlacklistEntry | null> {
+    const key = this.getKey(ip);
+    return await this.cache.get<BlacklistEntry>(key);
+  }
 
-        this.logger.log(`IP ${ip} blacklisted for ${actualTtl}s. Reason: ${reason}`);
-      } catch (error) {
-        this.logger.error(`Failed to blacklist IP ${ip} in Redis:`, error);
-      }
-    } else {
-      this.logger.warn(`IP ${ip} added to memory blacklist only. Reason: ${reason}`);
+  /**
+   * 모든 차단된 IP 조회
+   */
+  async getAllBlockedIps(): Promise<BlacklistEntry[]> {
+    const pattern = `${this.keyPrefix}:*`;
+    const keys = await this.cache.keys(pattern);
+    
+    if (keys.length === 0) {
+      return [];
+    }
+    
+    const entries = await this.cache.getMany<BlacklistEntry>(keys);
+    return entries.filter((entry): entry is BlacklistEntry => entry !== null);
+  }
+
+  /**
+   * 차단 목록 초기화
+   */
+  async clearAll(): Promise<void> {
+    const pattern = `${this.keyPrefix}:*`;
+    const keys = await this.cache.keys(pattern);
+    
+    if (keys.length > 0) {
+      await this.cache.deleteMany(keys);
+      this.logger.log(`Cleared ${keys.length} blocked IPs`);
     }
   }
 
   /**
-   * Check if IP is blacklisted
+   * 통계 조회
    */
-  async isBlacklisted(ip: string): Promise<boolean> {
-    // Check memory cache first
-    if (this.memoryCache.has(ip)) {
-      const info = this.memoryCache.get(ip);
-
-      // Check if entry is expired
-      if (info && this.isExpired(info)) {
-        this.memoryCache.delete(ip);
-      } else {
-        return true;
-      }
-    }
-
-    // Check Redis if connected
-    if (this.connected && this.redisClient) {
-      try {
-        const key = `${this.config.prefix}${ip}`;
-        const exists = await this.redisClient.exists(key);
-
-        if (exists) {
-          // Refresh memory cache from Redis
-          const data = await this.redisClient.get(key);
-          if (data) {
-            const info = JSON.parse(data);
-            this.memoryCache.set(ip, info);
-            this.logger.debug(`Blacklist hit for IP ${ip}: ${info.reason}`);
-          }
-          return true;
-        }
-      } catch (error) {
-        this.logger.error(`Failed to check blacklist for IP ${ip}:`, error);
-        // In case of error, check memory cache only
-        return this.memoryCache.has(ip);
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Remove IP from blacklist
-   */
-  async removeFromBlacklist(ip: string): Promise<void> {
-    // Remove from memory cache
-    this.memoryCache.delete(ip);
-
-    // Remove from Redis
-    if (this.connected && this.redisClient) {
-      try {
-        const key = `${this.config.prefix}${ip}`;
-        await this.redisClient.del(key);
-        await this.redisClient.sRem(this.config.setKey, ip);
-
-        this.logger.log(`IP ${ip} removed from blacklist`);
-      } catch (error) {
-        this.logger.error(`Failed to remove IP ${ip} from Redis blacklist:`, error);
-      }
-    }
-  }
-
-  /**
-   * Get all blacklisted IPs
-   */
-  async getAllBlacklistedIps(): Promise<string[]> {
-    const ips = new Set<string>();
-
-    // Add from memory cache
-    this.memoryCache.forEach((info, ip) => {
-      if (!this.isExpired(info)) {
-        ips.add(ip);
-      }
+  async getStats(): Promise<{
+    totalBlocked: number;
+    recentBlocks: number;
+    topReasons: Record<string, number>;
+  }> {
+    const entries = await this.getAllBlockedIps();
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    
+    const recentBlocks = entries.filter(
+      (entry) => new Date(entry.blockedAt) > oneHourAgo
+    ).length;
+    
+    const reasonCounts: Record<string, number> = {};
+    entries.forEach((entry) => {
+      reasonCounts[entry.reason] = (reasonCounts[entry.reason] || 0) + 1;
     });
-
-    // Add from Redis
-    if (this.connected && this.redisClient) {
-      try {
-        const redisIps = await this.redisClient.sMembers(this.config.setKey);
-        redisIps.forEach((ip: string) => ips.add(ip));
-      } catch (error) {
-        this.logger.error('Failed to get blacklisted IPs from Redis:', error);
-      }
-    }
-
-    return Array.from(ips);
-  }
-
-  /**
-   * Get IP information
-   */
-  async getIpInfo(ip: string): Promise<IpInfo | null> {
-    // Check memory cache first
-    if (this.memoryCache.has(ip)) {
-      const info = this.memoryCache.get(ip);
-      if (info && !this.isExpired(info)) {
-        return info;
-      }
-    }
-
-    // Check Redis
-    if (this.connected && this.redisClient) {
-      try {
-        const key = `${this.config.prefix}${ip}`;
-        const data = await this.redisClient.get(key);
-
-        if (data) {
-          const info = JSON.parse(data);
-          const ttl = await this.redisClient.ttl(key);
-          return { ...info, ttl };
-        }
-      } catch (error) {
-        this.logger.error(`Failed to get info for IP ${ip}:`, error);
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Get blacklist statistics
-   */
-  async getStatistics(): Promise<BlacklistStats> {
-    const allIps = await this.getAllBlacklistedIps();
-
+    
     return {
-      totalBlacklisted: allIps.length,
-      memoryBlacklisted: this.memoryCache.size,
-      redisConnected: this.connected,
+      totalBlocked: entries.length,
+      recentBlocks,
+      topReasons: reasonCounts,
     };
   }
 
   /**
-   * Blacklist IP range (CIDR notation)
+   * 자동 차단 (rate limiting 등과 연동)
    */
-  async blacklistIpRange(cidr: string, reason: string = BlockReason.MANUAL): Promise<void> {
-    // For simplicity, we're just logging this
-    // In production, you'd want to use a library like 'ip-cidr' to expand the range
-    this.logger.log(`IP range ${cidr} blacklisted. Reason: ${reason}`);
-
-    // Store the CIDR range itself for now
-    await this.blacklistIp(cidr, reason);
+  async autoBlock(ip: string, violations: string[]): Promise<void> {
+    const reason = `Auto-blocked: ${violations.join(', ')}`;
+    
+    // 위반 횟수에 따라 차단 시간 증가
+    const blockInfo = await this.getBlockInfo(ip);
+    const count = blockInfo ? blockInfo.count + 1 : 1;
+    const ttl = this.calculateBlockDuration(count);
+    
+    await this.blockIp(ip, reason, ttl);
   }
 
   /**
-   * Check if an entry is expired
+   * 차단 시간 계산 (지수적 증가)
    */
-  private isExpired(info: IpInfo): boolean {
-    if (!info.ttl) return false;
-
-    const createdAt = new Date(info.timestamp).getTime();
-    const now = Date.now();
-    const age = (now - createdAt) / 1000; // Age in seconds
-
-    return age > info.ttl;
+  private calculateBlockDuration(violationCount: number): number {
+    const baseTtl = this.ttl;
+    const multiplier = Math.min(Math.pow(2, violationCount - 1), 128); // 최대 128배
+    return baseTtl * multiplier;
   }
 
   /**
-   * Clean up expired entries from memory cache
+   * 캐시 키 생성
    */
-  private cleanupMemoryCache(): void {
-    const maxSize = 10000; // Maximum entries in memory
-
-    // Remove expired entries
-    for (const [ip, info] of this.memoryCache.entries()) {
-      if (this.isExpired(info)) {
-        this.memoryCache.delete(ip);
-      }
-    }
-
-    // If still too large, remove oldest entries
-    if (this.memoryCache.size > maxSize) {
-      const entries = Array.from(this.memoryCache.entries());
-      entries.sort(
-        (a, b) => new Date(a[1].timestamp).getTime() - new Date(b[1].timestamp).getTime(),
-      );
-
-      const toRemove = entries.slice(0, entries.length - maxSize);
-      toRemove.forEach(([ip]) => this.memoryCache.delete(ip));
-    }
+  private getKey(ip: string): string {
+    // IP 주소 정규화
+    const normalizedIp = ip.trim().toLowerCase();
+    return `${this.keyPrefix}:${normalizedIp}`;
   }
 
   /**
-   * Clean up resources
+   * IP 주소 유효성 검사
    */
-  private async cleanup(): Promise<void> {
-    if (this.redisClient) {
-      await this.redisClient.quit();
+  isValidIp(ip: string): boolean {
+    // IPv4 패턴
+    const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+    // IPv6 패턴 (간단한 버전)
+    const ipv6Pattern = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+    
+    if (ipv4Pattern.test(ip)) {
+      // IPv4 범위 확인
+      const parts = ip.split('.');
+      return parts.every(part => {
+        const num = parseInt(part, 10);
+        return num >= 0 && num <= 255;
+      });
     }
-    this.memoryCache.clear();
+    
+    return ipv6Pattern.test(ip);
+  }
+
+  /**
+   * CIDR 범위 차단 (예: 192.168.1.0/24)
+   */
+  async blockCidr(cidr: string, reason: string, ttl?: number): Promise<void> {
+    // CIDR 파싱 및 범위 내 모든 IP 차단
+    // 실제 구현은 더 복잡하지만, 기본 개념만 표시
+    this.logger.warn(`CIDR blocking not fully implemented: ${cidr}`);
+    
+    // 간단한 구현 예시 (실제로는 더 정교한 로직 필요)
+    const [baseIp, mask] = cidr.split('/');
+    if (baseIp && mask) {
+      await this.blockIp(cidr, `CIDR: ${reason}`, ttl);
+    }
   }
 }

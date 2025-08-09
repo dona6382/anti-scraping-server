@@ -1,77 +1,41 @@
-import { Injectable, ExecutionContext, Logger } from '@nestjs/common';
-import { BaseGuard } from './base.guard';
+import { Injectable, Logger } from '@nestjs/common';
+import { Request } from 'express';
+import { BaseSecurityGuard } from './base-security.guard';
 import { IpBlacklistService } from '../services/ip-blacklist.service';
-import { IpExtractor, LogUtil } from '../utils/security.utils';
-import { ERROR_MESSAGES } from '../constants/security.constants';
-import { GuardType } from '../types/security.types';
 
 /**
- * IP 블랙리스트 Guard (리팩토링)
+ * IP Blacklist Guard
+ * 차단된 IP 주소로부터의 접근을 막는 가드
  */
 @Injectable()
-export class IpBlacklistGuard extends BaseGuard {
+export class IpBlacklistGuard extends BaseSecurityGuard {
   protected readonly logger = new Logger(IpBlacklistGuard.name);
-  protected readonly guardName = GuardType.IP_BLACKLIST;
 
   constructor(private readonly ipBlacklistService: IpBlacklistService) {
     super();
   }
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const ip = this.extractIp(context);
-    const path = this.getPath(context);
+  protected getGuardName(): string {
+    return 'IpBlacklistGuard';
+  }
 
-    if (!ip) {
-      this.warn('Could not extract IP from request', { path });
-      return true; // Allow if we can't determine IP
+  protected async validateRequest(request: Request): Promise<boolean> {
+    const ip = this.getClientIp(request);
+    
+    // IP 차단 여부 확인
+    const isBlocked = await this.ipBlacklistService.isBlocked(ip);
+    
+    if (isBlocked) {
+      const reason = await this.ipBlacklistService.getBlockReason(ip);
+      this.logger.warn(`Blocked IP: ${ip}, Reason: ${reason}`);
+      return false;
     }
-
-    // Check if IP is blacklisted
-    const isBlacklisted = await this.ipBlacklistService.isBlacklisted(ip);
-
-    if (isBlacklisted) {
-      const ipInfo = await this.ipBlacklistService.getIpInfo(ip);
-
-      this.block(
-        'IP blacklisted',
-        {
-          ip,
-          reason: ipInfo?.reason || 'unknown',
-          ttl: ipInfo?.ttl || 'permanent',
-          path,
-        },
-        ERROR_MESSAGES.IP_BLOCKED,
-      );
-    }
-
-    // Check for proxy headers (optional - log only)
-    if (IpExtractor.hasProxyHeaders(this.getRequest(context))) {
-      this.debug('Proxy headers detected', {
-        ip: LogUtil.maskIp(ip),
-        path,
-      });
-
-      // Store proxy info in metadata
-      this.setRequestMetadata(context, 'hasProxy', true);
-    }
-
-    // Check if IP is private (optional - log only)
-    if (IpExtractor.isPrivate(ip)) {
-      this.debug('Private IP detected', {
-        ip: LogUtil.maskIp(ip),
-        path,
-      });
-
-      this.setRequestMetadata(context, 'isPrivateIp', true);
-    }
-
-    // Store IP info in metadata
-    this.setRequestMetadata(context, 'ip', {
-      address: ip,
-      hasProxy: IpExtractor.hasProxyHeaders(this.getRequest(context)),
-      isPrivate: IpExtractor.isPrivate(ip),
-    });
 
     return true;
+  }
+
+  protected getFailureMessage(request: Request): string {
+    const ip = this.getClientIp(request);
+    return `IP address ${ip} is blocked`;
   }
 }

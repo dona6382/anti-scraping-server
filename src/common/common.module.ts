@@ -1,9 +1,12 @@
 import { Module, Global } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { ConfigModule } from './config.module';
 
-// Config
-import { ConfigService } from './services/config.service';
+// Configuration
+import { ConfigurationModule } from '../modules/configuration/configuration.module';
+import { ConfigurationService } from '../modules/configuration/configuration.service';
+
+// Cache
+import { CacheFactory, CacheServiceProvider } from './services/cache.factory';
 
 // Services
 import { IpBlacklistService } from './services/ip-blacklist.service';
@@ -20,46 +23,90 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
 // Middleware
 import { IpBlacklistMiddleware } from './middleware/ip-blacklist.middleware';
 
+// Legacy Config Service (for backward compatibility)
+import { ConfigService } from './services/config.service';
+
+/**
+ * Common Module
+ * 공통 서비스, 가드, 미들웨어를 제공하는 글로벌 모듈
+ */
 @Global()
 @Module({
   imports: [
-    ConfigModule,
+    ConfigurationModule,
     ThrottlerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
+      imports: [ConfigurationModule],
+      inject: [ConfigurationService],
+      useFactory: (config: ConfigurationService) => ({
         throttlers: [
           {
             name: 'default',
-            ttl: config.get('app.throttle.ttl', 10) * 1000,
-            limit: config.get('app.throttle.limit', 20),
+            ttl: config.app.throttle.ttl * 1000,
+            limit: config.app.throttle.limit,
           },
         ],
       }),
     }),
   ],
   providers: [
+    // Cache
+    CacheFactory,
+    CacheServiceProvider,
+    
+    // Services
     IpBlacklistService,
     HttpService,
     HealthService,
+    
+    // Guards
     UserAgentGuard,
     IpBlacklistGuard,
     HoneypotGuard,
     RecaptchaGuard,
     HeadlessBrowserGuard,
+    
+    // Middleware
     IpBlacklistMiddleware,
+    
+    // Legacy Config Service (wraps ConfigurationService)
+    {
+      provide: ConfigService,
+      useFactory: (configurationService: ConfigurationService) => {
+        return {
+          get: (key: string, defaultValue?: any) => configurationService.get(key, defaultValue),
+          getOrThrow: (key: string) => configurationService.getOrThrow(key),
+          has: (key: string) => configurationService.has(key),
+        };
+      },
+      inject: [ConfigurationService],
+    },
   ],
   exports: [
+    // Export cache
+    'ICacheService',
+    CacheFactory,
+    
+    // Export services
     IpBlacklistService,
     HttpService,
     HealthService,
+    
+    // Export guards
     UserAgentGuard,
     IpBlacklistGuard,
     HoneypotGuard,
     RecaptchaGuard,
     HeadlessBrowserGuard,
+    
+    // Export middleware
     IpBlacklistMiddleware,
+    
+    // Export modules
     ThrottlerModule,
+    ConfigurationModule,
+    
+    // Export config service
+    ConfigService,
   ],
 })
 export class CommonModule {}

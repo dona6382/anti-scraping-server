@@ -1,67 +1,94 @@
-import { Injectable, ExecutionContext, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Request } from 'express';
+import { BaseSecurityGuard } from './base-security.guard';
 import { ConfigService } from '../services/config.service';
-import { BaseGuard } from './base.guard';
-import { RequestContext } from '../types/request.types';
-import { UserAgentValidationStrategy } from '../strategies/security.strategies';
 import { BLOCKED_USER_AGENTS, SUSPICIOUS_PATTERNS } from '../constants/security.constants';
-import { GuardType } from '../types/security.types';
 
 /**
- * User-Agent 기반 차단 Guard (Strategy Pattern 적용)
+ * User-Agent 기반 차단 Guard
+ * 악성 봇과 스크래퍼의 User-Agent를 탐지하고 차단
  */
 @Injectable()
-export class UserAgentGuard extends BaseGuard {
+export class UserAgentGuard extends BaseSecurityGuard {
   protected readonly logger = new Logger(UserAgentGuard.name);
-  protected readonly guardName = GuardType.USER_AGENT;
-
-  private readonly strategy: UserAgentValidationStrategy;
+  
+  private readonly blockedAgents: Set<string>;
+  private readonly suspiciousPatterns: RegExp[];
+  private readonly strictMode: boolean;
 
   constructor(private readonly configService: ConfigService) {
     super();
 
+    // 설정에서 차단할 User-Agent 목록 로드
     const configuredAgents = this.configService.get<string[]>('app.blockedUserAgents', []);
-    const blockedAgents = new Set(
+    this.blockedAgents = new Set(
       [...BLOCKED_USER_AGENTS, ...configuredAgents].map((agent) => agent.toLowerCase()),
     );
 
-    const strictMode = this.configService.get<boolean>('app.security.strictMode', false);
+    // 의심스러운 패턴 설정
+    this.suspiciousPatterns = SUSPICIOUS_PATTERNS.map((pattern) => new RegExp(pattern, 'i'));
 
-    this.strategy = new UserAgentValidationStrategy(
-      blockedAgents,
-      [...SUSPICIOUS_PATTERNS],
-      strictMode,
-    );
+    // Strict 모드 설정
+    this.strictMode = this.configService.get<boolean>('app.security.strictMode', false);
 
     this.logger.log(
-      `Initialized with ${blockedAgents.size} blocked agents, strict mode: ${strictMode}`,
+      `Initialized with ${this.blockedAgents.size} blocked agents, strict mode: ${this.strictMode}`,
     );
   }
 
-  canActivate(context: ExecutionContext): boolean {
-    const request = this.getRequest(context);
-    const requestContext = RequestContext.fromExpressRequest(request);
+  protected getGuardName(): string {
+    return 'UserAgentGuard';
+  }
 
-    const result = this.strategy.validate(requestContext);
-
-    if (!result.passed) {
-      this.block(result.reason || 'Validation failed', {
-        ip: requestContext.getMaskedIp(),
-        path: requestContext.path,
-        ...result.details,
-      });
+  protected validateRequest(request: Request): boolean {
+    const userAgent = this.getUserAgent(request).toLowerCase();
+    
+    // User-Agent가 없는 경우
+    if (!userAgent || userAgent === '') {
+      if (this.strictMode) {
+        this.logger.warn(`Blocked request with missing User-Agent from ${this.getClientIp(request)}`);
+        return false;
+      }
+      return true;
     }
 
-    // Store validation result in metadata
-    this.setRequestMetadata(context, 'userAgentValidation', {
-      passed: true,
-      userAgent: requestContext.userAgent,
-    });
+    // 차단된 User-Agent 확인
+    if (this.isBlockedUserAgent(userAgent)) {
+      this.logger.warn(`Blocked User-Agent: ${userAgent} from ${this.getClientIp(request)}`);
+      return false;
+    }
 
-    this.debug('User-Agent validation passed', {
-      ip: requestContext.getMaskedIp(),
-      path: requestContext.path,
-    });
+    // 의심스러운 패턴 확인
+    if (this.strictMode && this.hasSuspiciousPattern(userAgent)) {
+      this.logger.warn(`Suspicious User-Agent pattern: ${userAgent} from ${this.getClientIp(request)}`);
+      return false;
+    }
 
     return true;
+  }
+
+  /**
+   * 차단된 User-Agent인지 확인
+   */
+  private isBlockedUserAgent(userAgent: string): boolean {
+    // 정확한 매칭
+    for (const blocked of this.blockedAgents) {
+      if (userAgent.includes(blocked)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 의심스러운 패턴이 있는지 확인
+   */
+  private hasSuspiciousPattern(userAgent: string): boolean {
+    return this.suspiciousPatterns.some((pattern) => pattern.test(userAgent));
+  }
+
+  protected getFailureMessage(request: Request): string {
+    const userAgent = this.getUserAgent(request);
+    return `Blocked User-Agent: ${userAgent}`;
   }
 }

@@ -23,7 +23,7 @@ export abstract class BaseSecurityGuard implements CanActivate {
   /**
    * 검증 실패 시 상세 메시지
    */
-  protected getFailureMessage(request: Request): string {
+  protected getFailureMessage(_request: Request): string {
     return `Access denied by ${this.getGuardName()}`;
   }
 

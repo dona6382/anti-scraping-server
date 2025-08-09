@@ -32,9 +32,16 @@ export class IpBlacklistService {
   }
 
   /**
-   * IP 차단
+   * IP 차단 (별칭 추가)
    */
   async blockIp(ip: string, reason: string, ttl?: number): Promise<void> {
+    return this.blacklistIp(ip, reason, ttl);
+  }
+
+  /**
+   * IP 차단
+   */
+  async blacklistIp(ip: string, reason: string, ttl?: number): Promise<void> {
     const key = this.getKey(ip);
     const existingEntry = await this.cache.get<BlacklistEntry>(key);
     
@@ -52,18 +59,32 @@ export class IpBlacklistService {
   }
 
   /**
-   * IP 차단 해제
+   * IP 차단 해제 (별칭 추가)
    */
   async unblockIp(ip: string): Promise<void> {
+    return this.removeFromBlacklist(ip);
+  }
+
+  /**
+   * IP 차단 해제
+   */
+  async removeFromBlacklist(ip: string): Promise<void> {
     const key = this.getKey(ip);
     await this.cache.delete(key);
     this.logger.log(`Unblocked IP: ${ip}`);
   }
 
   /**
-   * IP 차단 여부 확인
+   * IP 차단 여부 확인 (별칭 추가)
    */
   async isBlocked(ip: string): Promise<boolean> {
+    return this.isBlacklisted(ip);
+  }
+
+  /**
+   * IP 차단 여부 확인
+   */
+  async isBlacklisted(ip: string): Promise<boolean> {
     const key = this.getKey(ip);
     const entry = await this.cache.get<BlacklistEntry>(key);
     
@@ -90,17 +111,31 @@ export class IpBlacklistService {
   }
 
   /**
-   * 차단 정보 조회
+   * 차단 정보 조회 (별칭 추가)
    */
   async getBlockInfo(ip: string): Promise<BlacklistEntry | null> {
+    return this.getIpInfo(ip);
+  }
+
+  /**
+   * IP 정보 조회
+   */
+  async getIpInfo(ip: string): Promise<BlacklistEntry | null> {
     const key = this.getKey(ip);
     return await this.cache.get<BlacklistEntry>(key);
   }
 
   /**
-   * 모든 차단된 IP 조회
+   * 모든 차단된 IP 조회 (별칭 추가)
    */
   async getAllBlockedIps(): Promise<BlacklistEntry[]> {
+    return this.getAllBlacklistedIps();
+  }
+
+  /**
+   * 모든 차단된 IP 조회
+   */
+  async getAllBlacklistedIps(): Promise<BlacklistEntry[]> {
     const pattern = `${this.keyPrefix}:*`;
     const keys = await this.cache.keys(pattern);
     
@@ -126,9 +161,20 @@ export class IpBlacklistService {
   }
 
   /**
-   * 통계 조회
+   * 통계 조회 (별칭 추가)
    */
   async getStats(): Promise<{
+    totalBlocked: number;
+    recentBlocks: number;
+    topReasons: Record<string, number>;
+  }> {
+    return this.getStatistics();
+  }
+
+  /**
+   * 통계 조회
+   */
+  async getStatistics(): Promise<{
     totalBlocked: number;
     recentBlocks: number;
     topReasons: Record<string, number>;

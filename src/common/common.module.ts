@@ -1,5 +1,6 @@
 import { Module, Global } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 // Configuration
 import { ConfigurationModule } from '../modules/configuration/configuration.module';
@@ -26,6 +27,9 @@ import { IpBlacklistMiddleware } from './middleware/ip-blacklist.middleware';
 // Legacy Config Service (for backward compatibility)
 import { ConfigService } from './services/config.service';
 
+// Event Bus
+import { EventBusService } from './events/event-bus.service';
+
 /**
  * Common Module
  * 공통 서비스, 가드, 미들웨어를 제공하는 글로벌 모듈
@@ -34,6 +38,15 @@ import { ConfigService } from './services/config.service';
 @Module({
   imports: [
     ConfigurationModule,
+    EventEmitterModule.forRoot({
+      wildcard: true,
+      delimiter: '.',
+      newListener: false,
+      removeListener: false,
+      maxListeners: 10,
+      verboseMemoryLeak: false,
+      ignoreErrors: false,
+    }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigurationModule],
       inject: [ConfigurationService],
@@ -52,6 +65,9 @@ import { ConfigService } from './services/config.service';
     // Cache
     CacheFactory,
     CacheServiceProvider,
+    
+    // Event Bus
+    EventBusService,
     
     // Services
     IpBlacklistService,
@@ -85,6 +101,9 @@ import { ConfigService } from './services/config.service';
     // Export cache
     'ICacheService',
     CacheFactory,
+    
+    // Export event bus
+    EventBusService,
     
     // Export services
     IpBlacklistService,

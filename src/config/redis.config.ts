@@ -10,22 +10,22 @@ export default registerAs('redis', () => {
     // 기본 연결 설정
     connection: {
       host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
       password: process.env.REDIS_PASSWORD || undefined,
-      db: parseInt(process.env.REDIS_DB, 10) || 0,
-      family: parseInt(process.env.REDIS_FAMILY, 10) || 4, // 4 (IPv4) or 6 (IPv6)
+      db: parseInt(process.env.REDIS_DB || '0', 10),
+      family: parseInt(process.env.REDIS_FAMILY || '4', 10), // 4 (IPv4) or 6 (IPv6)
 
       // 연결 관련 설정
-      connectTimeout: parseInt(process.env.REDIS_CONNECT_TIMEOUT, 10) || 10000,
-      keepAlive: parseInt(process.env.REDIS_KEEP_ALIVE, 10) || 30000,
+      connectTimeout: parseInt(process.env.REDIS_CONNECT_TIMEOUT || '10000', 10),
+      keepAlive: parseInt(process.env.REDIS_KEEP_ALIVE || '30000', 10),
       noDelay: process.env.REDIS_NO_DELAY === 'true',
       connectionName: process.env.REDIS_CONNECTION_NAME || 'anti-scraping-server',
     },
 
     // 재시도 전략
     retry: {
-      maxRetries: parseInt(process.env.REDIS_MAX_RETRIES, 10) || 3,
-      retryDelay: parseInt(process.env.REDIS_RETRY_DELAY, 10) || 1000,
+      maxRetries: parseInt(process.env.REDIS_MAX_RETRIES || '3', 10),
+      retryDelay: parseInt(process.env.REDIS_RETRY_DELAY || '1000', 10),
       retryStrategy: (times: number) => {
         const delay = Math.min(times * 50, 2000);
         return delay;
@@ -34,8 +34,8 @@ export default registerAs('redis', () => {
 
     // 연결 풀 설정 (Bull Queue 등에서 사용)
     pool: {
-      min: parseInt(process.env.REDIS_POOL_MIN, 10) || 2,
-      max: parseInt(process.env.REDIS_POOL_MAX, 10) || 10,
+      min: parseInt(process.env.REDIS_POOL_MIN || '2', 10),
+      max: parseInt(process.env.REDIS_POOL_MAX || '10', 10),
     },
 
     // Sentinel 설정 (고가용성)
@@ -76,8 +76,8 @@ export default registerAs('redis', () => {
 
     // 캐시 설정
     cache: {
-      ttl: parseInt(process.env.REDIS_DEFAULT_TTL, 10) || 3600, // 1 hour
-      max: parseInt(process.env.REDIS_MAX_ITEMS, 10) || 10000,
+      ttl: parseInt(process.env.REDIS_DEFAULT_TTL || '3600', 10), // 1 hour
+      max: parseInt(process.env.REDIS_MAX_ITEMS || '10000', 10),
 
       // 키 프리픽스
       keyPrefix: {
@@ -93,7 +93,7 @@ export default registerAs('redis', () => {
     monitoring: {
       enabled: process.env.REDIS_MONITORING_ENABLED === 'true',
       logSlowCommands: process.env.REDIS_LOG_SLOW_COMMANDS === 'true',
-      slowLogThreshold: parseInt(process.env.REDIS_SLOW_LOG_THRESHOLD, 10) || 100, // ms
+      slowLogThreshold: parseInt(process.env.REDIS_SLOW_LOG_THRESHOLD || '100', 10), // ms
     },
 
     // 성능 최적화

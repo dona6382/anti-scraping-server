@@ -1,0 +1,68 @@
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+
+// Core Modules
+import { SecurityModule } from '../security/security.module';
+import { HealthModule } from '../health/health.module';
+import { ApiModule } from '../api/api.module';
+import { ConfigurationModule } from '../configuration/configuration.module';
+
+// Shared
+import { GlobalExceptionFilter } from '../../shared/filters/global-exception.filter';
+import { LoggingInterceptor } from '../../shared/interceptors/logging.interceptor';
+import { TransformInterceptor } from '../../shared/interceptors/transform.interceptor';
+
+// Controllers
+import { AppController } from './app.controller';
+
+/**
+ * Root Application Module (Refactored)
+ * Clean Architecture 적용
+ */
+@Module({
+  imports: [
+    // Configuration
+    ConfigurationModule,
+    
+    // Rate Limiting
+    ThrottlerModule.forRootAsync({
+      useFactory: () => ({
+        throttlers: [
+          {
+            name: 'default',
+            ttl: parseInt(process.env.THROTTLE_TTL || '10') * 1000,
+            limit: parseInt(process.env.THROTTLE_LIMIT || '20'),
+          },
+        ],
+      }),
+    }),
+    
+    // Feature Modules
+    SecurityModule,
+    HealthModule,
+    ApiModule,
+  ],
+  controllers: [AppController],
+  providers: [
+    // Global Exception Filter
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
+    // Global Interceptors
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TransformInterceptor,
+    },
+  ],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply global middleware if needed
+  }
+}

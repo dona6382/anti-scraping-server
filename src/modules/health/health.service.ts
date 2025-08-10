@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 /**
  * Health Status Interface
  */
-interface HealthStatus {
+export interface HealthStatus {
   healthy: boolean;
   timestamp: Date;
   uptime: number;

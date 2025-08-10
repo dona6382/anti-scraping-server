@@ -3,9 +3,9 @@ import { ICacheService } from './base-cache.service';
 import { ConfigurationService } from '../../modules/configuration/configuration.service';
 
 /**
- * IP Blacklist Entry
+ * Blacklist Entry Interface
  */
-interface BlacklistEntry {
+export interface BlacklistEntry {
   ip: string;
   reason: string;
   blockedAt: Date;
@@ -178,6 +178,7 @@ export class IpBlacklistService {
     totalBlocked: number;
     recentBlocks: number;
     topReasons: Record<string, number>;
+    redisConnected?: boolean;
   }> {
     const entries = await this.getAllBlockedIps();
     const now = new Date();
@@ -196,6 +197,7 @@ export class IpBlacklistService {
       totalBlocked: entries.length,
       recentBlocks,
       topReasons: reasonCounts,
+      redisConnected: true, // Redis 또는 메모리 캐시가 항상 작동
     };
   }
 

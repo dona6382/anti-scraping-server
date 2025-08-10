@@ -56,9 +56,9 @@ export class HealthService {
     try {
       const stats = await this.ipBlacklistService.getStatistics();
       return {
-        status: stats.redisConnected ? 'healthy' : 'unhealthy',
-        connected: stats.redisConnected,
-        blacklisted: stats.totalBlacklisted,
+        status: stats.redisConnected !== false ? 'healthy' : 'unhealthy',
+        connected: stats.redisConnected !== false,
+        blacklisted: stats.totalBlocked,
       };
     } catch (error) {
       return {

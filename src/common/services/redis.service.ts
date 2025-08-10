@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { createClient } from 'redis';
 import * as IORedis from 'ioredis';
-import { createRedisOptions, RedisConnectionStatus } from '../config/redis.config';
+import { createRedisOptions, RedisConnectionStatus } from '../../config/redis.config';
 
 /**
  * Redis 관리 서비스

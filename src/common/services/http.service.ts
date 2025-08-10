@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import AxiosInstance = Axios.AxiosInstance;
 
 /**
  * HTTP 클라이언트 서비스

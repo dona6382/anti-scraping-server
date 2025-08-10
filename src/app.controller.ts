@@ -15,7 +15,7 @@ import { Throttle, SkipThrottle } from '@nestjs/throttler';
 
 // Services
 import { AppService } from './app.service';
-import { IpBlacklistService } from './common/services/ip-blacklist.service';
+import { IpBlacklistService, BlacklistEntry } from './common/services/ip-blacklist.service';
 import { HealthService } from './common/services/health.service';
 
 // Guards

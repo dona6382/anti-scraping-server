@@ -37,7 +37,11 @@ import { SecurityAdminController } from './security-admin.controller';
   imports: [],
   controllers: [SecurityAdminController],
   providers: [
-    // Cache Adapter
+    // Core Services
+    {
+      provide: 'IIpValidationService',
+      useClass: IpManagementService,
+    },
     {
       provide: 'ICache',
       useFactory: () => {
@@ -56,44 +60,6 @@ import { SecurityAdminController } from './security-admin.controller';
           ttl: 3600,
         });
       },
-    },
-    
-    // Event Publisher (dummy implementation)
-    {
-      provide: 'IEventPublisher',
-      useValue: {
-        publish: (event: string, data: any) => {
-          console.log(`Event: ${event}`, data);
-        }
-      }
-    },
-    
-    // Metrics Collector (dummy implementation)
-    {
-      provide: 'IMetricsCollector',
-      useValue: {
-        increment: (metric: string, tags?: any) => {
-          console.log(`Metric increment: ${metric}`, tags);
-        },
-        gauge: (metric: string, value: number, tags?: any) => {
-          console.log(`Metric gauge: ${metric} = ${value}`, tags);
-        }
-      }
-    },
-    
-    // IP Management Service with proper dependencies
-    {
-      provide: IpManagementService,
-      useFactory: (cache: any, eventPublisher: any, metricsCollector: any) => {
-        return new IpManagementService(cache, eventPublisher, metricsCollector);
-      },
-      inject: ['ICache', 'IEventPublisher', 'IMetricsCollector']
-    },
-    
-    // Interface provider
-    {
-      provide: 'IIpValidationService',
-      useExisting: IpManagementService,
     },
     
     // Security Orchestrator
@@ -122,36 +88,14 @@ import { SecurityAdminController } from './security-admin.controller';
       },
     },
     
-    // Guards with proper dependencies
-    {
-      provide: IpBlacklistGuard,
-      useFactory: (ipValidationService: any) => {
-        return new IpBlacklistGuard(ipValidationService);
-      },
-      inject: ['IIpValidationService']
-    },
-    
-    {
-      provide: RateLimitGuard,
-      useFactory: () => {
-        // Create a simple rate limiter implementation
-        const rateLimiter = {
-          checkLimit: async (key: string) => ({ allowed: true, remaining: 100, resetAt: new Date(), limit: 100 }),
-          consume: async (key: string) => {}
-        };
-        return new RateLimitGuard(rateLimiter);
-      }
-    },
-    
     // Guards
     UnifiedSecurityGuard,
+    IpBlacklistGuard,
+    RateLimitGuard,
   ],
   exports: [
     'IIpValidationService',
     'ICache',
-    'IEventPublisher',
-    'IMetricsCollector',
-    IpManagementService,
     SecurityOrchestrator,
     UnifiedSecurityGuard,
     IpBlacklistGuard,

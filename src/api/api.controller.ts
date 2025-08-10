@@ -39,6 +39,18 @@ export class ApiController {
   // ============================================
 
   /**
+   * 샘플 사용자 데이터 조회 (테스트용)
+   */
+  @Get('sample/user')
+  @UseGuards(UserAgentGuard)
+  @Throttle({ default: { ttl: 60, limit: 50 } })
+  async getSampleUserData() {
+    this.logger.log('Sample user data requested');
+
+    return this.apiService.getSampleUserData();
+  }
+
+  /**
    * 제품 목록 조회 (공개 데이터)
    */
   @Get('products')

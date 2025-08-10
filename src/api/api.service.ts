@@ -20,6 +20,39 @@ export class ApiService {
     private readonly analyticsService: AnalyticsService,
   ) {}
 
+  // ===== Sample Data =====
+  async getSampleUserData() {
+    return {
+      status: 'success',
+      data: {
+        firstName: "John",
+        lastName: "Doe",
+        age: 30,
+        isStudent: false,
+        courses: [
+          {
+            title: "History 101",
+            credits: 3
+          },
+          {
+            title: "Math 202",
+            credits: 4
+          }
+        ],
+        address: {
+          street: "123 Main St",
+          city: "Anytown",
+          zipCode: "12345"
+        },
+        phoneNumbers: [
+          "123-456-7890",
+          "987-654-3210"
+        ],
+        email: null
+      }
+    };
+  }
+
   // ===== Product Domain =====
   async getProducts(page: number, limit: number) {
     return this.productService.getProducts({ page, limit });

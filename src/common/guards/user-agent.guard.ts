@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Request } from 'express';
+import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
 import { BaseSecurityGuard } from './base-security.guard';
-import { ConfigService } from '../services/config.service';
+import { ConfigurationService } from '../../modules/configuration/configuration.service';
 import { BLOCKED_USER_AGENTS, SUSPICIOUS_PATTERNS } from '../constants/security.constants';
+import { ExtendedRequest } from '../../types';
 
 /**
  * User-Agent 기반 차단 Guard
@@ -10,13 +10,13 @@ import { BLOCKED_USER_AGENTS, SUSPICIOUS_PATTERNS } from '../constants/security.
  */
 @Injectable()
 export class UserAgentGuard extends BaseSecurityGuard {
-  protected readonly logger = new Logger(UserAgentGuard.name);
+  protected override readonly logger = new Logger(UserAgentGuard.name);
   
   private readonly blockedAgents: Set<string>;
   private readonly suspiciousPatterns: RegExp[];
   private readonly strictMode: boolean;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(private readonly configService: ConfigurationService) {
     super();
 
     // 설정에서 차단할 User-Agent 목록 로드
@@ -36,11 +36,19 @@ export class UserAgentGuard extends BaseSecurityGuard {
     );
   }
 
+  /**
+   * canActivate 메서드 구현
+   */
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest<ExtendedRequest>();
+    return this.validateRequest(request);
+  }
+
   protected getGuardName(): string {
     return 'UserAgentGuard';
   }
 
-  protected validateRequest(request: Request): boolean {
+  protected validateRequest(request: ExtendedRequest): boolean {
     const userAgent = this.getUserAgent(request).toLowerCase();
     
     // User-Agent가 없는 경우
@@ -87,7 +95,7 @@ export class UserAgentGuard extends BaseSecurityGuard {
     return this.suspiciousPatterns.some((pattern) => pattern.test(userAgent));
   }
 
-  protected getFailureMessage(request: Request): string {
+  protected getFailureMessage(request: ExtendedRequest): string {
     const userAgent = this.getUserAgent(request);
     return `Blocked User-Agent: ${userAgent}`;
   }

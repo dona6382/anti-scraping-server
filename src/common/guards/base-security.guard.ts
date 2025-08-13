@@ -1,146 +1,267 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
-import { Request } from 'express';
+import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/common';
+import { ExtendedRequest } from '../../types';
 
 /**
  * Base Security Guard
- * 모든 보안 가드의 기본 클래스
- * 공통 로직과 로깅을 제공
+ * 모든 보안 가드의 공통 기능을 제공하는 기본 클래스
  */
 @Injectable()
 export abstract class BaseSecurityGuard implements CanActivate {
-  protected abstract readonly logger: Logger;
-  
+  protected readonly logger = new Logger(this.constructor.name);
+
   /**
-   * 가드 이름 (로깅용)
+   * 추상 메서드 - 각 Guard에서 구현해야 함
+   */
+  abstract canActivate(context: ExecutionContext): boolean | Promise<boolean>;
+
+  /**
+   * 가드 이름 반환 (로깅용)
    */
   protected abstract getGuardName(): string;
 
   /**
-   * 실제 검증 로직
+   * 요청 검증 로직 (각 가드에서 구현)
    */
-  protected abstract validateRequest(request: Request): Promise<boolean> | boolean;
+  protected abstract validateRequest(request: ExtendedRequest): boolean | Promise<boolean>;
 
   /**
-   * 검증 실패 시 상세 메시지
+   * 실패 메시지 생성 (각 가드에서 구현)
    */
-  protected getFailureMessage(_request: Request): string {
-    return `Access denied by ${this.getGuardName()}`;
-  }
+  protected abstract getFailureMessage(request: ExtendedRequest): string;
 
   /**
-   * Guard 실행
+   * 클라이언트 IP 주소 추출
    */
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
-    const startTime = Date.now();
-    const guardName = this.getGuardName();
-
-    try {
-      // 검증 수행
-      const result = await this.validateRequest(request);
-      
-      // 실행 시간 측정
-      const duration = Date.now() - startTime;
-      
-      // 결과 로깅
-      this.logGuardExecution(request, result, duration);
-      
-      // 실패 시 추가 정보 저장
-      if (!result) {
-        this.attachFailureInfo(request, guardName);
+  protected getClientIp(request: ExtendedRequest): string {
+    // X-Forwarded-For 헤더에서 첫 번째 IP 추출
+    const forwardedFor = request.headers['x-forwarded-for'];
+    if (forwardedFor) {
+      const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+      if (ips) {
+        return ips.split(',')[0]?.trim() || 'unknown';
       }
-      
-      return result;
-    } catch (error) {
-      // 에러 처리
-      this.handleError(error, request);
-      return false;
     }
-  }
 
-  /**
-   * Guard 실행 로깅
-   */
-  protected logGuardExecution(
-    request: Request,
-    result: boolean,
-    duration: number,
-  ): void {
-    const { method, url, ip } = request;
-    const userAgent = request.get('user-agent') || 'unknown';
-    
-    if (result) {
-      this.logger.debug(
-        `${this.getGuardName()} passed - ${method} ${url} - ${ip} - ${duration}ms`,
-      );
-    } else {
-      this.logger.warn(
-        `${this.getGuardName()} blocked - ${method} ${url} - ${ip} - UserAgent: ${userAgent} - ${duration}ms`,
-      );
+    // X-Real-IP 헤더 확인
+    const realIp = request.headers['x-real-ip'];
+    if (realIp) {
+      return Array.isArray(realIp) ? (realIp[0] || 'unknown') : (realIp || 'unknown');
     }
-  }
 
-  /**
-   * 실패 정보를 요청 객체에 첨부
-   */
-  protected attachFailureInfo(request: Request, guardName: string): void {
-    if (!request['securityFailures']) {
-      request['securityFailures'] = [];
+    // X-Client-IP 헤더 확인
+    const clientIp = request.headers['x-client-ip'];
+    if (clientIp) {
+      return Array.isArray(clientIp) ? (clientIp[0] || 'unknown') : (clientIp || 'unknown');
     }
-    request['securityFailures'].push({
-      guard: guardName,
-      timestamp: new Date().toISOString(),
-      message: this.getFailureMessage(request),
-    });
-  }
 
-  /**
-   * 에러 처리
-   */
-  protected handleError(error: any, request: Request): void {
-    const { method, url, ip } = request;
-    this.logger.error(
-      `${this.getGuardName()} error - ${method} ${url} - ${ip}: ${error.message}`,
-      error.stack,
+    // 기본 IP 주소들 확인
+    return (
+      request.connection?.remoteAddress ||
+      request.socket?.remoteAddress ||
+      request.ip ||
+      'unknown'
     );
   }
 
   /**
-   * IP 주소 추출 (공통 유틸리티)
+   * User-Agent 추출
    */
-  protected getClientIp(request: Request): string {
-    const forwarded = request.headers['x-forwarded-for'];
-    if (forwarded) {
-      return (forwarded as string).split(',')[0].trim();
+  protected getUserAgent(request: ExtendedRequest): string {
+    const userAgent = request.headers['user-agent'];
+    return Array.isArray(userAgent) ? userAgent[0] || '' : userAgent || '';
+  }
+
+  /**
+   * 요청 식별자 생성
+   */
+  protected generateRequestId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+
+  /**
+   * 요청 정보 로깅
+   */
+  protected logRequest(request: ExtendedRequest, message: string): void {
+    const ip = this.getClientIp(request);
+    const userAgent = this.getUserAgent(request).substring(0, 50);
+    const method = request.method;
+    const url = request.url;
+
+    this.logger.log(`${message} - ${method} ${url} - IP: ${ip}, UA: ${userAgent}`);
+  }
+
+  /**
+   * 보안 위반 로깅
+   */
+  protected logSecurityViolation(request: ExtendedRequest, reason: string): void {
+    const ip = this.getClientIp(request);
+    const userAgent = this.getUserAgent(request).substring(0, 100);
+    const method = request.method;
+    const url = request.url;
+
+    this.logger.warn(`Security violation: ${reason} - ${method} ${url} - IP: ${ip}, UA: ${userAgent}`);
+  }
+
+  /**
+   * 요청 헤더 안전하게 가져오기
+   */
+  protected getHeader(request: ExtendedRequest, headerName: string): string | undefined {
+    const header = request.headers[headerName.toLowerCase()];
+    return Array.isArray(header) ? header[0] : header;
+  }
+
+  /**
+   * 요청 바디 안전하게 가져오기
+   */
+  protected getRequestBody(request: ExtendedRequest): Record<string, unknown> {
+    return request.body || {};
+  }
+
+  /**
+   * 요청 쿼리 파라미터 안전하게 가져오기
+   */
+  protected getQueryParams(request: ExtendedRequest): Record<string, string | string[]> {
+    return (request.query as Record<string, string | string[]>) || {};
+  }
+
+  /**
+   * 요청이 HTTPS인지 확인
+   */
+  protected isHttps(request: ExtendedRequest): boolean {
+    return (
+      (request as any).protocol === 'https' ||
+      this.getHeader(request, 'x-forwarded-proto') === 'https' ||
+      this.getHeader(request, 'x-forwarded-ssl') === 'on'
+    );
+  }
+
+  /**
+   * 요청이 모바일 디바이스에서 온 것인지 확인
+   */
+  protected isMobileDevice(request: ExtendedRequest): boolean {
+    const userAgent = this.getUserAgent(request).toLowerCase();
+    const mobilePatterns = [
+      'mobile',
+      'android',
+      'iphone',
+      'ipad',
+      'ipod',
+      'blackberry',
+      'windows phone',
+      'opera mini',
+      'opera mobi',
+    ];
+
+    return mobilePatterns.some(pattern => userAgent.includes(pattern));
+  }
+
+  /**
+   * 요청 크기 확인 (대략적)
+   */
+  protected getRequestSize(request: ExtendedRequest): number {
+    const contentLength = this.getHeader(request, 'content-length');
+    return contentLength ? parseInt(contentLength, 10) : 0;
+  }
+
+  /**
+   * 요청 시간 측정을 위한 타임스탬프 설정
+   */
+  protected setRequestTimestamp(request: ExtendedRequest): void {
+    (request as any).__requestTimestamp = Date.now();
+  }
+
+  /**
+   * 요청 처리 시간 계산
+   */
+  protected getRequestDuration(request: ExtendedRequest): number {
+    const timestamp = (request as any).__requestTimestamp;
+    return timestamp ? Date.now() - timestamp : 0;
+  }
+
+  /**
+   * 안전한 JSON 파싱
+   */
+  protected safeJsonParse<T = unknown>(jsonString: string): T | null {
+    try {
+      return JSON.parse(jsonString) as T;
+    } catch {
+      return null;
     }
-    return request.ip || request.connection?.remoteAddress || 'unknown';
   }
 
   /**
-   * User-Agent 추출 (공통 유틸리티)
+   * IP 주소 유효성 검사
    */
-  protected getUserAgent(request: Request): string {
-    return request.get('user-agent') || '';
+  protected isValidIpAddress(ip: string): boolean {
+    // IPv4 패턴
+    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    // IPv6 패턴 (간단한 버전)
+    const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+
+    if (ipv4Regex.test(ip)) {
+      const parts = ip.split('.');
+      return parts.every(part => {
+        const num = parseInt(part, 10);
+        return num >= 0 && num <= 255;
+      });
+    }
+
+    return ipv6Regex.test(ip);
   }
 
   /**
-   * 요청 메타데이터 추출
+   * 프라이빗 IP 주소인지 확인
    */
-  protected getRequestMetadata(request: Request): {
-    ip: string;
-    userAgent: string;
-    method: string;
-    url: string;
-    referer?: string;
-    origin?: string;
-  } {
+  protected isPrivateIp(ip: string): boolean {
+    const privateRanges = [
+      /^10\./,
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+      /^192\.168\./,
+      /^127\./,
+      /^::1$/,
+      /^fc00:/,
+    ];
+
+    return privateRanges.some(range => range.test(ip));
+  }
+
+  /**
+   * 요청 메타데이터 생성
+   */
+  protected createRequestMetadata(request: ExtendedRequest): Record<string, unknown> {
     return {
       ip: this.getClientIp(request),
       userAgent: this.getUserAgent(request),
       method: request.method,
       url: request.url,
-      referer: request.get('referer'),
-      origin: request.get('origin'),
+      isHttps: this.isHttps(request),
+      isMobile: this.isMobileDevice(request),
+      requestSize: this.getRequestSize(request),
+      timestamp: new Date().toISOString(),
+      requestId: this.generateRequestId(),
+    };
+  }
+
+  /**
+   * 표준화된 보안 에러 생성
+   */
+  protected createSecurityError(
+    request: ExtendedRequest,
+    reason: string,
+    statusCode: number = 403
+  ): {
+    message: string;
+    statusCode: number;
+    metadata: Record<string, unknown>;
+  } {
+    return {
+      message: this.getFailureMessage(request),
+      statusCode,
+      metadata: {
+        reason,
+        guard: this.getGuardName(),
+        ...this.createRequestMetadata(request),
+      },
     };
   }
 }

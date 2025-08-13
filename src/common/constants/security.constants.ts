@@ -1,132 +1,114 @@
 /**
- * Anti-scraping 관련 상수 정의
+ * Security Constants
+ * 보안 관련 상수 정의
  */
 
-export const SECURITY_CONSTANTS = {
-  // Rate Limiting
-  RATE_LIMIT: {
-    DEFAULT_TTL: 10,
-    DEFAULT_LIMIT: 20,
-    STRICT_TTL: 60,
-    STRICT_LIMIT: 10,
-    CRITICAL_TTL: 600,
-    CRITICAL_LIMIT: 3,
-  },
-
-  // IP Blacklist
-  IP_BLACKLIST: {
-    PREFIX: 'blacklist:ip:',
-    SET_KEY: 'blacklist:ips',
-    DEFAULT_TTL: 86400, // 24 hours
-    TEMPORARY_TTL: 3600, // 1 hour
-    EXTENDED_TTL: 604800, // 7 days
-  },
-
-  // User-Agent
-  USER_AGENT: {
-    MIN_LENGTH: 10,
-    MAX_LENGTH: 500,
-  },
-
-  // Honeypot
-  HONEYPOT: {
-    TIME_THRESHOLD: 2000, // 2 seconds
-    TOKEN_EXPIRY: 3600000, // 1 hour
-  },
-
-  // reCAPTCHA
-  RECAPTCHA: {
-    VERIFY_URL: 'https://www.google.com/recaptcha/api/siteverify',
-    DEFAULT_THRESHOLD: 0.5,
-    LOW_SCORE_THRESHOLD: 0.3,
-    TIMEOUT: 5000,
-  },
-
-  // Headers
-  HEADERS: {
-    IP: ['x-forwarded-for', 'x-real-ip', 'x-client-ip', 'cf-connecting-ip', 'true-client-ip'],
-    PROXY: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'via', 'forwarded'],
-    CHROME: ['sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform'],
-  },
-} as const;
-
-export const ERROR_MESSAGES = {
-  INVALID_REQUEST: 'Invalid request',
-  ACCESS_DENIED: 'Access denied',
-  USER_AGENT_REQUIRED: 'User-Agent header is required',
-  AUTOMATED_BROWSER: 'Automated browser detected',
-  IP_BLOCKED: 'Your IP address has been blocked',
-  RATE_LIMIT_EXCEEDED: 'Too many requests',
-  RECAPTCHA_REQUIRED: 'reCAPTCHA verification required',
-  RECAPTCHA_FAILED: 'reCAPTCHA verification failed',
-  BOT_DETECTED: 'Bot activity detected',
-} as const;
-
-export const LOG_MESSAGES = {
-  BLOCKED: '[BLOCKED]',
-  WARNING: '[WARNING]',
-  ALLOWED: '[ALLOWED]',
-  DETECTED: '[DETECTED]',
-  ERROR: '[ERROR]',
-} as const;
-
+/**
+ * 차단된 User-Agent 패턴들
+ */
 export const BLOCKED_USER_AGENTS = [
-  // Web scrapers
-  'scrapy',
-  'python-requests',
-  'python-urllib',
-  'go-http-client',
-  'java',
-  'perl',
-  'ruby',
-  'php',
+  // 일반적인 봇들
+  'bot', 'crawler', 'spider', 'scraper',
+  
+  // 자동화 도구들
+  'selenium', 'webdriver', 'phantomjs', 'headless',
+  'chrome-headless', 'chromium', 'playwright',
+  
+  // HTTP 클라이언트들
+  'curl', 'wget', 'httpie', 'python-requests',
+  'java/', 'go-http-client', 'okhttp',
+  
+  // 스크래핑 라이브러리들
+  'scrapy', 'beautifulsoup', 'mechanize',
+  'jsoup', 'htmlunit', 'apache-httpclient',
+  
+  // 특정 봇들
+  'googlebot', 'bingbot', 'slurp', 'duckduckbot',
+  'baiduspider', 'yandexbot', 'facebookexternalhit',
+  
+  // 의심스러운 패턴들
+  'test', 'check', 'monitor', 'scan',
+  'probe', 'fetch', 'download',
+];
 
-  // Command line tools
-  'curl',
-  'wget',
-  'httpie',
-
-  // API testing tools
-  'postman',
-  'insomnia',
-  'paw',
-
-  // Node.js libraries
-  'axios',
-  'node-fetch',
-  'got',
-  'undici',
-  'superagent',
-
-  // Other libraries
-  'libwww-perl',
-  'mechanize',
-  'httpclient',
-
-  // Headless browsers
-  'phantomjs',
-  'headlesschrome',
-  'nightmare',
-  'zombie',
-] as const;
-
+/**
+ * 의심스러운 User-Agent 패턴들
+ */
 export const SUSPICIOUS_PATTERNS = [
-  /bot/i,
-  /spider/i,
-  /crawl/i,
-  /scrape/i,
-  /fetch/i,
-  /scan/i,
-  /audit/i,
-  /monitor/i,
-] as const;
+  // 버전이 없거나 이상한 패턴
+  /^Mozilla\/5\.0$/,
+  /^Mozilla$/,
+  /^Chrome$/,
+  /^Safari$/,
+  
+  // 너무 오래된 브라우저
+  /MSIE [1-8]\./,
+  /Chrome\/[1-9]\./,
+  /Firefox\/[1-9]\./,
+  
+  // 의심스러운 키워드
+  /hack/i,
+  /exploit/i,
+  /injection/i,
+  /vulnerability/i,
+  
+  // 자동화 도구 흔적
+  /automation/i,
+  /testing/i,
+  /robot/i,
+  /artificial/i,
+];
 
-export const VALID_BROWSER_KEYWORDS = [
-  'Mozilla',
-  'Chrome',
-  'Safari',
-  'Firefox',
-  'Edge',
-  'Opera',
-  'Trident',
-] as const;
+/**
+ * 화이트리스트된 User-Agent (검증 제외)
+ */
+export const WHITELISTED_USER_AGENTS = [
+  // 주요 검색엔진 (실제 봇은 IP로도 검증해야 함)
+  'Googlebot',
+  'Bingbot', 
+  'Slurp',
+  'DuckDuckBot',
+  
+  // 소셜 미디어 크롤러
+  'facebookexternalhit',
+  'Twitterbot',
+  'LinkedInBot',
+  
+  // 합법적인 모니터링 도구
+  'Pingdom',
+  'UptimeRobot',
+  'StatusCake',
+];
+
+/**
+ * IP 차단 사유 코드
+ */
+export const BLOCK_REASONS = {
+  MANUAL: 'MANUAL_ADMIN_ACTION',
+  BOT_DETECTED: 'BOT_DETECTED',
+  RATE_LIMIT: 'RATE_LIMIT_EXCEEDED', 
+  SUSPICIOUS_BEHAVIOR: 'SUSPICIOUS_BEHAVIOR',
+  HONEYPOT_TRIGGERED: 'HONEYPOT_TRIGGERED',
+  INVALID_USER_AGENT: 'INVALID_USER_AGENT',
+  HEADLESS_BROWSER: 'HEADLESS_BROWSER_DETECTED',
+  RECAPTCHA_FAILED: 'RECAPTCHA_VERIFICATION_FAILED',
+} as const;
+
+/**
+ * 보안 설정 기본값
+ */
+export const SECURITY_DEFAULTS = {
+  // IP 차단 기본 TTL (초)
+  DEFAULT_BLOCK_TTL: 86400, // 24시간
+  
+  // Honeypot 기본 설정
+  HONEYPOT_FIELD_NAME: 'email_confirm',
+  HONEYPOT_TIME_THRESHOLD: 2000, // 2초
+  
+  // Rate Limiting 기본값
+  DEFAULT_RATE_LIMIT: 100,
+  DEFAULT_RATE_WINDOW: 60000, // 1분
+  
+  // reCAPTCHA 기본 임계값
+  RECAPTCHA_SCORE_THRESHOLD: 0.5,
+} as const;

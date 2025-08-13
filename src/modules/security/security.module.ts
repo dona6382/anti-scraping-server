@@ -1,161 +1,26 @@
-import { Module, Global, OnModuleInit } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
-
-// Core Services
-import { SecurityOrchestrator } from '../../core/application/services/security-orchestrator.service';
-import { IpManagementService } from '../../core/application/services/ip-management.service';
-
-// Strategies
-import {
-  UserAgentValidationStrategy,
-  HeadlessBrowserDetectionStrategy,
-  HoneypotValidationStrategy,
-} from '../../core/application/services/security-orchestrator.service';
-
-// Guards
-import {
-  UnifiedSecurityGuard,
-  IpBlacklistGuard,
-  RateLimitGuard,
-} from './security.guard';
-
-// Adapters
-import {
-  RedisCacheAdapter,
-  MemoryCacheAdapter,
-} from '../../core/infrastructure/adapters/cache.adapter';
+import { Module, Global } from '@nestjs/common';
 
 // Controllers
 import { SecurityAdminController } from './security-admin.controller';
+import { FingerprintController } from './fingerprint.controller';
+
+// Common services that are already available
+import { IpBlacklistService } from '../../common/services/ip-blacklist.service';
 
 /**
  * Security Module
- * 모든 보안 관련 기능을 제공하는 모듈
+ * 보안 관련 관리 기능을 제공하는 모듈
+ * 실제 보안 가드들은 Common 모듈에서 제공됨
  */
 @Global()
 @Module({
-  imports: [],
-  controllers: [SecurityAdminController],
+  controllers: [
+    SecurityAdminController,
+    FingerprintController,
+  ],
   providers: [
-    // Cache Adapter
-    {
-      provide: 'ICache',
-      useFactory: () => {
-        const redisHost = process.env.REDIS_HOST;
-        if (redisHost) {
-          return new RedisCacheAdapter({
-            host: redisHost,
-            port: parseInt(process.env.REDIS_PORT || '6379'),
-            password: process.env.REDIS_PASSWORD,
-            db: parseInt(process.env.REDIS_DB || '0'),
-            keyPrefix: 'anti-scraping:',
-          });
-        }
-        return new MemoryCacheAdapter({
-          maxSize: 10000,
-          ttl: 3600,
-        });
-      },
-    },
-    
-    // Event Publisher (dummy implementation)
-    {
-      provide: 'IEventPublisher',
-      useValue: {
-        publish: (event: string, data: any) => {
-          console.log(`Event: ${event}`, data);
-        }
-      }
-    },
-    
-    // Metrics Collector (dummy implementation)
-    {
-      provide: 'IMetricsCollector',
-      useValue: {
-        increment: (metric: string, tags?: any) => {
-          console.log(`Metric increment: ${metric}`, tags);
-        },
-        gauge: (metric: string, value: number, tags?: any) => {
-          console.log(`Metric gauge: ${metric} = ${value}`, tags);
-        }
-      }
-    },
-    
-    // IP Management Service with proper dependencies
-    {
-      provide: IpManagementService,
-      useFactory: (cache: any, eventPublisher: any, metricsCollector: any) => {
-        return new IpManagementService(cache, eventPublisher, metricsCollector);
-      },
-      inject: ['ICache', 'IEventPublisher', 'IMetricsCollector']
-    },
-    
-    // Interface provider
-    {
-      provide: 'IIpValidationService',
-      useExisting: IpManagementService,
-    },
-    
-    // Security Orchestrator
-    {
-      provide: SecurityOrchestrator,
-      useFactory: () => {
-        const orchestrator = new SecurityOrchestrator();
-        
-        // Create and register strategies
-        const blockedAgents = process.env.BLOCKED_USER_AGENTS?.split(',') || [];
-        const strictMode = process.env.SECURITY_STRICT_MODE === 'true';
-        const userAgentStrategy = new UserAgentValidationStrategy(blockedAgents, strictMode);
-        
-        const headlessStrategy = new HeadlessBrowserDetectionStrategy();
-        
-        const fields = process.env.HONEYPOT_FIELDS?.split(',') || ['email_confirm'];
-        const threshold = parseInt(process.env.HONEYPOT_TIME_THRESHOLD || '2000');
-        const honeypotStrategy = new HoneypotValidationStrategy(fields, threshold);
-        
-        // Register all strategies
-        orchestrator.registerStrategy(userAgentStrategy);
-        orchestrator.registerStrategy(headlessStrategy);
-        orchestrator.registerStrategy(honeypotStrategy);
-        
-        return orchestrator;
-      },
-    },
-    
-    // Guards with proper dependencies
-    {
-      provide: IpBlacklistGuard,
-      useFactory: (ipValidationService: any) => {
-        return new IpBlacklistGuard(ipValidationService);
-      },
-      inject: ['IIpValidationService']
-    },
-    
-    {
-      provide: RateLimitGuard,
-      useFactory: () => {
-        // Create a simple rate limiter implementation
-        const rateLimiter = {
-          checkLimit: async (key: string) => ({ allowed: true, remaining: 100, resetAt: new Date(), limit: 100 }),
-          consume: async (key: string) => {}
-        };
-        return new RateLimitGuard(rateLimiter);
-      }
-    },
-    
-    // Guards
-    UnifiedSecurityGuard,
+    // Security Admin에서 사용할 서비스들은 Common에서 inject
   ],
-  exports: [
-    'IIpValidationService',
-    'ICache',
-    'IEventPublisher',
-    'IMetricsCollector',
-    IpManagementService,
-    SecurityOrchestrator,
-    UnifiedSecurityGuard,
-    IpBlacklistGuard,
-    RateLimitGuard,
-  ],
+  exports: [],
 })
 export class SecurityModule {}

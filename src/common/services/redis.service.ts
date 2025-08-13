@@ -2,11 +2,23 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { createClient } from 'redis';
 import * as IORedis from 'ioredis';
-import { createRedisOptions, RedisConnectionStatus } from '../../config/redis.config';
 
 /**
- * Redis 관리 서비스
- * 모든 Redis 연결을 중앙에서 관리합니다.
+ * Redis 연결 상태
+ */
+export enum RedisConnectionStatus {
+  DISCONNECTED = 'disconnected',
+  CONNECTING = 'connecting', 
+  CONNECTED = 'connected',
+  READY = 'ready',
+  RECONNECTING = 'reconnecting',
+  CLOSED = 'closed',
+  ERROR = 'error',
+}
+
+/**
+ * Redis 관리 서비스 (간소화 버전)
+ * 기본적인 Redis 연결 관리만 제공
  */
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -15,11 +27,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   // node-redis v4 클라이언트
   private client: any;
 
-  // ioredis 클라이언트 (고급 기능용)
-  private ioredisClient: IORedis.Redis;
-
   // 연결 상태
-  private status: RedisConnectionStatus = RedisConnectionStatus.CLOSED;
+  private status: RedisConnectionStatus = RedisConnectionStatus.DISCONNECTED;
 
   // 설정
   private readonly config: any;
@@ -35,11 +44,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   };
 
   constructor(private readonly configService: ConfigService) {
-    this.config = this.configService.get('redis');
-    this.isConfigured = this.config?.isConfigured || false;
+    this.config = this.configService.get('redis') || {};
+    this.isConfigured = !!this.config.host;
 
     if (!this.isConfigured) {
       this.logger.warn('Redis not configured. Running in memory-only mode.');
+    } else {
+      this.logger.log(`Redis configured: ${this.config.host}:${this.config.port}/${this.config.db}`);
     }
   }
 
@@ -58,20 +69,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   private async connect(): Promise<void> {
     try {
-      // Cluster 모드
-      if (this.config.cluster.enabled) {
-        await this.connectCluster();
-        return;
-      }
+      this.logger.log('Connecting to Redis...');
+      this.status = RedisConnectionStatus.CONNECTING;
 
-      // Sentinel 모드
-      if (this.config.sentinel.enabled) {
-        await this.connectSentinel();
-        return;
-      }
+      // 간단한 Redis URL 생성
+      const url = this.config.password
+        ? `redis://:${this.config.password}@${this.config.host}:${this.config.port}/${this.config.db || 0}`
+        : `redis://${this.config.host}:${this.config.port}/${this.config.db || 0}`;
 
-      // 단일 인스턴스 모드
-      await this.connectSingle();
+      this.client = createClient({
+        url,
+        socket: {
+          connectTimeout: this.config.connectTimeout || 10000,
+          keepAlive: this.config.keepAlive || 1000,
+        },
+        name: this.config.connectionName || 'anti-scraping-server',
+      });
+
+      this.setupEventHandlers();
+      await this.client.connect();
+
     } catch (error) {
       this.logger.error('Failed to connect to Redis:', error);
       this.status = RedisConnectionStatus.ERROR;
@@ -80,83 +97,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * 단일 Redis 인스턴스 연결
-   */
-  private async connectSingle(): Promise<void> {
-    this.logger.log('Connecting to Redis (single instance mode)...');
-    this.status = RedisConnectionStatus.CONNECTING;
-
-    // node-redis v4 클라이언트 생성
-    const url = this.config.connection.password
-      ? `redis://:${this.config.connection.password}@${this.config.connection.host}:${this.config.connection.port}/${this.config.connection.db}`
-      : `redis://${this.config.connection.host}:${this.config.connection.port}/${this.config.connection.db}`;
-
-    this.client = createClient({
-      url,
-      socket: {
-        connectTimeout: this.config.connection.connectTimeout,
-        keepAlive: this.config.connection.keepAlive,
-        noDelay: this.config.connection.noDelay,
-      },
-      name: this.config.connection.connectionName,
-    });
-
-    // 이벤트 핸들러 등록
-    this.setupEventHandlers();
-
-    // 연결
-    await this.client.connect();
-
-    // ioredis 클라이언트도 생성 (고급 기능용)
-    if (this.config.optimization.enableAutoPipelining) {
-      const options = createRedisOptions(this.config);
-      this.ioredisClient = new IORedis.default(options);
-
-      this.ioredisClient.on('ready', () => {
-        this.logger.log('IORedis client ready with auto-pipelining');
-      });
-    }
-  }
-
-  /**
-   * Redis Sentinel 연결
-   */
-  private async connectSentinel(): Promise<void> {
-    this.logger.log('Connecting to Redis (sentinel mode)...');
-    this.status = RedisConnectionStatus.CONNECTING;
-
-    this.ioredisClient = new IORedis.default({
-      sentinels: this.config.sentinel.sentinels,
-      name: this.config.sentinel.name,
-      password: this.config.connection.password,
-      db: this.config.connection.db,
-      sentinelPassword: this.config.sentinel.password,
-      ...createRedisOptions(this.config),
-    });
-
-    this.setupIoredisEventHandlers();
-  }
-
-  /**
-   * Redis Cluster 연결
-   */
-  private async connectCluster(): Promise<void> {
-    this.logger.log('Connecting to Redis (cluster mode)...');
-    this.status = RedisConnectionStatus.CONNECTING;
-
-    const cluster = new IORedis.Cluster(this.config.cluster.nodes, {
-      redisOptions: {
-        password: this.config.connection.password,
-        ...createRedisOptions(this.config),
-      },
-    });
-
-    this.ioredisClient = cluster as any;
-    this.setupIoredisEventHandlers();
-  }
-
-  /**
-   * node-redis 이벤트 핸들러 설정
+   * 이벤트 핸들러 설정
    */
   private setupEventHandlers(): void {
     if (!this.client) return;
@@ -191,52 +132,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * ioredis 이벤트 핸들러 설정
-   */
-  private setupIoredisEventHandlers(): void {
-    if (!this.ioredisClient) return;
-
-    this.ioredisClient.on('connect', () => {
-      this.logger.log('IORedis connected');
-      this.status = RedisConnectionStatus.CONNECTED;
-    });
-
-    this.ioredisClient.on('ready', () => {
-      this.logger.log('IORedis ready');
-      this.status = RedisConnectionStatus.READY;
-      this.stats.connectedAt = new Date();
-    });
-
-    this.ioredisClient.on('error', (error) => {
-      this.logger.error('IORedis error:', error);
-      this.status = RedisConnectionStatus.ERROR;
-      this.stats.lastError = new Date();
-    });
-
-    this.ioredisClient.on('close', () => {
-      this.logger.log('IORedis connection closed');
-      this.status = RedisConnectionStatus.CLOSED;
-    });
-
-    this.ioredisClient.on('reconnecting', () => {
-      this.logger.warn('IORedis reconnecting...');
-      this.status = RedisConnectionStatus.RECONNECTING;
-      this.stats.reconnections++;
-    });
-  }
-
-  /**
    * Redis 연결 해제
    */
   private async disconnect(): Promise<void> {
     if (this.client) {
-      await this.client.quit();
+      try {
+        await this.client.quit();
+      } catch (error) {
+        this.logger.error('Error disconnecting Redis:', error);
+      }
       this.client = null;
-    }
-
-    if (this.ioredisClient) {
-      this.ioredisClient.disconnect();
-      this.ioredisClient = null;
     }
 
     this.status = RedisConnectionStatus.CLOSED;
@@ -244,17 +149,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * 기본 클라이언트 가져오기
+   * 클라이언트 가져오기
    */
   getClient(): any {
     return this.client;
-  }
-
-  /**
-   * IORedis 클라이언트 가져오기
-   */
-  getIoredisClient(): IORedis.Redis | null {
-    return this.ioredisClient;
   }
 
   /**
@@ -291,21 +189,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      if (this.client) {
-        await this.client.ping();
-      } else if (this.ioredisClient) {
-        await this.ioredisClient.ping();
-      }
+      await this.client.ping();
       return true;
     } catch (error) {
       this.logger.error('Health check failed:', error);
       return false;
     }
   }
-
-  // ============================================
-  // 래퍼 메서드들 (편의 기능)
-  // ============================================
 
   /**
    * 키-값 설정 (TTL 포함)
@@ -320,17 +210,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     try {
       if (ttl) {
-        if (this.client) {
-          await this.client.setEx(prefixedKey, ttl, serialized);
-        } else if (this.ioredisClient) {
-          await this.ioredisClient.setex(prefixedKey, ttl, serialized);
-        }
+        await this.client.setEx(prefixedKey, ttl, serialized);
       } else {
-        if (this.client) {
-          await this.client.set(prefixedKey, serialized);
-        } else if (this.ioredisClient) {
-          await this.ioredisClient.set(prefixedKey, serialized);
-        }
+        await this.client.set(prefixedKey, serialized);
       }
       this.stats.commandsSent++;
     } catch (error) {
@@ -350,14 +232,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const prefixedKey = this.getPrefixedKey(key);
 
     try {
-      let value: string | null = null;
-
-      if (this.client) {
-        value = await this.client.get(prefixedKey);
-      } else if (this.ioredisClient) {
-        value = await this.ioredisClient.get(prefixedKey);
-      }
-
+      const value = await this.client.get(prefixedKey);
       this.stats.commandsSent++;
       return value ? JSON.parse(value) : null;
     } catch (error) {
@@ -378,14 +253,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const prefixedKeys = keys.map((k) => this.getPrefixedKey(k));
 
     try {
-      let result = 0;
-
-      if (this.client) {
-        result = await this.client.del(prefixedKeys);
-      } else if (this.ioredisClient) {
-        result = await this.ioredisClient.del(...prefixedKeys);
-      }
-
+      const result = await this.client.del(prefixedKeys);
       this.stats.commandsSent++;
       return result;
     } catch (error) {
@@ -405,14 +273,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const prefixedKey = this.getPrefixedKey(key);
 
     try {
-      let result = -1;
-
-      if (this.client) {
-        result = await this.client.ttl(prefixedKey);
-      } else if (this.ioredisClient) {
-        result = await this.ioredisClient.ttl(prefixedKey);
-      }
-
+      const result = await this.client.ttl(prefixedKey);
       this.stats.commandsSent++;
       return result;
     } catch (error) {
@@ -425,7 +286,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * 키에 프리픽스 추가
    */
   private getPrefixedKey(key: string): string {
-    const prefix = this.config?.cache?.keyPrefix?.global || 'anti-scraping:';
+    const prefix = this.config.keyPrefix || 'anti-scraping:';
     return `${prefix}${key}`;
   }
 }

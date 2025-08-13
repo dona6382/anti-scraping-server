@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Request } from 'express';
+import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
 import { BaseSecurityGuard } from './base-security.guard';
 import { IpBlacklistService } from '../services/ip-blacklist.service';
+import { ExtendedRequest } from '../../types';
 
 /**
  * IP Blacklist Guard
@@ -9,17 +9,25 @@ import { IpBlacklistService } from '../services/ip-blacklist.service';
  */
 @Injectable()
 export class IpBlacklistGuard extends BaseSecurityGuard {
-  protected readonly logger = new Logger(IpBlacklistGuard.name);
+  protected override readonly logger = new Logger(IpBlacklistGuard.name);
 
   constructor(private readonly ipBlacklistService: IpBlacklistService) {
     super();
+  }
+
+  /**
+   * canActivate 메서드 구현
+   */
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<ExtendedRequest>();
+    return this.validateRequest(request);
   }
 
   protected getGuardName(): string {
     return 'IpBlacklistGuard';
   }
 
-  protected async validateRequest(request: Request): Promise<boolean> {
+  protected async validateRequest(request: ExtendedRequest): Promise<boolean> {
     const ip = this.getClientIp(request);
     
     // IP 차단 여부 확인
@@ -34,7 +42,7 @@ export class IpBlacklistGuard extends BaseSecurityGuard {
     return true;
   }
 
-  protected getFailureMessage(request: Request): string {
+  protected getFailureMessage(request: ExtendedRequest): string {
     const ip = this.getClientIp(request);
     return `IP address ${ip} is blocked`;
   }

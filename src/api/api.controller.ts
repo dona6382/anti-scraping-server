@@ -24,7 +24,7 @@ import { RecaptchaGuard } from '../common/guards/recaptcha.guard';
 
 /**
  * API Controller
- * 실제 비즈니스 로직을 처리하는 API 엔드포인트
+ * 안티 스크래핑 기능을 테스트하는 API 엔드포인트
  * 각 엔드포인트마다 필요한 보호 수준을 다르게 적용
  */
 @Controller('api/v1')
@@ -46,32 +46,18 @@ export class ApiController {
   @Throttle({ default: { ttl: 60, limit: 50 } })
   async getSampleUserData() {
     this.logger.log('Sample user data requested');
-
     return this.apiService.getSampleUserData();
   }
 
   /**
-   * 제품 목록 조회 (공개 데이터)
+   * API 상태 확인
    */
-  @Get('products')
+  @Get('status')
   @UseGuards(UserAgentGuard)
   @Throttle({ default: { ttl: 60, limit: 30 } })
-  async getProducts(@Query('page') page: number = 1, @Query('limit') limit: number = 10) {
-    this.logger.log(`Products requested - Page: ${page}, Limit: ${limit}`);
-
-    return this.apiService.getProducts(page, limit);
-  }
-
-  /**
-   * 제품 상세 조회
-   */
-  @Get('products/:id')
-  @UseGuards(UserAgentGuard, HeadlessBrowserGuard)
-  @Throttle({ default: { ttl: 60, limit: 20 } })
-  async getProduct(@Param('id') id: string) {
-    this.logger.log(`Product ${id} requested`);
-
-    return this.apiService.getProduct(id);
+  async getApiStatus() {
+    this.logger.log('API status requested');
+    return this.apiService.getApiStatus();
   }
 
   // ============================================
@@ -79,50 +65,51 @@ export class ApiController {
   // ============================================
 
   /**
-   * 사용자 프로필 조회
+   * 보호된 데이터 조회
    */
-  @Get('users/:id')
+  @Get('protected/data')
   @UseGuards(UserAgentGuard, HeadlessBrowserGuard)
   @Throttle({ default: { ttl: 60, limit: 10 } })
-  async getUserProfile(@Param('id') id: string) {
-    this.logger.log(`User profile ${id} requested`);
-
-    return this.apiService.getUserProfile(id);
+  async getProtectedData() {
+    this.logger.log('Protected data requested');
+    
+    return {
+      status: 'success',
+      message: 'Protected data accessed successfully',
+      data: {
+        secret: 'This is protected by anti-scraping measures',
+        timestamp: new Date().toISOString(),
+        level: 'medium-protection'
+      }
+    };
   }
 
   /**
-   * 주문 생성 (Honeypot + reCAPTCHA)
+   * 폼 제출 테스트 (Honeypot + reCAPTCHA)
    */
-  @Post('orders')
+  @Post('contact')
   @UseGuards(UserAgentGuard, HeadlessBrowserGuard, HoneypotGuard, RecaptchaGuard)
   @Throttle({ default: { ttl: 300, limit: 5 } })
-  async createOrder(@Body() orderData: any) {
-    this.logger.log('Order creation requested', {
-      userId: orderData.userId,
-      totalAmount: orderData.totalAmount,
+  async submitContact(@Body() contactData: any) {
+    this.logger.log('Contact form submission', {
+      name: contactData.name,
+      email: contactData.email
     });
 
     // Honeypot과 reCAPTCHA 필드 제거
-    const cleanedData = { ...orderData };
+    const cleanedData = { ...contactData };
     delete cleanedData.email_confirm;
     delete cleanedData.recaptchaToken;
     delete cleanedData._timestamp;
     delete cleanedData._jsToken;
     delete cleanedData._browserProps;
 
-    return this.apiService.createOrder(cleanedData);
-  }
-
-  /**
-   * 주문 목록 조회
-   */
-  @Get('orders')
-  @UseGuards(UserAgentGuard, HeadlessBrowserGuard)
-  @Throttle({ default: { ttl: 60, limit: 15 } })
-  async getOrders(@Query('userId') userId: string) {
-    this.logger.log(`Orders requested for user: ${userId}`);
-
-    return this.apiService.getOrders(userId);
+    return {
+      status: 'success',
+      message: 'Contact form submitted successfully',
+      data: cleanedData,
+      timestamp: new Date().toISOString()
+    };
   }
 
   // ============================================
@@ -130,50 +117,31 @@ export class ApiController {
   // ============================================
 
   /**
-   * 결제 처리 (최대 보호)
+   * 중요한 액션 (최대 보호)
    */
-  @Post('payments')
+  @Post('critical/action')
   @UseGuards(UserAgentGuard, HeadlessBrowserGuard, HoneypotGuard, RecaptchaGuard)
   @Throttle({ default: { ttl: 600, limit: 3 } })
-  async processPayment(@Body() paymentData: any) {
-    this.logger.warn('Payment processing requested', {
-      orderId: paymentData.orderId,
-      amount: paymentData.amount,
+  async performCriticalAction(@Body() actionData: any) {
+    this.logger.warn('Critical action requested', {
+      action: actionData.action,
+      userId: actionData.userId
     });
 
     // 민감한 필드 제거
-    const cleanedData = { ...paymentData };
+    const cleanedData = { ...actionData };
     delete cleanedData.email_confirm;
     delete cleanedData.recaptchaToken;
     delete cleanedData._timestamp;
     delete cleanedData._jsToken;
     delete cleanedData._browserProps;
 
-    return this.apiService.processPayment(cleanedData);
-  }
-
-  /**
-   * 사용자 정보 수정
-   */
-  @Put('users/:id')
-  @UseGuards(UserAgentGuard, HeadlessBrowserGuard, RecaptchaGuard)
-  @Throttle({ default: { ttl: 300, limit: 5 } })
-  async updateUser(@Param('id') id: string, @Body() userData: any) {
-    this.logger.log(`User ${id} update requested`);
-
-    return this.apiService.updateUser(id, userData);
-  }
-
-  /**
-   * 계정 삭제 (최대 보호)
-   */
-  @Delete('users/:id')
-  @UseGuards(UserAgentGuard, HeadlessBrowserGuard, HoneypotGuard, RecaptchaGuard)
-  @Throttle({ default: { ttl: 3600, limit: 1 } }) // 1시간에 1번만
-  async deleteUser(@Param('id') id: string, @Body() confirmData: any) {
-    this.logger.error(`User ${id} deletion requested`);
-
-    return this.apiService.deleteUser(id, confirmData);
+    return {
+      status: 'success',
+      message: 'Critical action completed',
+      actionId: `ACTION_${Date.now()}`,
+      timestamp: new Date().toISOString()
+    };
   }
 
   // ============================================
@@ -181,41 +149,54 @@ export class ApiController {
   // ============================================
 
   /**
-   * 가격 데이터 조회 (스크래핑 대상)
+   * 검색 API (스크래핑 대상)
    */
-  @Get('pricing')
+  @Get('search')
   @UseGuards(UserAgentGuard, HeadlessBrowserGuard)
-  @Throttle({ default: { ttl: 120, limit: 10 } })
-  async getPricingData(@Query('category') category?: string) {
-    this.logger.log(`Pricing data requested for category: ${category || 'all'}`);
+  @Throttle({ default: { ttl: 60, limit: 20 } })
+  async searchData(@Query('q') query: string, @Query('page') page: number = 1) {
+    this.logger.log(`Search requested: ${query}, page: ${page}`);
 
-    return this.apiService.getPricingData(category);
+    if (!query) {
+      return {
+        status: 'error',
+        message: 'Query parameter is required',
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    return {
+      status: 'success',
+      query,
+      page,
+      results: [
+        { id: 1, title: `Result 1 for "${query}"`, score: 0.95 },
+        { id: 2, title: `Result 2 for "${query}"`, score: 0.87 },
+        { id: 3, title: `Result 3 for "${query}"`, score: 0.76 }
+      ],
+      total: 150,
+      timestamp: new Date().toISOString()
+    };
   }
 
   /**
-   * 재고 현황 조회
+   * 민감한 데이터 조회 (최고 보호)
    */
-  @Get('inventory')
-  @UseGuards(UserAgentGuard, HeadlessBrowserGuard)
-  @Throttle({ default: { ttl: 60, limit: 15 } })
-  async getInventory(@Query('productId') productId?: string) {
-    this.logger.log(`Inventory requested for product: ${productId || 'all'}`);
-
-    return this.apiService.getInventory(productId);
-  }
-
-  /**
-   * 분석 데이터 내보내기 (높은 보호)
-   */
-  @Post('analytics/export')
+  @Get('sensitive/data')
   @UseGuards(UserAgentGuard, HeadlessBrowserGuard, RecaptchaGuard)
-  @Throttle({ default: { ttl: 1800, limit: 2 } }) // 30분에 2번
-  async exportAnalytics(@Body() exportRequest: any) {
-    this.logger.warn('Analytics export requested', {
-      type: exportRequest.type,
-      dateRange: exportRequest.dateRange,
-    });
+  @Throttle({ default: { ttl: 300, limit: 5 } })
+  async getSensitiveData(@Query('type') dataType?: string) {
+    this.logger.warn(`Sensitive data requested: ${dataType}`);
 
-    return this.apiService.exportAnalytics(exportRequest);
+    return {
+      status: 'success',
+      message: 'Sensitive data access granted',
+      dataType: dataType || 'default',
+      data: {
+        secret: 'Highly protected information',
+        level: 'maximum-protection',
+        accessTime: new Date().toISOString()
+      }
+    };
   }
 }

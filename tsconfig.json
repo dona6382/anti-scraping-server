@@ -12,14 +12,34 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
-    "strictNullChecks": false,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false,
+    // TypeScript strict mode 활성화
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": false, // 개발 중이므로 일단 false
+    "noUnusedParameters": false, // 개발 중이므로 일단 false
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": false, // Express Request 객체 때문에 false
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
     "paths": {
       "@/*": ["src/*"]
     }
   },
-  "exclude": ["node_modules", "dist", "**/*.bak", "**/*.bak/**/*"]
+  "exclude": [
+    "node_modules", 
+    "dist", 
+    "**/*.bak", 
+    "**/*.bak/**/*", 
+    "**/DELETE_ME_*", 
+    "**/DELETE_ME_*/**/*", 
+    "**/database_DISABLED", 
+    "**/database_DISABLED/**/*"
+  ]
 }

@@ -10,7 +10,7 @@ import {
   HttpStatus,
   Query,
 } from '@nestjs/common';
-import { IpManagementService } from '../../core/application/services/ip-management.service';
+import { IpBlacklistService } from '../../common/services/ip-blacklist.service';
 import { Public } from './security.guard';
 
 /**
@@ -19,121 +19,127 @@ import { Public } from './security.guard';
  */
 @Controller('admin/security')
 export class SecurityAdminController {
-  constructor(
-    private readonly ipManagementService: IpManagementService,
-  ) {}
+  
+  constructor(private readonly ipBlacklistService: IpBlacklistService) {}
 
   /**
-   * Get security statistics
+   * IP 블랙리스트 통계 조회
    */
-  @Get('stats')
+  @Get('blacklist/stats')
+  @Public()
   @HttpCode(HttpStatus.OK)
-  async getStatistics() {
-    const stats = await this.ipManagementService.getStatistics();
+  async getBlacklistStats() {
+    const stats = await this.ipBlacklistService.getStatistics();
     
     return {
       status: 'success',
       data: stats,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 
   /**
-   * Get all blacklisted IPs
+   * 블랙리스트된 IP 목록 조회
    */
-  @Get('blacklist')
+  @Get('blacklist/ips')
+  @Public()
   @HttpCode(HttpStatus.OK)
   async getBlacklistedIps() {
-    const ips = await this.ipManagementService.getBlacklistedIps();
+    const ips = await this.ipBlacklistService.getAllBlacklistedIps();
     
     return {
       status: 'success',
       data: {
-        ips,
-        total: ips.length,
+        count: ips.length,
+        ips: ips
       },
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 
   /**
-   * Add IP to blacklist
+   * IP를 블랙리스트에 추가
    */
-  @Post('blacklist')
+  @Post('blacklist/ip')
+  @Public()
   @HttpCode(HttpStatus.CREATED)
-  async blacklistIp(
-    @Body() dto: {
-      ip: string;
-      reason: string;
-      ttl?: number;
-    }
-  ) {
-    await this.ipManagementService.blacklist(dto.ip, dto.reason, dto.ttl);
+  async addIpToBlacklist(@Body() body: { ip: string; reason?: string; ttl?: number }) {
+    await this.ipBlacklistService.blacklistIp(
+      body.ip, 
+      body.reason || 'MANUAL_ADMIN_ACTION', 
+      body.ttl
+    );
     
     return {
       status: 'success',
-      message: `IP ${dto.ip} has been blacklisted`,
-      data: {
-        ip: dto.ip,
-        reason: dto.reason,
-        ttl: dto.ttl,
-      },
-      timestamp: new Date().toISOString(),
+      message: `IP ${body.ip} has been blacklisted`,
+      timestamp: new Date().toISOString()
     };
   }
 
   /**
-   * Remove IP from blacklist
+   * IP를 블랙리스트에서 제거
    */
-  @Delete('blacklist/:ip')
+  @Delete('blacklist/ip/:ip')
+  @Public()
   @HttpCode(HttpStatus.OK)
-  async whitelistIp(@Param('ip') ip: string) {
-    await this.ipManagementService.whitelist(ip);
+  async removeIpFromBlacklist(@Param('ip') ip: string) {
+    await this.ipBlacklistService.removeFromBlacklist(ip);
     
     return {
       status: 'success',
       message: `IP ${ip} has been removed from blacklist`,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 
   /**
-   * Check if IP is blacklisted
+   * 특정 IP 정보 조회
    */
-  @Get('blacklist/:ip')
+  @Get('blacklist/ip/:ip')
+  @Public()
   @HttpCode(HttpStatus.OK)
-  async checkIp(@Param('ip') ip: string) {
-    const isBlacklisted = await this.ipManagementService.isBlacklisted(ip);
-    const validation = await this.ipManagementService.validate(ip);
+  async getIpInfo(@Param('ip') ip: string) {
+    const info = await this.ipBlacklistService.getIpInfo(ip);
     
     return {
       status: 'success',
       data: {
-        ip,
-        isBlacklisted,
-        validation,
+        ip: ip,
+        info: info
       },
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 
   /**
-   * Record failed attempt for IP
+   * 보안 시스템 상태 조회
    */
-  @Post('failed-attempt')
+  @Get('status')
+  @Public()
   @HttpCode(HttpStatus.OK)
-  async recordFailedAttempt(
-    @Body() dto: {
-      ip: string;
-      reason: string;
-    }
-  ) {
-    await this.ipManagementService.recordFailedAttempt(dto.ip, dto.reason);
+  async getSecurityStatus() {
+    const stats = await this.ipBlacklistService.getStatistics();
     
     return {
       status: 'success',
-      message: `Failed attempt recorded for IP ${dto.ip}`,
-      timestamp: new Date().toISOString(),
+      data: {
+        system: 'Anti-Scraping Security',
+        version: '1.0.0',
+        uptime: process.uptime(),
+        redis: {
+          connected: stats.redisConnected,
+          totalBlacklisted: stats.totalBlocked
+        },
+        guards: [
+          'IP Blacklist Guard',
+          'User-Agent Guard', 
+          'Headless Browser Guard',
+          'Honeypot Guard',
+          'reCAPTCHA Guard'
+        ]
+      },
+      timestamp: new Date().toISOString()
     };
   }
 }

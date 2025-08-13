@@ -1,85 +1,62 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
+import { Module } from '@nestjs/common';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 // Core Modules
 import { ConfigurationModule } from './modules/configuration/configuration.module';
 import { SecurityModule } from './modules/security/security.module';
 import { HealthModule } from './modules/health/health.module';
-import { ApiModule } from './api/api.module';
+import { ClientInfoModule } from './modules/client-info/client-info.module';
+
+// New Modular Structure
+import { ControllersModule } from './controllers/controllers.module';
 
 // Common
+import { CommonModule } from './common/common.module';
 import { UnifiedExceptionFilter } from './common/filters/global-exception.filter';
-import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
-// Controllers
+// Main App Controller (simplified)
 import { AppController } from './app.controller';
-
-// Services
 import { AppService } from './app.service';
-
-// Middleware
-import { IpBlacklistMiddleware } from './common/middleware/ip-blacklist.middleware';
 
 /**
  * Root Application Module
- * Clean Architecture 적용 및 모든 모듈 통합
+ * 모듈화된 아키텍처로 각 기능이 분리됨
  */
 @Module({
   imports: [
-    // Configuration (최우선 로드)
+    // Configuration (must be first)
     ConfigurationModule,
     
-    // Rate Limiting
-    ThrottlerModule.forRootAsync({
-      imports: [ConfigurationModule],
-      useFactory: () => ({
-        throttlers: [
-          {
-            name: 'default',
-            ttl: parseInt(process.env.THROTTLE_TTL || '10') * 1000,
-            limit: parseInt(process.env.THROTTLE_LIMIT || '20'),
-          },
-        ],
-      }),
-    }),
+    // Common services and guards  
+    CommonModule,
     
-    // Feature Modules
+    // Feature modules
     SecurityModule,
     HealthModule,
-    ApiModule,
+    ClientInfoModule,
+    
+    // Controllers module (all API endpoints)
+    ControllersModule,
   ],
-  controllers: [AppController],
+  controllers: [
+    // Only the main app controller remains here
+    AppController,
+  ],
   providers: [
     AppService,
     
-    // Global Exception Filter
-    {
-      provide: APP_FILTER,
-      useClass: UnifiedExceptionFilter,
-    },
-    
-    // Global Interceptors
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: LoggingInterceptor,
-    },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: TransformInterceptor,
-    },
-    
-    // Global Rate Limiting Guard
+    // Global guards
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    
+    // Global filters
+    {
+      provide: APP_FILTER,
+      useClass: UnifiedExceptionFilter,
+    },
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    // IP Blacklist Middleware를 모든 경로에 적용
-    consumer.apply(IpBlacklistMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}

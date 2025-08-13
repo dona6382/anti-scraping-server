@@ -1,8 +1,34 @@
 import { join } from 'path';
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import * as express from 'express';
 import { AppModule } from './app.module';
+
+/**
+ * Application Configuration Interface
+ */
+interface AppConfiguration {
+  port: number;
+  nodeEnv: string;
+  allowedOrigins: string[];
+  corsEnabled: boolean;
+  swaggerEnabled: boolean;
+  staticFilesEnabled: boolean;
+}
+
+/**
+ * Startup Information Interface
+ */
+interface StartupInfo {
+  port: number;
+  environment: string;
+  docsEnabled: boolean;
+  redisConfigured: boolean;
+  strictMode: boolean;
+  recaptchaConfigured: boolean;
+}
 
 /**
  * Bootstrap the NestJS application
@@ -11,76 +37,375 @@ async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
 
   try {
-    const app = await NestFactory.create(AppModule, {
+    // Create NestJS application
+    const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       logger: ['error', 'warn', 'log', 'debug'],
+      cors: false, // We'll configure CORS manually
     });
 
-    // Global validation pipe
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        transformOptions: {
-          enableImplicitConversion: true,
-        },
-      }),
-    );
+    // Get configuration
+    const config = getApplicationConfiguration();
 
-    // CORS configuration
-    app.enableCors({
-      origin:
-        process.env.NODE_ENV === 'production'
-          ? process.env.ALLOWED_ORIGINS?.split(',') || false
-          : true,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Recaptcha-Token'],
-    });
+    // Setup global pipes
+    setupGlobalPipes(app);
 
-    // Serve static files
-    app.use('/public', express.static(join(__dirname, '..', 'public')));
+    // Setup CORS
+    setupCors(app, config);
 
-    // Get port from environment
-    const port = process.env.PORT || 3000;
-
-    await app.listen(port);
-
-    // Log startup information
-    logger.log(`
-    ╔════════════════════════════════════════════════════════╗
-    ║                                                        ║
-    ║        Anti-Scraping Server Started Successfully       ║
-    ║                                                        ║
-    ╠════════════════════════════════════════════════════════╣
-    ║  🚀 Application:  http://localhost:${port}                ║
-    ║  📄 Test UI:      http://localhost:${port}/public         ║
-    ║  📊 Health:       http://localhost:${port}/health         ║
-    ║  🔒 Environment:  ${process.env.NODE_ENV || 'development'}                          ║
-    ╚════════════════════════════════════════════════════════╝
-    `);
-
-    // Check Redis connection
-    const redisHost = process.env.REDIS_HOST;
-    if (redisHost) {
-      logger.log(`📦 Redis: Configured at ${redisHost}:${process.env.REDIS_PORT || 6379}`);
-    } else {
-      logger.warn('📦 Redis: Not configured - using in-memory cache');
+    // Setup static files
+    if (config.staticFilesEnabled) {
+      setupStaticFiles(app);
     }
 
-    // Security configuration status
-    const strictMode = process.env.SECURITY_STRICT_MODE === 'true';
-    logger.log(`🛡️  Security: Strict mode ${strictMode ? 'ENABLED' : 'DISABLED'}`);
+    // Setup Swagger documentation
+    if (config.swaggerEnabled) {
+      setupSwagger(app);
+    }
 
-    // reCAPTCHA status
-    const recaptchaConfigured = !!process.env.RECAPTCHA_SECRET_KEY;
-    logger.log(`🤖 reCAPTCHA: ${recaptchaConfigured ? 'Configured' : 'Not configured'}`);
+    // Start the application
+    await app.listen(config.port);
+
+    // Log startup information
+    const startupInfo = createStartupInfo(config);
+    logStartupMessage(logger, startupInfo);
 
   } catch (error) {
     logger.error('Failed to start application', error);
     process.exit(1);
   }
 }
+
+/**
+ * Get application configuration from environment
+ */
+function getApplicationConfiguration(): AppConfiguration {
+  const port = parseInt(process.env.PORT || '3000', 10);
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+    : [];
+
+  return {
+    port,
+    nodeEnv,
+    allowedOrigins,
+    corsEnabled: true,
+    swaggerEnabled: nodeEnv !== 'production' || process.env.ENABLE_SWAGGER === 'true',
+    staticFilesEnabled: true,
+  };
+}
+
+/**
+ * Setup global validation pipes
+ */
+function setupGlobalPipes(app: NestExpressApplication): void {
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+      disableErrorMessages: process.env.NODE_ENV === 'production',
+      validationError: {
+        target: false,
+        value: false,
+      },
+    }),
+  );
+}
+
+/**
+ * Setup CORS configuration
+ */
+function setupCors(app: NestExpressApplication, config: AppConfiguration): void {
+  if (!config.corsEnabled) {
+    return;
+  }
+
+  const corsOptions: Parameters<typeof app.enableCors>[0] = {
+    origin: config.nodeEnv === 'production' 
+      ? config.allowedOrigins.length > 0 ? config.allowedOrigins : false
+      : true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: [
+      'Content-Type', 
+      'Authorization', 
+      'X-Requested-With', 
+      'X-Recaptcha-Token',
+      'Accept',
+      'Origin',
+      'User-Agent',
+    ],
+    exposedHeaders: [
+      'X-RateLimit-Limit',
+      'X-RateLimit-Remaining',
+      'X-RateLimit-Reset',
+    ],
+    maxAge: 86400, // 24 hours
+  };
+
+  app.enableCors(corsOptions);
+}
+
+/**
+ * Setup static file serving
+ */
+function setupStaticFiles(app: NestExpressApplication): void {
+  const staticPath = join(__dirname, '..', 'public');
+  
+  app.use('/public', express.static(staticPath, {
+    maxAge: '1d', // Cache for 1 day
+    etag: true,
+    lastModified: true,
+    index: ['index.html'],
+  }));
+}
+
+/**
+ * Setup Swagger documentation
+ */
+function setupSwagger(app: NestExpressApplication): void {
+  const config = new DocumentBuilder()
+    .setTitle('Anti-Scraping Server API')
+    .setDescription(getSwaggerDescription())
+    .setVersion('1.0.0')
+    .setContact(
+      'Anti-Scraping Server Support',
+      'https://github.com/your-repo',
+      'support@example.com'
+    )
+    .setLicense('MIT', 'https://opensource.org/licenses/MIT')
+    .addServer('http://localhost:3000', 'Development server')
+    .addServer('https://your-domain.com', 'Production server')
+    .addTag('Application', 'Core application endpoints')
+    .addTag('Admin', 'Administrative functions')
+    .addTag('Testing', 'Security testing endpoints')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth'
+    )
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config, {
+    operationIdFactory: (controllerKey: string, methodKey: string) => 
+      `${controllerKey}_${methodKey}`,
+    ignoreGlobalPrefix: false,
+  });
+
+  SwaggerModule.setup('api-docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      displayRequestDuration: true,
+      docExpansion: 'none',
+      filter: true,
+      showRequestHeaders: true,
+      tryItOutEnabled: true,
+      syntaxHighlight: {
+        activated: true,
+        theme: 'agate'
+      },
+      defaultModelsExpandDepth: 2,
+      defaultModelExpandDepth: 2,
+    },
+    customSiteTitle: 'Anti-Scraping Server API Documentation',
+    customfavIcon: '/public/favicon.ico',
+    customCss: getSwaggerCustomCss(),
+    customJs: [
+      '/public/swagger-custom.js'
+    ],
+  });
+}
+
+/**
+ * Get Swagger description
+ */
+function getSwaggerDescription(): string {
+  return `
+Production-ready anti-scraping solution with multiple protection layers.
+
+🛡️ **Security Features:**
+- IP Blacklisting with Redis persistence
+- User-Agent filtering and bot detection
+- Rate limiting per IP and endpoint
+- Headless browser detection
+- Honeypot fields for bot trapping
+- reCAPTCHA v3 integration
+- Request fingerprinting
+
+🔐 **Protection Levels:**
+- **Public APIs**: Basic rate limiting
+- **Protected APIs**: User-Agent + Headless detection
+- **Secure APIs**: Full protection stack including reCAPTCHA
+
+📊 **Rate Limits:**
+- Public Data: Default throttling
+- Protected Data: 10 requests/minute
+- Contact Form: 5 requests/5 minutes
+- Critical Actions: 3 requests/10 minutes
+- Search: 20 requests/30 seconds
+
+⚠️ **Note**: All endpoints include IP blacklist protection where applicable.
+
+🧪 **Testing**: Use the testing endpoints to verify each security layer individually.
+  `.trim();
+}
+
+/**
+ * Get Swagger custom CSS
+ */
+function getSwaggerCustomCss(): string {
+  return `
+    .swagger-ui .topbar { display: none; }
+    .swagger-ui .info .title { 
+      color: #3b82f6; 
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .swagger-ui .info .description { 
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+    .swagger-ui .scheme-container { 
+      background: #f8fafc; 
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+    .swagger-ui .opblock .opblock-summary-description {
+      font-weight: 500;
+    }
+    .swagger-ui .btn.authorize {
+      background-color: #10b981;
+      border-color: #10b981;
+    }
+    .swagger-ui .btn.authorize:hover {
+      background-color: #059669;
+      border-color: #059669;
+    }
+    .swagger-ui .opblock.opblock-post {
+      background: rgba(73, 204, 144, .1);
+      border-color: #49cc90;
+    }
+    .swagger-ui .opblock.opblock-get {
+      background: rgba(97, 175, 254, .1);
+      border-color: #61affe;
+    }
+    .swagger-ui .opblock.opblock-delete {
+      background: rgba(249, 62, 62, .1);
+      border-color: #f93e3e;
+    }
+  `;
+}
+
+/**
+ * Create startup information
+ */
+function createStartupInfo(config: AppConfiguration): StartupInfo {
+  return {
+    port: config.port,
+    environment: config.nodeEnv,
+    docsEnabled: config.swaggerEnabled,
+    redisConfigured: !!process.env.REDIS_HOST,
+    strictMode: process.env.SECURITY_STRICT_MODE === 'true',
+    recaptchaConfigured: !!process.env.RECAPTCHA_SECRET_KEY,
+  };
+}
+
+/**
+ * Log startup message with ASCII art and configuration
+ */
+function logStartupMessage(logger: Logger, info: StartupInfo): void {
+  const isProduction = info.environment === 'production';
+  
+  logger.log(`
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║        🛡️  Anti-Scraping Server Started Successfully         ║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║  🚀 Application:  http://localhost:${info.port.toString().padEnd(30)} ║
+║  📄 Test UI:      http://localhost:${info.port}/public${' '.repeat(19)} ║
+║  📊 Health:       http://localhost:${info.port}/health${' '.repeat(19)} ║
+${info.docsEnabled ? `║  📚 API Docs:     http://localhost:${info.port}/api-docs${' '.repeat(16)} ║` : ''}
+║  🔒 Environment:  ${info.environment.padEnd(43)} ║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║  📦 Redis:        ${(info.redisConfigured ? 'Configured' : 'Not configured').padEnd(43)} ║
+║  🛡️  Security:     Strict mode ${(info.strictMode ? 'ENABLED' : 'DISABLED').padEnd(32)} ║
+║  🤖 reCAPTCHA:    ${(info.recaptchaConfigured ? 'Configured' : 'Not configured').padEnd(43)} ║
+║  📖 Docs:         ${(info.docsEnabled ? 'Enabled' : 'Disabled').padEnd(43)} ║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║  ⚡ Status:       All systems operational                     ║
+║  🎯 Mode:         ${(isProduction ? 'Production' : 'Development').padEnd(43)} ║
+║  📅 Started:      ${new Date().toLocaleString().padEnd(43)} ║
+╚═══════════════════════════════════════════════════════════════╝
+  `);
+
+  // 환경별 추가 로그
+  if (isProduction) {
+    logger.warn('🚨 Running in PRODUCTION mode - ensure all security configurations are properly set!');
+  } else {
+    logger.log('🔧 Running in DEVELOPMENT mode - additional debugging enabled');
+  }
+
+  // 보안 설정 확인
+  if (!info.recaptchaConfigured && isProduction) {
+    logger.warn('⚠️  reCAPTCHA not configured - consider enabling for production');
+  }
+
+  if (!info.redisConfigured) {
+    logger.warn('⚠️  Redis not configured - using in-memory cache (not recommended for production)');
+  }
+
+  // 성능 팁
+  logger.log('💡 Performance tip: Enable Redis for better caching and IP blacklist persistence');
+  
+  if (info.docsEnabled) {
+    logger.log('📚 API documentation available at /api-docs');
+  }
+}
+
+/**
+ * Handle process termination gracefully
+ */
+function setupGracefulShutdown(): void {
+  const logger = new Logger('Shutdown');
+  
+  process.on('SIGTERM', () => {
+    logger.log('Received SIGTERM, shutting down gracefully...');
+    process.exit(0);
+  });
+
+  process.on('SIGINT', () => {
+    logger.log('Received SIGINT, shutting down gracefully...');
+    process.exit(0);
+  });
+
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception:', error);
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+  });
+}
+
+// Setup graceful shutdown handlers
+setupGracefulShutdown();
 
 // Start the application
 void bootstrap();

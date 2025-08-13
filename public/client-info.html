@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Information Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 1000px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            text-align: center;
+            color: white;
+        }
+        .header h1 { font-size: 2rem; margin-bottom: 10px; }
+        .header p { opacity: 0.9; }
+        .buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 30px;
+            justify-content: center;
+            background: #f8f9fa;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-secondary { background: white; color: #667eea; border: 2px solid #667eea; }
+        .btn-success { background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%); color: white; }
+        .btn-warning { background: linear-gradient(135deg, #f2994a 0%, #f2c94c 100%); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); color: white; }
+        .results {
+            padding: 30px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .json-viewer {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .info-item {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Client Information Analyzer</h1>
+            <p>Test and analyze client detection capabilities</p>
+        </div>
+        
+        <div class="buttons">
+            <button class="btn btn-primary" onclick="getFullInfo()">📊 Get Full Info</button>
+            <button class="btn btn-secondary" onclick="getIpOnly()">🌐 IP Only</button>
+            <button class="btn btn-success" onclick="checkProxy()">🔍 Check Proxy</button>
+            <button class="btn btn-warning" onclick="getLocation()">📍 Get Location</button>
+            <button class="btn btn-danger" onclick="securityAnalysis()">🔒 Security Analysis</button>
+            <button class="btn btn-secondary" onclick="getHeaders()">📋 View Headers</button>
+            <button class="btn btn-primary" onclick="openHtmlView()">🖼️ HTML View</button>
+        </div>
+        
+        <div class="results" id="results">
+            <div class="result-card">
+                <h3>Ready</h3>
+                <p>Click any button above to start analyzing client information.</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = '/api/v1/client';
+        const resultsDiv = document.getElementById('results');
+        
+        function displayResult(title, data) {
+            const resultHtml = `
+                <div class="result-card">
+                    <h3>${title}</h3>
+                    <div class="json-viewer">
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                </div>
+            `;
+            resultsDiv.innerHTML = resultHtml + resultsDiv.innerHTML;
+        }
+        
+        async function getFullInfo() {
+            try {
+                const response = await fetch(`${API_BASE}/info?detailed=true`);
+                const data = await response.json();
+                displayResult('Full Client Information', data);
+            } catch (error) {
+                displayResult('Error', { error: error.message });
+            }
+        }
+        
+        async function getIpOnly() {
+            try {
+                const response = await fetch(`${API_BASE}/ip`);
+                const data = await response.json();
+                displayResult('IP Information', data);
+            } catch (error) {
+                displayResult('Error', { error: error.message });
+            }
+        }
+        
+        async function checkProxy() {
+            try {
+                const response = await fetch(`${API_BASE}/proxy`);
+                const data = await response.json();
+                displayResult('Proxy Detection', data);
+            } catch (error) {
+                displayResult('Error', { error: error.message });
+            }
+        }
+        
+        async function getLocation() {
+            try {
+                const response = await fetch(`${API_BASE}/location`);
+                const data = await response.json();
+                displayResult('Location Information', data);
+            } catch (error) {
+                displayResult('Error', { error: error.message });
+            }
+        }
+        
+        async function securityAnalysis() {
+            try {
+                const response = await fetch(`${API_BASE}/security`);
+                const data = await response.json();
+                displayResult('Security Analysis', data);
+            } catch (error) {
+                displayResult('Error', { error: error.message });
+            }
+        }
+        
+        async function getHeaders() {
+            try {
+                const response = await fetch(`${API_BASE}/headers`);
+                const data = await response.json();
+                displayResult('Request Headers', data);
+            } catch (error) {
+                displayResult('Error', { error: error.message });
+            }
+        }
+        
+        function openHtmlView() {
+            window.open(`${API_BASE}/view`, '_blank');
+        }
+    </script>
+</body>
+</html>

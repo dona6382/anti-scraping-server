@@ -1,17 +1,7 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { ICacheService } from './base-cache.service';
 import { ConfigurationService } from '../../modules/configuration/configuration.service';
-
-/**
- * Blacklist Entry Interface
- */
-export interface BlacklistEntry {
-  ip: string;
-  reason: string;
-  blockedAt: Date;
-  expiresAt?: Date;
-  count: number;
-}
+import { BlacklistEntry, SecurityReason } from '../../types';
 
 /**
  * IP Blacklist Service
@@ -34,14 +24,14 @@ export class IpBlacklistService {
   /**
    * IP 차단 (별칭 추가)
    */
-  async blockIp(ip: string, reason: string, ttl?: number): Promise<void> {
+  async blockIp(ip: string, reason: SecurityReason, ttl?: number): Promise<void> {
     return this.blacklistIp(ip, reason, ttl);
   }
 
   /**
    * IP 차단
    */
-  async blacklistIp(ip: string, reason: string, ttl?: number): Promise<void> {
+  async blacklistIp(ip: string, reason: SecurityReason, ttl?: number): Promise<void> {
     const key = this.getKey(ip);
     const existingEntry = await this.cache.get<BlacklistEntry>(key);
     
@@ -205,7 +195,7 @@ export class IpBlacklistService {
    * 자동 차단 (rate limiting 등과 연동)
    */
   async autoBlock(ip: string, violations: string[]): Promise<void> {
-    const reason = `Auto-blocked: ${violations.join(', ')}`;
+    const reason = `Auto-blocked: ${violations.join(', ')}` as SecurityReason;
     
     // 위반 횟수에 따라 차단 시간 증가
     const blockInfo = await this.getBlockInfo(ip);
@@ -257,7 +247,7 @@ export class IpBlacklistService {
   /**
    * CIDR 범위 차단 (예: 192.168.1.0/24)
    */
-  async blockCidr(cidr: string, reason: string, ttl?: number): Promise<void> {
+  async blockCidr(cidr: string, reason: SecurityReason, ttl?: number): Promise<void> {
     // CIDR 파싱 및 범위 내 모든 IP 차단
     // 실제 구현은 더 복잡하지만, 기본 개념만 표시
     this.logger.warn(`CIDR blocking not fully implemented: ${cidr}`);
@@ -265,7 +255,7 @@ export class IpBlacklistService {
     // 간단한 구현 예시 (실제로는 더 정교한 로직 필요)
     const [baseIp, mask] = cidr.split('/');
     if (baseIp && mask) {
-      await this.blockIp(cidr, `CIDR: ${reason}`, ttl);
+      await this.blockIp(cidr, reason, ttl);
     }
   }
 }

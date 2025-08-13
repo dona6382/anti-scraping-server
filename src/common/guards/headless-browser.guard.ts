@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Request } from 'express';
+import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
 import { BaseSecurityGuard } from './base-security.guard';
+import { ExtendedRequest } from '../../types';
 
 /**
  * Headless Browser Detection Guard
@@ -8,13 +8,21 @@ import { BaseSecurityGuard } from './base-security.guard';
  */
 @Injectable()
 export class HeadlessBrowserGuard extends BaseSecurityGuard {
-  protected readonly logger = new Logger(HeadlessBrowserGuard.name);
+  protected override readonly logger = new Logger(HeadlessBrowserGuard.name);
+
+  /**
+   * canActivate 메서드 구현
+   */
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest<ExtendedRequest>();
+    return this.validateRequest(request);
+  }
 
   protected getGuardName(): string {
     return 'HeadlessBrowserGuard';
   }
 
-  protected validateRequest(request: Request): boolean {
+  protected validateRequest(request: ExtendedRequest): boolean {
     const headers = request.headers;
     const userAgent = this.getUserAgent(request).toLowerCase();
 
@@ -73,7 +81,7 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
 
     // Navigator.webdriver 속성 체크 (클라이언트 사이드에서 전송된 경우)
     if (request.body && request.body._browserProps) {
-      const browserProps = request.body._browserProps;
+      const browserProps = request.body._browserProps as any;
       if (browserProps.webdriver === true) {
         this.logger.warn('Navigator.webdriver property is true');
         return false;
@@ -113,7 +121,7 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
     return mobilePatterns.some((pattern) => userAgent.includes(pattern));
   }
 
-  protected getFailureMessage(request: Request): string {
+  protected getFailureMessage(request: ExtendedRequest): string {
     return 'Headless browser or automation tool detected';
   }
 }

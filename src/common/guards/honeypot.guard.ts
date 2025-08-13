@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Request } from 'express';
+import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
 import { BaseSecurityGuard } from './base-security.guard';
-import { ConfigService } from '../services/config.service';
+import { ConfigurationService } from '../../modules/configuration/configuration.service';
+import { ExtendedRequest } from '../../types';
 
 /**
  * Honeypot Guard
@@ -9,21 +9,21 @@ import { ConfigService } from '../services/config.service';
  */
 @Injectable()
 export class HoneypotGuard extends BaseSecurityGuard {
-  protected readonly logger = new Logger(HoneypotGuard.name);
+  protected override readonly logger = new Logger(HoneypotGuard.name);
   
   private readonly honeypotFieldName: string;
   private readonly timeThreshold: number;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(private readonly configService: ConfigurationService) {
     super();
     
     this.honeypotFieldName = this.configService.get<string>(
-      'app.honeypot.fieldName',
+      'app.security.honeypotField',
       'email_confirm',
     );
     
     this.timeThreshold = this.configService.get<number>(
-      'app.honeypot.timeThreshold',
+      'app.security.honeypotTimeThreshold',
       2000, // 2초
     );
     
@@ -32,11 +32,19 @@ export class HoneypotGuard extends BaseSecurityGuard {
     );
   }
 
+  /**
+   * canActivate 메서드 구현
+   */
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest<ExtendedRequest>();
+    return this.validateRequest(request);
+  }
+
   protected getGuardName(): string {
     return 'HoneypotGuard';
   }
 
-  protected validateRequest(request: Request): boolean {
+  protected validateRequest(request: ExtendedRequest): boolean {
     // POST, PUT, PATCH 요청에만 적용
     if (!['POST', 'PUT', 'PATCH'].includes(request.method)) {
       return true;
@@ -57,7 +65,7 @@ export class HoneypotGuard extends BaseSecurityGuard {
 
     // 시간 기반 검증 (너무 빠른 제출 감지)
     if (body._timestamp) {
-      const submissionTime = Date.now() - parseInt(body._timestamp, 10);
+      const submissionTime = Date.now() - parseInt(body._timestamp as string, 10);
       if (submissionTime < this.timeThreshold) {
         this.logger.warn(
           `Form submitted too quickly: ${submissionTime}ms from ${this.getClientIp(request)}`,
@@ -84,7 +92,7 @@ export class HoneypotGuard extends BaseSecurityGuard {
    * JavaScript 토큰 생성
    * 클라이언트 측 JavaScript에서 동일한 로직으로 생성해야 함
    */
-  private generateJsToken(request: Request): string {
+  private generateJsToken(request: ExtendedRequest): string {
     const userAgent = this.getUserAgent(request);
     const timestamp = Math.floor(Date.now() / 60000); // 분 단위
     
@@ -93,7 +101,7 @@ export class HoneypotGuard extends BaseSecurityGuard {
     return token.substring(0, 16);
   }
 
-  protected getFailureMessage(request: Request): string {
+  protected getFailureMessage(request: ExtendedRequest): string {
     return 'Honeypot validation failed - potential bot detected';
   }
 }

@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+// import { DatabaseService } from '../database/database.service'; // TODO: TypeORM 설치 후 활성화
 
 /**
  * Health Status Interface
@@ -13,7 +14,7 @@ export interface HealthStatus {
 /**
  * Individual Health Check
  */
-interface HealthCheck {
+export interface HealthCheck {
   name: string;
   status: 'healthy' | 'degraded' | 'unhealthy';
   responseTime?: number;
@@ -29,6 +30,12 @@ interface HealthCheck {
 export class HealthService {
   private readonly logger = new Logger(HealthService.name);
   private readonly startTime = Date.now();
+
+  constructor(
+    // @Optional() private readonly databaseService?: DatabaseService // TODO: TypeORM 설치 후 활성화
+  ) {
+    // DatabaseService는 선택적 의존성 (데이터베이스가 설정되지 않을 수 있음)
+  }
 
   /**
    * Get overall health status
@@ -79,7 +86,7 @@ export class HealthService {
     // CPU check
     checks.push(this.checkCpu());
     
-    // Database check (if applicable)
+    // Database check (if available)
     checks.push(await this.checkDatabase());
     
     // Redis check (if applicable)
@@ -96,9 +103,9 @@ export class HealthService {
     const heapUsedPercent = (used.heapUsed / used.heapTotal) * 100;
     
     let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
-    if (heapUsedPercent > 90) {
+    if (heapUsedPercent > 95) {
       status = 'unhealthy';
-    } else if (heapUsedPercent > 75) {
+    } else if (heapUsedPercent > 85) {
       status = 'degraded';
     }
     
@@ -143,12 +150,58 @@ export class HealthService {
    * Check database connection
    */
   private async checkDatabase(): Promise<HealthCheck> {
-    // Placeholder - implement actual database check if needed
+    // TODO: TypeORM 설치 후 활성화
     return {
       name: 'database',
       status: 'healthy',
-      message: 'No database configured',
+      message: 'Database module disabled - install TypeORM to enable',
     };
+
+    /* TODO: TypeORM 설치 후 주석 해제
+    if (!this.databaseService) {
+      return {
+        name: 'database',
+        status: 'healthy',
+        message: 'No database configured',
+      };
+    }
+
+    const startTime = Date.now();
+    
+    try {
+      const isConnected = await this.databaseService.isConnected();
+      const responseTime = Date.now() - startTime;
+      
+      if (!isConnected) {
+        return {
+          name: 'database',
+          status: 'unhealthy',
+          message: 'Database connection failed',
+          responseTime,
+        };
+      }
+
+      const stats = await this.databaseService.getStats();
+      
+      return {
+        name: 'database',
+        status: 'healthy',
+        message: 'PostgreSQL connected',
+        responseTime,
+        metadata: {
+          ...stats,
+          responseTime,
+        },
+      };
+    } catch (error) {
+      return {
+        name: 'database',
+        status: 'unhealthy',
+        message: `Database error: ${error.message}`,
+        responseTime: Date.now() - startTime,
+      };
+    }
+    */
   }
 
   /**
@@ -166,11 +219,15 @@ export class HealthService {
       };
     }
     
-    // TODO: Implement actual Redis health check
     return {
       name: 'redis',
       status: 'healthy',
-      message: 'Redis connection check not implemented',
+      message: 'Redis health check not implemented yet',
+      metadata: {
+        host: redisHost,
+        port: process.env.REDIS_PORT || 6379,
+        db: process.env.REDIS_DB || 0,
+      },
     };
   }
 
@@ -179,9 +236,19 @@ export class HealthService {
    */
   private async checkDependencies(): Promise<Record<string, any>> {
     return {
+      database: {
+        configured: false, // TODO: TypeORM 설치 후 true로 변경
+        type: 'PostgreSQL',
+        host: process.env.DB_HOST || 'not configured',
+        port: process.env.DB_PORT || 'not configured',
+        name: process.env.DB_NAME || 'not configured',
+        status: 'disabled - install @nestjs/typeorm typeorm pg',
+      },
       redis: {
         configured: !!process.env.REDIS_HOST,
         host: process.env.REDIS_HOST || 'not configured',
+        port: process.env.REDIS_PORT || 'not configured',
+        db: process.env.REDIS_DB || 'not configured',
       },
       recaptcha: {
         configured: !!process.env.RECAPTCHA_SECRET_KEY,

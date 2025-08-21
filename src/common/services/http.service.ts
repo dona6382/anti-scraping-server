@@ -1,32 +1,35 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpClientConfig, HttpResponse } from '../../types';
+import axios from 'axios';
 
-// Axios 타입을 더 안전하게 가져오기
-const axios = require('axios');
-
-interface AxiosRequestConfig {
-  url?: string;
-  method?: string;
-  timeout?: number;
-  headers?: Record<string, string>;
-  signal?: AbortSignal;
-  metadata?: any;
-  __retryCount?: number;
-}
-
-interface AxiosResponse<T = any> {
+// Axios 타입 정의 (axios 모듈의 타입이 제대로 export되지 않아 직접 정의)
+type AxiosInstance = any;
+type AxiosRequestConfig = any;
+type AxiosResponse<T = any> = {
   data: T;
   status: number;
   statusText: string;
-  headers: Record<string, string>;
-  config: AxiosRequestConfig;
-}
-
-interface AxiosError extends Error {
-  config?: AxiosRequestConfig;
+  headers: any;
+  config: any;
+  request?: any;
+};
+type AxiosError = {
+  message: string;
+  name: string;
+  stack?: string;
+  config?: any;
+  code?: string;
   request?: any;
   response?: AxiosResponse;
-  isAxiosError?: boolean;
+  isAxiosError: boolean;
+  toJSON: () => object;
+};
+
+// Axios 인스턴스 타입 확장
+interface ExtendedAxiosRequestConfig {
+  metadata?: any;
+  __retryCount?: number;
+  [key: string]: any;
 }
 
 /**
@@ -36,7 +39,7 @@ interface AxiosError extends Error {
 @Injectable()
 export class HttpService {
   private readonly logger = new Logger(HttpService.name);
-  private readonly axiosInstance: any;
+  private readonly axiosInstance: AxiosInstance;
   private readonly defaultConfig: HttpClientConfig;
 
   constructor() {
@@ -65,7 +68,7 @@ export class HttpService {
   private setupInterceptors(): void {
     // Request interceptor
     this.axiosInstance.interceptors.request.use(
-      (config: AxiosRequestConfig) => {
+      (config: any) => {
         this.logger.debug(`HTTP Request: ${config.method?.toUpperCase()} ${config.url}`);
         
         // 요청 시작 시간 기록
@@ -73,7 +76,7 @@ export class HttpService {
         
         return config;
       },
-      (error: AxiosError) => {
+      (error: any) => {
         this.logger.error('HTTP Request Error:', this.formatAxiosError(error));
         return Promise.reject(error);
       }
@@ -81,14 +84,14 @@ export class HttpService {
 
     // Response interceptor
     this.axiosInstance.interceptors.response.use(
-      (response: AxiosResponse) => {
+      (response: any) => {
         const duration = this.calculateDuration(response.config);
         this.logger.debug(
           `HTTP Response: ${response.status} from ${response.config.url} (${duration}ms)`
         );
         return response;
       },
-      async (error: AxiosError) => {
+      async (error: any) => {
         const duration = error.config ? this.calculateDuration(error.config) : 0;
         this.logger.error(
           `HTTP Response Error: ${error.message} (${duration}ms)`,
@@ -113,8 +116,8 @@ export class HttpService {
     config?: Partial<AxiosRequestConfig>
   ): Promise<HttpResponse<T>> {
     try {
-      const response = await this.axiosInstance.get<T>(url, config);
-      return this.formatResponse(response);
+      const response = await this.axiosInstance.get(url, config);
+      return this.formatResponse<T>(response);
     } catch (error) {
       throw this.handleError(error as AxiosError);
     }
@@ -129,8 +132,8 @@ export class HttpService {
     config?: Partial<AxiosRequestConfig>,
   ): Promise<HttpResponse<T>> {
     try {
-      const response = await this.axiosInstance.post<T>(url, data, config);
-      return this.formatResponse(response);
+      const response = await this.axiosInstance.post(url, data, config);
+      return this.formatResponse<T>(response);
     } catch (error) {
       throw this.handleError(error as AxiosError);
     }
@@ -145,8 +148,8 @@ export class HttpService {
     config?: Partial<AxiosRequestConfig>,
   ): Promise<HttpResponse<T>> {
     try {
-      const response = await this.axiosInstance.put<T>(url, data, config);
-      return this.formatResponse(response);
+      const response = await this.axiosInstance.put(url, data, config);
+      return this.formatResponse<T>(response);
     } catch (error) {
       throw this.handleError(error as AxiosError);
     }
@@ -160,8 +163,8 @@ export class HttpService {
     config?: Partial<AxiosRequestConfig>
   ): Promise<HttpResponse<T>> {
     try {
-      const response = await this.axiosInstance.delete<T>(url, config);
-      return this.formatResponse(response);
+      const response = await this.axiosInstance.delete(url, config);
+      return this.formatResponse<T>(response);
     } catch (error) {
       throw this.handleError(error as AxiosError);
     }
@@ -176,8 +179,8 @@ export class HttpService {
     config?: Partial<AxiosRequestConfig>,
   ): Promise<HttpResponse<T>> {
     try {
-      const response = await this.axiosInstance.patch<T>(url, data, config);
-      return this.formatResponse(response);
+      const response = await this.axiosInstance.patch(url, data, config);
+      return this.formatResponse<T>(response);
     } catch (error) {
       throw this.handleError(error as AxiosError);
     }
@@ -215,7 +218,7 @@ export class HttpService {
       urlEncodedData.append(key, String(value));
     });
 
-    const formConfig: AxiosRequestConfig = {
+    const formConfig: any = {
       ...config,
       headers: {
         ...config?.headers,
@@ -234,7 +237,7 @@ export class HttpService {
     data: Record<string, unknown>,
     config?: Partial<AxiosRequestConfig>
   ): Promise<HttpResponse<T>> {
-    const jsonConfig: AxiosRequestConfig = {
+    const jsonConfig: any = {
       ...config,
       headers: {
         ...config?.headers,
@@ -258,8 +261,8 @@ export class HttpService {
     };
 
     try {
-      const response = await this.axiosInstance.request<T>(timeoutConfig);
-      return this.formatResponse(response);
+      const response = await this.axiosInstance.request(timeoutConfig);
+      return this.formatResponse<T>(response);
     } catch (error) {
       throw this.handleError(error as AxiosError);
     }
@@ -287,9 +290,9 @@ export class HttpService {
   /**
    * 응답을 표준 형식으로 변환
    */
-  private formatResponse<T>(response: AxiosResponse<T>): HttpResponse<T> {
+  private formatResponse<T = any>(response: AxiosResponse<T>): HttpResponse<T> {
     return {
-      data: response.data,
+      data: response.data as T,
       status: response.status,
       headers: response.headers as Record<string, string>,
       url: response.config.url || '',
@@ -310,7 +313,7 @@ export class HttpService {
       return enhancedError;
     } else if (error.request) {
       // 요청은 보냈지만 응답을 받지 못함
-      return new Error(`Network error: No response received from ${error.config?.url}`);
+      return new Error(`Network error: No response received from ${(error as any).config?.url}`);
     } else {
       // 요청 설정 중 에러 발생
       return new Error(`Request configuration error: ${error.message}`);
@@ -323,8 +326,8 @@ export class HttpService {
   private formatAxiosError(error: AxiosError): Record<string, unknown> {
     return {
       message: error.message,
-      url: error.config?.url,
-      method: error.config?.method,
+      url: (error as any).config?.url,
+      method: (error as any).config?.method,
       status: error.response?.status,
       statusText: error.response?.statusText,
       data: error.response?.data,
@@ -335,7 +338,7 @@ export class HttpService {
    * 요청 지속 시간 계산
    */
   private calculateDuration(config: AxiosRequestConfig): number {
-    const startTime = config.metadata?.startTime;
+    const startTime = (config as any).metadata?.startTime;
     return startTime ? Date.now() - startTime : 0;
   }
 
@@ -356,7 +359,7 @@ export class HttpService {
    * 요청 재시도
    */
   private async retryRequest(error: AxiosError): Promise<AxiosResponse> {
-    const config = error.config;
+    const config = (error as any).config;
     if (!config) {
       throw error;
     }
@@ -408,8 +411,8 @@ export class HttpService {
     };
 
     try {
-      const response = await this.axiosInstance.request<T>(cancelConfig);
-      return this.formatResponse(response);
+      const response = await this.axiosInstance.request(cancelConfig);
+      return this.formatResponse<T>(response);
     } catch (error) {
       // axios.isCancel 대신 AbortSignal로 확인
       if (signal.aborted) {

@@ -1,18 +1,41 @@
 /**
  * Common Types for Anti-Scraping Server
+ * Enhanced with proper type safety
  */
 
-// Request types
-export interface ExtendedRequest {
+import { Request } from 'express';
+import { RedisClientType } from 'redis';
+import { Redis as IORedisType } from 'ioredis';
+
+// Re-export new type definitions
+export * from './security.types';
+export * from './config.types';
+
+// Enhanced Request type (replacing the old one)
+export interface ExtendedRequest extends Omit<Request, 'connection' | 'socket'> {
   ip: string;
   headers: Record<string, string | string[] | undefined>;
   body: Record<string, unknown>;
   method: string;
   url: string;
   query: Record<string, string | string[] | undefined>;
-  connection?: any;
-  socket?: any;
+  connection?: {
+    remoteAddress?: string;
+  } | any;
+  socket?: {
+    remoteAddress?: string;
+  } | any;
+  // New fields from security.types
+  clientInfo?: import('./security.types').ClientInfo;
+  securityContext?: import('./security.types').SecurityContext;
+  requestId?: string;
+  timestamp?: number;
+  recaptchaToken?: string;
+  honeypotData?: Record<string, unknown>;
 }
+
+// Redis Client Types (replacing any)
+export type RedisClient = RedisClientType | IORedisType | null;
 
 // Security types
 export type SecurityReason = 
@@ -38,14 +61,14 @@ export interface BlacklistEntry {
   ip: string;
   reason: SecurityReason;
   blockedAt: Date;
-  expiresAt?: Date | undefined;
+  expiresAt?: Date;
   count: number;
 }
 
 // Cache types
 export interface CacheEntry<T = unknown> {
   value: T;
-  expiresAt?: number | undefined;
+  expiresAt?: number;
 }
 
 export interface CacheStatistics {
@@ -55,40 +78,16 @@ export interface CacheStatistics {
   missRate: number;
 }
 
-// Configuration types
-export interface SecurityConfig {
-  strictMode: boolean;
-  honeypotField: string;
-  honeypotTimeThreshold: number;
-  recaptchaScoreThreshold: number;
-  recaptchaFailOpen: boolean;
-}
-
+// Configuration types (keeping for backward compatibility)
 export interface ThrottleConfig {
   ttl: number;
   limit: number;
 }
 
-export interface AppConfig {
-  port: number;
-  nodeEnv: 'development' | 'production' | 'test';
-  security: SecurityConfig;
-  throttle: ThrottleConfig;
-  blockedUserAgents: string[];
-}
-
-export interface RedisConfig {
-  host: string;
-  port: number;
-  password?: string;
-  db: number;
-  isConfigured: boolean;
-}
-
 // API Response types
 export interface ApiResponse<T = unknown> {
   status: 'success' | 'error';
-  data?: T;
+  data?: T | undefined;
   message?: string | undefined;
   timestamp: string;
   code?: string | undefined;
@@ -189,18 +188,12 @@ export interface ISecurityService {
   getStatistics(): Promise<IpStatistics>;
 }
 
-// Guard types
+// Guard types (enhanced from security.types)
 export interface GuardContext {
   request: ExtendedRequest;
   ip: string;
   userAgent: string;
   endpoint: string;
-}
-
-export interface GuardResult {
-  allowed: boolean;
-  reason?: SecurityReason;
-  metadata?: Record<string, unknown>;
 }
 
 // Error types
@@ -250,4 +243,91 @@ export interface DeviceFingerprint {
   secFetchUser?: string;
   secFetchDest?: string;
   hash: string;
+}
+
+export interface WebGLData {
+  vendor?: string;
+  renderer?: string;
+  version?: string;
+  extensions?: string[];
+  parameters?: Record<string, number | string | boolean>;
+}
+
+export interface ScreenData {
+  width: number;
+  height: number;
+  availWidth: number;
+  availHeight: number;
+  colorDepth: number;
+  pixelDepth: number;
+}
+
+export interface WebRTCData {
+  localIP?: string;
+  publicIP?: string;
+  leaked?: boolean;
+}
+
+export interface BrowserData {
+  canvas?: string;
+  webgl?: WebGLData;
+  audio?: string;
+  fonts?: string[];
+  screen?: ScreenData;
+  timezone?: string;
+  language?: string;
+  platform?: string;
+  hardwareConcurrency?: number;
+  deviceMemory?: number;
+  colorDepth?: number;
+  pixelRatio?: number;
+  touchSupport?: boolean;
+  webrtc?: WebRTCData | string;
+  plugins?: Array<{ name: string; version?: string }>;
+}
+
+export interface BrowserFingerprint {
+  id: string;
+  canvas: string;
+  webgl: WebGLData;
+  audio: string;
+  fonts: string[];
+  screen: ScreenData;
+  timezone?: string;
+  language?: string;
+  platform?: string;
+  hardwareConcurrency?: number;
+  deviceMemory?: number;
+  colorDepth?: number;
+  pixelRatio?: number;
+  touchSupport?: boolean;
+  webrtc?: WebRTCData | string;
+  plugins: string[];
+  timestamp: Date;
+  trustScore: number;
+}
+
+export interface FingerprintData {
+  fingerprint: BrowserFingerprint;
+  createdAt: number;
+}
+
+export interface Challenge {
+  type: string;
+  difficulty: number;
+  data: Record<string, unknown>;
+}
+
+export interface FingerprintValidationResponse {
+  success: boolean;
+  fingerprintId: string;
+  trustScore: number;
+  botDetection: {
+    isBot: boolean;
+    score: number;
+    confidence: number;
+    factors: string[];
+  };
+  recommendation: string;
+  challenge?: Challenge | null;
 }

@@ -1,3 +1,4 @@
+import { SecurityReason } from '../../types';
 import {
   Controller,
   Get,
@@ -66,7 +67,7 @@ export class SecurityAdminController {
   async addIpToBlacklist(@Body() body: { ip: string; reason?: string; ttl?: number }) {
     await this.ipBlacklistService.blacklistIp(
       body.ip, 
-      body.reason || 'MANUAL_ADMIN_ACTION', 
+      (body.reason as SecurityReason) || 'MANUAL_ADMIN_ACTION', 
       body.ttl
     );
     

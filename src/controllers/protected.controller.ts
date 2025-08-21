@@ -29,18 +29,19 @@ import { HoneypotGuard } from '../common/guards/honeypot.guard';
 import { RecaptchaGuard } from '../common/guards/recaptcha.guard';
 import { HeadlessBrowserGuard } from '../common/guards/headless-browser.guard';
 
+// Utils
+import { ResponseBuilder, FormatResponse } from '../common/utils/response.builder';
+
 // DTOs
 import {
   BaseResponseDto,
   ContactRequestDto,
   ContactResponseDto,
-  CriticalActionRequestDto,
-  CriticalActionResponseDto,
 } from '../common/dto';
 
 /**
  * Protected API Controller
- * 중간 수준의 보안이 적용된 API 엔드포인트
+ * 중간 수준의 보안이 적용된 API 엔드포인트 (리팩토링됨)
  */
 @ApiTags('Protected APIs')
 @Controller('api/protected')
@@ -55,27 +56,21 @@ export class ProtectedController {
    */
   @Get('data')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { ttl: 60000, limit: 10 } }) // 1분에 10회
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiOperation({ 
     summary: 'Get protected data',
-    description: 'Retrieve protected data with enhanced security measures including User-Agent filtering and headless browser detection.'
+    description: 'Retrieve protected data with enhanced security measures.'
   })
   @ApiResponse({
     status: 200,
-    description: 'Protected data retrieved successfully',
-    type: BaseResponseDto
+    description: 'Protected data retrieved successfully'
   })
   @ApiForbiddenResponse({ description: 'Access denied by security policy' })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
-  getProtectedData(): BaseResponseDto<{
-    message: string;
-    timestamp: string;
-    sensitive: { secret: string; value: string };
-  }> {
+  @FormatResponse('Protected data retrieved successfully')
+  async getProtectedData() {
     this.logger.log('Protected data accessed successfully');
-
-    const data = this.businessService.generateProtectedData();
-    return new BaseResponseDto(data);
+    return this.businessService.generateProtectedData();
   }
 
   /**
@@ -83,24 +78,21 @@ export class ProtectedController {
    */
   @Post('contact')
   @UseGuards(HoneypotGuard, RecaptchaGuard)
-  @Throttle({ default: { ttl: 300000, limit: 5 } }) // 5분에 5회
+  @Throttle({ default: { ttl: 300000, limit: 5 } })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ 
     summary: 'Submit contact form',
-    description: 'Submit a contact form with full anti-bot protection including honeypot fields and reCAPTCHA verification.'
+    description: 'Submit a contact form with full anti-bot protection.'
   })
   @ApiBody({ type: ContactRequestDto })
   @ApiResponse({
     status: 201,
-    description: 'Contact form submitted successfully',
-    type: BaseResponseDto<ContactResponseDto>
+    description: 'Contact form submitted successfully'
   })
   @ApiForbiddenResponse({ description: 'Security validation failed' })
   @ApiBadRequestResponse({ description: 'Invalid request data' })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
-  async submitContact(
-    @Body() contactDto: ContactRequestDto
-  ): Promise<BaseResponseDto<ContactResponseDto>> {
+  async submitContact(@Body() contactDto: ContactRequestDto) {
     this.logger.log('Contact form submitted', {
       email: contactDto.email,
       name: contactDto.name,
@@ -110,11 +102,35 @@ export class ProtectedController {
     const validation = this.businessService.validateBusinessRules(contactDto as any);
     if (!validation.isValid) {
       this.logger.warn('Contact form validation failed', { errors: validation.errors });
-      // 실제로는 ValidationException을 던질 수 있음
+      
+      // validation.errors가 Record<string, string[]> 형식이 맞는지 확인
+      const errors: Record<string, string[]> = {};
+      if (validation.errors && typeof validation.errors === 'object') {
+        // errors가 배열인 경우 처리
+        if (Array.isArray(validation.errors)) {
+          errors.general = validation.errors as string[];
+        } else {
+          // errors가 객체인 경우 처리
+          for (const [key, value] of Object.entries(validation.errors)) {
+            if (Array.isArray(value)) {
+              errors[key] = value as string[];
+            } else if (typeof value === 'string') {
+              errors[key] = [value];
+            } else {
+              errors[key] = [String(value)];
+            }
+          }
+        }
+      }
+      
+      return ResponseBuilder.validationError(
+        errors,
+        'Contact form validation failed'
+      );
     }
 
     const response = await this.businessService.processContactForm(contactDto);
-    return new BaseResponseDto(response, 'Contact form submitted successfully');
+    return ResponseBuilder.success(response, 'Contact form submitted successfully');
   }
 
   /**
@@ -122,11 +138,11 @@ export class ProtectedController {
    */
   @Post('profile/update')
   @UseGuards(HoneypotGuard)
-  @Throttle({ default: { ttl: 60000, limit: 3 } }) // 1분에 3회
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Update user profile',
-    description: 'Update user profile information with protection against automated updates.'
+    description: 'Update user profile information with protection.'
   })
   @ApiResponse({
     status: 200,
@@ -140,26 +156,23 @@ export class ProtectedController {
       phone?: string;
       preferences?: Record<string, unknown>;
     }
-  ): Promise<BaseResponseDto<{
-    id: string;
-    updatedFields: string[];
-    timestamp: string;
-  }>> {
+  ) {
     this.logger.log('Profile update requested', { 
       fields: Object.keys(updateData) 
     });
 
-    // 비즈니스 로직: 프로필 업데이트
-    const updatedFields = Object.keys(updateData).filter(key => updateData[key as keyof typeof updateData] !== undefined);
+    const updatedFields = Object.keys(updateData).filter(
+      key => updateData[key as keyof typeof updateData] !== undefined
+    );
+    
     const updateId = `UPDATE-${Date.now()}`;
-
     const result = {
       id: updateId,
       updatedFields,
       timestamp: new Date().toISOString(),
     };
 
-    return new BaseResponseDto(result, 'Profile updated successfully');
+    return ResponseBuilder.success(result, 'Profile updated successfully');
   }
 
   /**
@@ -167,23 +180,17 @@ export class ProtectedController {
    */
   @Get('resources')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { ttl: 120000, limit: 15 } }) // 2분에 15회
+  @Throttle({ default: { ttl: 120000, limit: 15 } })
   @ApiOperation({ 
     summary: 'Get protected resources',
-    description: 'Retrieve list of protected resources available to authenticated users.'
+    description: 'Retrieve list of protected resources.'
   })
   @ApiResponse({
     status: 200,
     description: 'Resources retrieved successfully'
   })
-  getProtectedResources(): BaseResponseDto<Array<{
-    id: string;
-    name: string;
-    type: string;
-    size: number;
-    lastModified: string;
-    downloadUrl: string;
-  }>> {
+  @FormatResponse('Resources retrieved successfully')
+  getProtectedResources() {
     this.logger.log('Protected resources requested');
 
     const resources = [
@@ -191,29 +198,29 @@ export class ProtectedController {
         id: 'res-001',
         name: 'User Manual.pdf',
         type: 'document',
-        size: 2048576, // 2MB in bytes
-        lastModified: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+        size: 2048576,
+        lastModified: new Date(Date.now() - 86400000).toISOString(),
         downloadUrl: '/api/protected/download/res-001'
       },
       {
         id: 'res-002', 
         name: 'API Documentation.pdf',
         type: 'document',
-        size: 1536000, // 1.5MB
-        lastModified: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+        size: 1536000,
+        lastModified: new Date(Date.now() - 172800000).toISOString(),
         downloadUrl: '/api/protected/download/res-002'
       },
       {
         id: 'res-003',
         name: 'Sample Data.csv',
         type: 'data',
-        size: 512000, // 500KB
+        size: 512000,
         lastModified: new Date().toISOString(),
         downloadUrl: '/api/protected/download/res-003'
       }
     ];
 
-    return new BaseResponseDto(resources);
+    return resources;
   }
 
   /**
@@ -221,15 +228,15 @@ export class ProtectedController {
    */
   @Post('export')
   @UseGuards(HoneypotGuard)
-  @Throttle({ default: { ttl: 900000, limit: 2 } }) // 15분에 2회
+  @Throttle({ default: { ttl: 900000, limit: 2 } })
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ 
     summary: 'Request data export',
-    description: 'Request export of user data. The export will be processed asynchronously.'
+    description: 'Request export of user data.'
   })
   @ApiResponse({
     status: 202,
-    description: 'Export request accepted and queued for processing'
+    description: 'Export request accepted'
   })
   async requestDataExport(
     @Body() exportRequest: {
@@ -240,26 +247,19 @@ export class ProtectedController {
       };
       includeMetadata?: boolean;
     }
-  ): Promise<BaseResponseDto<{
-    exportId: string;
-    estimatedCompletionTime: string;
-    downloadWillBeAvailableUntil: string;
-  }>> {
+  ) {
     this.logger.log('Data export requested', { 
       format: exportRequest.format,
       includeMetadata: exportRequest.includeMetadata 
     });
 
     const exportId = `EXPORT-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-    const estimatedCompletionTime = new Date(Date.now() + 300000).toISOString(); // 5분 후
-    const downloadWillBeAvailableUntil = new Date(Date.now() + 2592000000).toISOString(); // 30일 후
-
     const result = {
       exportId,
-      estimatedCompletionTime,
-      downloadWillBeAvailableUntil,
+      estimatedCompletionTime: new Date(Date.now() + 300000).toISOString(),
+      downloadWillBeAvailableUntil: new Date(Date.now() + 2592000000).toISOString(),
     };
 
-    return new BaseResponseDto(result, 'Export request queued successfully');
+    return ResponseBuilder.success(result, 'Export request queued successfully');
   }
 }

@@ -1,5 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
+import { 
+  BrowserData, 
+  BrowserFingerprint, 
+  FingerprintData,
+  WebGLData,
+  ScreenData
+} from '../../../types';
 
 /**
  * Browser Fingerprinting Service
@@ -25,22 +32,27 @@ export class FingerprintService {
     const fingerprint: BrowserFingerprint = {
       id: fingerprintId,
       canvas: data.canvas || 'unavailable',
-      webgl: data.webgl,
+      webgl: data.webgl || {
+        vendor: 'unknown',
+        renderer: 'unknown',
+        version: 'unknown',
+        extensions: []
+      },
       audio: data.audio || 'unavailable',
       fonts: data.fonts || [],
       screen: this.processScreenData(data.screen),
-      timezone: data.timezone,
-      language: data.language,
-      platform: data.platform,
-      hardwareConcurrency: data.hardwareConcurrency,
-      deviceMemory: data.deviceMemory,
-      colorDepth: data.colorDepth,
-      pixelRatio: data.pixelRatio,
-      touchSupport: data.touchSupport,
-      webrtc: data.webrtc,
-      plugins: this.processPlugins(data.plugins),
+      timezone: data.timezone || 'unknown',
+      language: data.language || 'unknown',
+      platform: data.platform || 'unknown',
+      plugins: this.processPlugins(data.plugins || []),
       timestamp: new Date(),
       trustScore: this.calculateTrustScore(data),
+      ...(data.hardwareConcurrency !== undefined && { hardwareConcurrency: data.hardwareConcurrency }),
+      ...(data.deviceMemory !== undefined && { deviceMemory: data.deviceMemory }),
+      ...(data.colorDepth !== undefined && { colorDepth: data.colorDepth }),
+      ...(data.pixelRatio !== undefined && { pixelRatio: data.pixelRatio }),
+      ...(data.touchSupport !== undefined && { touchSupport: data.touchSupport }),
+      ...(data.webrtc !== undefined && { webrtc: data.webrtc }),
     };
 
     // 캐시 저장
@@ -287,7 +299,7 @@ export class FingerprintService {
     }
 
     // WebRTC 누출 체크
-    if (fingerprint.webrtc?.leaked) {
+    if (typeof fingerprint.webrtc === 'object' && fingerprint.webrtc?.leaked) {
       score += 5;
       factors.push('WebRTC IP leak detected');
     }
@@ -424,73 +436,6 @@ export class FingerprintService {
 }
 
 // ===== Type Definitions =====
-
-export interface BrowserData {
-  canvas?: string;
-  webgl?: WebGLData;
-  audio?: string;
-  fonts?: string[];
-  screen?: any;
-  timezone?: string;
-  language?: string;
-  platform?: string;
-  hardwareConcurrency?: number;
-  deviceMemory?: number;
-  colorDepth?: number;
-  pixelRatio?: number;
-  touchSupport?: boolean;
-  webrtc?: WebRTCData;
-  plugins?: any[];
-}
-
-export interface WebGLData {
-  renderer?: string;
-  vendor?: string;
-  version?: string;
-  shadingLanguageVersion?: string;
-  extensions?: string[];
-}
-
-export interface WebRTCData {
-  localIP?: string;
-  publicIP?: string;
-  leaked?: boolean;
-}
-
-export interface ScreenData {
-  width: number;
-  height: number;
-  availWidth: number;
-  availHeight: number;
-  colorDepth: number;
-  pixelDepth: number;
-}
-
-export interface BrowserFingerprint {
-  id: string;
-  canvas: string;
-  webgl: WebGLData;
-  audio: string;
-  fonts: string[];
-  screen: ScreenData;
-  timezone?: string;
-  language?: string;
-  platform?: string;
-  hardwareConcurrency?: number;
-  deviceMemory?: number;
-  colorDepth?: number;
-  pixelRatio?: number;
-  touchSupport?: boolean;
-  webrtc?: WebRTCData;
-  plugins?: string[];
-  timestamp: Date;
-  trustScore: number;
-}
-
-export interface FingerprintData {
-  fingerprint: BrowserFingerprint;
-  createdAt: number;
-}
 
 export interface CanvasValidation {
   isValid: boolean;

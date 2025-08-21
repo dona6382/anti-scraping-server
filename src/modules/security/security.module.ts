@@ -4,8 +4,13 @@ import { Module, Global } from '@nestjs/common';
 import { SecurityAdminController } from './security-admin.controller';
 import { FingerprintController } from './fingerprint.controller';
 
+// Business Services
+import { SecurityBusinessService } from '../../services/security/security-business.service';
+import { AdminBusinessService } from '../../services/admin/admin-business.service';
+
 // Common services that are already available
 import { IpBlacklistService } from '../../common/services/ip-blacklist.service';
+import { FingerprintService } from '../../common/services/fingerprint/fingerprint.service';
 
 /**
  * Security Module
@@ -19,8 +24,14 @@ import { IpBlacklistService } from '../../common/services/ip-blacklist.service';
     FingerprintController,
   ],
   providers: [
-    // Security Admin에서 사용할 서비스들은 Common에서 inject
+    SecurityBusinessService,
+    AdminBusinessService,
+    FingerprintService,
+    // IpBlacklistService는 CommonModule에서 이미 export되어 있음
   ],
-  exports: [],
+  exports: [
+    SecurityBusinessService,
+    AdminBusinessService,
+  ],
 })
 export class SecurityModule {}

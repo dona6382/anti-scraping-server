@@ -10,7 +10,7 @@ import { BaseCacheService } from './base-cache.service';
 @Injectable()
 export class RedisCacheService extends BaseCacheService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisCacheService.name);
-  private client: RedisClientType;
+  private client!: RedisClientType;
   private isConnected = false;
 
   constructor(

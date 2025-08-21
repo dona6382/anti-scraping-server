@@ -1,10 +1,11 @@
-// Re-export unified exception filter for backward compatibility
-export { UnifiedExceptionFilter } from './global-exception.filter';
-export { UnifiedExceptionFilter as GlobalExceptionFilter } from './global-exception.filter';
-export { 
-  DomainException,
-  SecurityException,
-  ValidationException,
-  ResourceNotFoundException,
-  RateLimitException 
+/**
+ * Export all filters
+ */
+export {
+  UnifiedExceptionFilter,
+  HttpExceptionFilter,
+  ValidationExceptionFilter,
 } from './global-exception.filter';
+
+// Re-export exceptions from exceptions module
+export * from '../exceptions';

@@ -9,6 +9,7 @@ import { TestController } from './test.controller';
 
 // Services
 import { BusinessService } from '../services/business.service';
+import { TestingBusinessService } from '../services/testing/testing-business.service';
 
 // Common Module for shared services and guards
 import { CommonModule } from '../common/common.module';
@@ -26,7 +27,13 @@ import { CommonModule } from '../common/common.module';
     SecureController,
     TestController,
   ],
-  providers: [BusinessService],
-  exports: [BusinessService],
+  providers: [
+    BusinessService,
+    TestingBusinessService,
+  ],
+  exports: [
+    BusinessService,
+    TestingBusinessService,
+  ],
 })
 export class ControllersModule {}

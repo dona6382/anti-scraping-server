@@ -267,4 +267,49 @@ export class BusinessService {
       ...additionalData,
     };
   }
+
+  /**
+   * 대량 작업 처리
+   */
+  async processBulkOperation(data: any): Promise<{
+    processedCount: number;
+    successCount: number;
+    failedCount: number;
+    results: Array<{ id: string; status: 'success' | 'failed'; message?: string }>;
+  }> {
+    this.logger.log('Processing bulk operation');
+    
+    // 비즈니스 로직: 대량 작업 처리 시뮬레이션
+    const items = Array.isArray(data) ? data : [data];
+    const results: Array<{ id: string; status: 'success' | 'failed'; message?: string }> = [];
+    
+    let successCount = 0;
+    let failedCount = 0;
+    
+    for (const [index, item] of items.entries()) {
+      const id = this.generateId(`BULK-${index}`);
+      
+      // 각 항목 처리 시뮬레이션
+      const success = Math.random() > 0.1; // 90% 성공률
+      
+      if (success) {
+        successCount++;
+        results.push({ id, status: 'success' });
+      } else {
+        failedCount++;
+        results.push({ 
+          id, 
+          status: 'failed', 
+          message: 'Processing failed due to validation error' 
+        });
+      }
+    }
+    
+    return {
+      processedCount: items.length,
+      successCount,
+      failedCount,
+      results,
+    };
+  }
 }

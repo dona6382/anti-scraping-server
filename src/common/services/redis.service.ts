@@ -113,7 +113,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.stats.connectedAt = new Date();
     });
 
-    this.client.on('error', (error) => {
+    this.client.on('error', (error: any) => {
       this.logger.error('Redis error:', error);
       this.status = RedisConnectionStatus.ERROR;
       this.stats.lastError = new Date();

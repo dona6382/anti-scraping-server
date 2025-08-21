@@ -35,7 +35,8 @@ export class CacheFactory {
           throw new Error('Redis health check failed');
         }
       } catch (error) {
-        this.logger.warn(`Failed to initialize Redis cache: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(`Failed to initialize Redis cache: ${errorMessage}`);
         this.logger.log('Falling back to memory cache');
       }
     } else {

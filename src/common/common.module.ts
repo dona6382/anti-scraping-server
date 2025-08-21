@@ -1,12 +1,15 @@
 import { Module, Global } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 
-// Configuration
+// Configuration은 ConfigurationModule에서 이미 글로벌로 제공됨
 import { ConfigurationModule } from '../modules/configuration/configuration.module';
-import { ConfigurationService } from '../modules/configuration/configuration.service';
 
 // Cache
 import { CacheFactory, CacheServiceProvider } from './services/cache.factory';
+import { RedisService } from './services/redis.service';
+import { MemoryCacheService } from './services/memory-cache.service';
+import { RedisCacheService } from './services/redis-cache.service';
 
 // Services
 import { IpBlacklistService } from './services/ip-blacklist.service';
@@ -30,19 +33,22 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
     ConfigurationModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigurationModule],
-      inject: [ConfigurationService],
-      useFactory: (config: ConfigurationService) => ({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
         throttlers: [
           {
             name: 'default',
-            ttl: config.app.throttle.ttl * 1000,
-            limit: config.app.throttle.limit,
+            ttl: configService.get<number>('THROTTLE_TTL', 10) * 1000,
+            limit: configService.get<number>('THROTTLE_LIMIT', 20),
           },
         ],
       }),
     }),
   ],
   providers: [
+    // Redis
+    RedisService,
+    
     // Cache
     CacheFactory,
     CacheServiceProvider,
@@ -63,6 +69,7 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
     // Export cache
     'ICacheService',
     CacheFactory,
+    RedisService,
     
     // Export services
     IpBlacklistService,

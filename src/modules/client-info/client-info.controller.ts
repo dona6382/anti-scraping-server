@@ -17,7 +17,9 @@ export class ClientInfoController {
       }
       return clientInfo;
     } catch (error) {
-      this.logger.error(`Failed to get client info: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to get client info: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -26,7 +28,7 @@ export class ClientInfoController {
     const forwarded = request.headers['x-forwarded-for'] as string;
     const realIp = request.headers['x-real-ip'] as string;
     if (forwarded) {
-      return forwarded.split(',')[0].trim();
+      return forwarded.split(',')[0]?.trim() || 'unknown';
     }
     if (realIp) {
       return realIp;

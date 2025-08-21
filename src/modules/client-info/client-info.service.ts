@@ -221,8 +221,8 @@ export class ClientInfoService {
       if (value) {
         const ip = Array.isArray(value) ? value[0] : value.toString();
         // x-forwarded-for는 쉼표로 구분된 목록일 수 있음
-        const firstIp = ip.split(',')[0].trim();
-        if (this.isValidIp(firstIp)) {
+        const firstIp = ip?.split(',')[0]?.trim();
+        if (firstIp && this.isValidIp(firstIp)) {
           return firstIp;
         }
       }
@@ -350,7 +350,8 @@ export class ClientInfoService {
         };
       }
     } catch (error) {
-      this.logger.error(`Failed to get location info: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to get location info: ${errorMessage}`);
     }
 
     return {
@@ -399,7 +400,8 @@ export class ClientInfoService {
         }
       }
     } catch (error) {
-      this.logger.debug(`VPN/Tor check failed: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.debug(`VPN/Tor check failed: ${errorMessage}`);
     }
 
     return { isVpn, isTor };
@@ -585,7 +587,7 @@ export class ClientInfoService {
     );
 
     return {
-      all: allHeaders,
+      all: allHeaders as Record<string, string | string[]>,
       suspicious: suspiciousHeaders,
       missing: missingHeaders,
     };
@@ -679,8 +681,8 @@ export class ClientInfoService {
     const acceptLanguage = request.headers['accept-language'] || '';
     const languages = acceptLanguage
       .split(',')
-      .map(lang => lang.split(';')[0].trim())
-      .filter(Boolean);
+      .map(lang => lang?.split(';')[0]?.trim())
+      .filter((lang): lang is string => Boolean(lang));
 
     return {
       javascript: false, // 클라이언트 사이드에서 확인 필요

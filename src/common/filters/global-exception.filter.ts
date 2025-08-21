@@ -7,227 +7,291 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { SecurityException } from '../exceptions';
 
-/**
- * Domain Exception
- * 도메인 레이어에서 발생하는 비즈니스 로직 예외
- */
-export class DomainException extends Error {
-  constructor(
-    public readonly message: string,
-    public readonly code: string,
-    public readonly statusCode: number = HttpStatus.BAD_REQUEST,
-    public readonly context?: any,
-  ) {
-    super(message);
-    this.name = 'DomainException';
-  }
+interface ExceptionInfo {
+  statusCode: number;
+  message: string;
+  error?: string | undefined;
+  details?: Record<string, unknown> | undefined;
+  stack?: string | undefined;
 }
 
 /**
- * Unified Exception Filter
- * 모든 예외를 처리하고 일관된 응답 형식을 제공
+ * 통합 예외 필터
+ * 모든 예외를 처리하고 안전한 응답을 생성
  */
 @Catch()
 export class UnifiedExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(UnifiedExceptionFilter.name);
+  private readonly logger = new Logger('ExceptionFilter');
   private readonly isDevelopment = process.env.NODE_ENV !== 'production';
 
-  catch(exception: unknown, host: ArgumentsHost) {
+  catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    // 에러 정보 추출
-    const errorInfo = this.extractErrorInfo(exception);
+    // 예외 정보 추출
+    const exceptionInfo = this.extractExceptionInfo(exception);
     
-    // 로깅
-    this.logError(exception, errorInfo, request);
+    // 내부 로깅 (상세 정보 포함)
+    this.logException(exceptionInfo, request);
 
-    // 응답 생성
-    const errorResponse = this.createErrorResponse(errorInfo, request);
+    // 클라이언트 응답 (안전한 정보만)
+    const clientResponse = this.createClientResponse(exceptionInfo, request);
     
-    // 응답 전송
-    response.status(errorInfo.statusCode).json(errorResponse);
+    response
+      .status(exceptionInfo.statusCode)
+      .json(clientResponse);
   }
 
   /**
-   * 예외로부터 에러 정보 추출
+   * 예외 정보 추출
    */
-  private extractErrorInfo(exception: unknown): {
-    statusCode: number;
-    message: string;
-    code: string;
-    details?: any;
-  } {
-    let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Internal server error';
-    let code = 'INTERNAL_ERROR';
-    let details: any = undefined;
+  private extractExceptionInfo(exception: unknown): ExceptionInfo {
+    // SecurityException 처리
+    if (exception instanceof SecurityException) {
+      return {
+        statusCode: HttpStatus.FORBIDDEN,
+        message: 'Access denied',
+        error: 'Forbidden',
+        details: exception.getInternalDetails(),
+        stack: exception.stack,
+      };
+    }
 
-    // Domain Exception 처리
-    if (exception instanceof DomainException) {
-      statusCode = exception.statusCode;
-      message = exception.message;
-      code = exception.code;
-      details = exception.context;
-    }
-    // HTTP Exception 처리
-    else if (exception instanceof HttpException) {
-      statusCode = exception.getStatus();
-      const errorResponse = exception.getResponse();
-      
-      if (typeof errorResponse === 'string') {
-        message = errorResponse;
-      } else if (typeof errorResponse === 'object' && errorResponse !== null) {
-        message = (errorResponse as any).message || message;
-        code = (errorResponse as any).error || code;
-        details = (errorResponse as any).details;
-      }
-    }
-    // 일반 Error 처리
-    else if (exception instanceof Error) {
-      message = exception.message;
-      
-      // 개발 환경에서는 스택 트레이스 포함
-      if (this.isDevelopment) {
-        details = {
+    // HttpException 처리
+    if (exception instanceof HttpException) {
+      const response = exception.getResponse();
+      const status = exception.getStatus();
+
+      if (typeof response === 'object' && response !== null) {
+        return {
+          statusCode: status,
+          message: (response as any).message || exception.message,
+          error: (response as any).error || exception.name,
+          details: response as Record<string, unknown>,
           stack: exception.stack,
-          name: exception.name,
         };
       }
+
+      return {
+        statusCode: status,
+        message: exception.message,
+        error: exception.name,
+        stack: exception.stack,
+      };
     }
 
-    // 프로덕션 환경에서 내부 에러 숨기기
-    if (!this.isDevelopment && statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
-      message = 'An error occurred processing your request';
-      details = undefined;
+    // 일반 Error 처리
+    if (exception instanceof Error) {
+      return {
+        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: this.isDevelopment ? exception.message : 'Internal server error',
+        error: 'Internal Server Error',
+        stack: exception.stack,
+      };
     }
 
-    return { statusCode, message, code, details };
+    // 알 수 없는 예외
+    return {
+      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+      message: 'An unexpected error occurred',
+      error: 'Internal Server Error',
+      details: { raw: String(exception) },
+    };
   }
 
   /**
-   * 에러 로깅
+   * 예외 로깅
    */
-  private logError(
-    exception: unknown,
-    errorInfo: any,
-    request: Request,
+  private logException(
+    exceptionInfo: ExceptionInfo,
+    request: Request
   ): void {
     const logContext = {
-      url: request.url,
+      statusCode: exceptionInfo.statusCode,
       method: request.method,
-      ip: request.ip,
-      userAgent: request.get('user-agent'),
-      statusCode: errorInfo.statusCode,
-      code: errorInfo.code,
+      url: request.url,
+      ip: this.getClientIp(request),
+      userAgent: request.headers['user-agent'],
+      timestamp: new Date().toISOString(),
     };
 
-    // 에러 레벨에 따른 로깅
-    if (errorInfo.statusCode >= 500) {
+    // 4xx 에러는 경고, 5xx 에러는 에러로 로깅
+    if (exceptionInfo.statusCode >= 500) {
       this.logger.error(
-        `Unhandled exception: ${errorInfo.message}`,
-        exception instanceof Error ? exception.stack : undefined,
-        logContext,
+        `${exceptionInfo.message}`,
+        exceptionInfo.stack,
+        {
+          ...logContext,
+          details: exceptionInfo.details,
+        }
       );
-    } else if (errorInfo.statusCode >= 400) {
+    } else if (exceptionInfo.statusCode >= 400) {
       this.logger.warn(
-        `Client error: ${errorInfo.code} - ${errorInfo.message}`,
-        logContext,
+        `${exceptionInfo.message}`,
+        {
+          ...logContext,
+          details: exceptionInfo.details,
+        }
       );
     }
   }
 
   /**
-   * 에러 응답 생성
+   * 클라이언트 응답 생성
    */
-  private createErrorResponse(
-    errorInfo: any,
-    request: Request,
-  ): any {
-    const response: any = {
-      success: false,
-      error: {
-        code: errorInfo.code,
-        message: errorInfo.message,
-        statusCode: errorInfo.statusCode,
-        timestamp: new Date().toISOString(),
-        path: request.url,
-        method: request.method,
-      },
+  private createClientResponse(
+    exceptionInfo: ExceptionInfo,
+    request: Request
+  ): Record<string, unknown> {
+    const baseResponse = {
+      statusCode: exceptionInfo.statusCode,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      method: request.method,
     };
 
-    // 상세 정보가 있으면 추가
-    if (errorInfo.details) {
-      response.error.details = errorInfo.details;
+    // 프로덕션 환경에서는 최소한의 정보만 노출
+    if (!this.isDevelopment) {
+      if (exceptionInfo.statusCode >= 500) {
+        return {
+          ...baseResponse,
+          message: 'Internal server error',
+          error: 'Internal Server Error',
+        };
+      }
+
+      if (exceptionInfo.statusCode === 403) {
+        return {
+          ...baseResponse,
+          message: 'Access denied',
+          error: 'Forbidden',
+        };
+      }
+
+      return {
+        ...baseResponse,
+        message: exceptionInfo.message,
+        error: exceptionInfo.error || 'Error',
+      };
     }
 
-    // Request ID가 있으면 추가 (추적용)
-    if ((request as any).id) {
-      response.requestId = (request as any).id;
+    // 개발 환경에서는 상세 정보 포함
+    return {
+      ...baseResponse,
+      message: exceptionInfo.message,
+      error: exceptionInfo.error,
+      // SecurityException의 경우 공개 가능한 정보만
+      ...(exceptionInfo.details && 
+        !(exceptionInfo.details.guardName) && {
+          details: exceptionInfo.details,
+        }),
+      // 스택 트레이스는 개발 환경에서만
+      ...(this.isDevelopment && exceptionInfo.statusCode >= 500 && exceptionInfo.stack && {
+        stack: exceptionInfo.stack.split('\n').slice(0, 5),
+      }),
+    };
+  }
+
+  /**
+   * 클라이언트 IP 추출
+   */
+  private getClientIp(request: Request): string {
+    const forwardedFor = request.headers['x-forwarded-for'];
+    if (forwardedFor) {
+      const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+      if (ips) {
+        return ips.split(',')[0]?.trim() || 'unknown';
+      }
     }
 
-    return response;
+    return (
+      (request.headers['x-real-ip'] as string) ||
+      (request as any).connection?.remoteAddress ||
+      (request as any).socket?.remoteAddress ||
+      request.ip ||
+      'unknown'
+    );
   }
 }
 
 /**
- * Security Exception
- * 보안 관련 예외
+ * HTTP Exception Filter
+ * HTTP 예외만 처리하는 필터 (특정 컨트롤러용)
  */
-export class SecurityException extends DomainException {
-  constructor(
-    message: string,
-    code: string = 'SECURITY_VIOLATION',
-    context?: any,
-  ) {
-    super(message, code, HttpStatus.FORBIDDEN, context);
-    this.name = 'SecurityException';
+@Catch(HttpException)
+export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger('HttpExceptionFilter');
+
+  catch(exception: HttpException, host: ArgumentsHost): void {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    const status = exception.getStatus();
+    const exceptionResponse = exception.getResponse();
+
+    const errorResponse = {
+      statusCode: status,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      method: request.method,
+      message: 
+        typeof exceptionResponse === 'object' && 'message' in exceptionResponse
+          ? (exceptionResponse as any).message
+          : exception.message,
+    };
+
+    this.logger.warn(
+      `HTTP Exception: ${errorResponse.message}`,
+      {
+        statusCode: status,
+        path: request.url,
+        method: request.method,
+      }
+    );
+
+    response.status(status).json(errorResponse);
   }
 }
 
 /**
- * Validation Exception
- * 입력 검증 예외
+ * Validation Exception Filter
+ * 검증 예외 전용 필터
  */
-export class ValidationException extends DomainException {
-  constructor(
-    message: string,
-    code: string = 'VALIDATION_ERROR',
-    context?: any,
-  ) {
-    super(message, code, HttpStatus.BAD_REQUEST, context);
-    this.name = 'ValidationException';
-  }
-}
+@Catch(HttpException)
+export class ValidationExceptionFilter implements ExceptionFilter {
+  catch(exception: HttpException, host: ArgumentsHost): void {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    const status = exception.getStatus();
 
-/**
- * Not Found Exception
- * 리소스를 찾을 수 없음
- */
-export class ResourceNotFoundException extends DomainException {
-  constructor(
-    message: string,
-    code: string = 'RESOURCE_NOT_FOUND',
-    context?: any,
-  ) {
-    super(message, code, HttpStatus.NOT_FOUND, context);
-    this.name = 'ResourceNotFoundException';
-  }
-}
-
-/**
- * Rate Limit Exception
- * 요청 제한 초과
- */
-export class RateLimitException extends DomainException {
-  constructor(
-    message: string = 'Too many requests',
-    code: string = 'RATE_LIMIT_EXCEEDED',
-    context?: any,
-  ) {
-    super(message, code, HttpStatus.TOO_MANY_REQUESTS, context);
-    this.name = 'RateLimitException';
+    if (status === HttpStatus.BAD_REQUEST) {
+      const exceptionResponse = exception.getResponse();
+      
+      response.status(status).json({
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        path: request.url,
+        error: 'Validation Error',
+        message: 'The request contains invalid data',
+        // 개발 환경에서만 상세 검증 오류 표시
+        ...(process.env.NODE_ENV !== 'production' && 
+          typeof exceptionResponse === 'object' && 
+          'errors' in exceptionResponse && {
+            errors: (exceptionResponse as any).errors,
+          }),
+      });
+    } else {
+      // BAD_REQUEST가 아닌 경우 기본 처리
+      response.status(status).json({
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        path: request.url,
+        message: exception.message,
+      });
+    }
   }
 }

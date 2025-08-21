@@ -1,7 +1,7 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ICacheService } from './base-cache.service';
-import { ConfigurationService } from '../../modules/configuration/configuration.service';
-import { BlacklistEntry, SecurityReason } from '../../types';
+import { BlacklistEntry, SecurityReason, IpStatistics } from '../../types';
 
 /**
  * IP Blacklist Service
@@ -15,9 +15,9 @@ export class IpBlacklistService {
 
   constructor(
     @Inject('ICacheService') private readonly cache: ICacheService,
-    private readonly configService: ConfigurationService,
+    private readonly configService: ConfigService,
   ) {
-    this.ttl = this.configService.app.ipBlacklist.ttl;
+    this.ttl = this.configService.get<number>('IP_BLACKLIST_TTL', 86400);
     this.logger.log(`Initialized with TTL: ${this.ttl} seconds`);
   }
 
@@ -35,11 +35,12 @@ export class IpBlacklistService {
     const key = this.getKey(ip);
     const existingEntry = await this.cache.get<BlacklistEntry>(key);
     
+    const expiresAt = ttl ? new Date(Date.now() + ttl * 1000) : undefined;
     const entry: BlacklistEntry = {
       ip,
       reason,
       blockedAt: new Date(),
-      expiresAt: ttl ? new Date(Date.now() + ttl * 1000) : undefined,
+      ...(expiresAt && { expiresAt }),
       count: existingEntry ? existingEntry.count + 1 : 1,
     };
     
@@ -49,213 +50,188 @@ export class IpBlacklistService {
   }
 
   /**
-   * IP 차단 해제 (별칭 추가)
-   */
-  async unblockIp(ip: string): Promise<void> {
-    return this.removeFromBlacklist(ip);
-  }
-
-  /**
    * IP 차단 해제
    */
-  async removeFromBlacklist(ip: string): Promise<void> {
+  async unblockIp(ip: string): Promise<void> {
     const key = this.getKey(ip);
     await this.cache.delete(key);
     this.logger.log(`Unblocked IP: ${ip}`);
   }
 
   /**
-   * IP 차단 여부 확인 (별칭 추가)
+   * IP 차단 해제 (별칭)
    */
-  async isBlocked(ip: string): Promise<boolean> {
-    return this.isBlacklisted(ip);
+  async removeFromBlacklist(ip: string): Promise<void> {
+    return this.unblockIp(ip);
   }
 
   /**
    * IP 차단 여부 확인
    */
-  async isBlacklisted(ip: string): Promise<boolean> {
+  async isBlocked(ip: string): Promise<boolean> {
     const key = this.getKey(ip);
-    const entry = await this.cache.get<BlacklistEntry>(key);
-    
-    if (!entry) {
-      return false;
-    }
-    
-    // 만료 시간 확인
-    if (entry.expiresAt && new Date(entry.expiresAt) < new Date()) {
-      await this.cache.delete(key);
-      return false;
-    }
-    
-    return true;
+    return this.cache.exists(key);
+  }
+
+  /**
+   * 차단 정보 조회
+   */
+  async getBlockInfo(ip: string): Promise<BlacklistEntry | null> {
+    const key = this.getKey(ip);
+    return this.cache.get<BlacklistEntry>(key);
+  }
+
+  /**
+   * IP 정보 조회 (별칭)
+   */
+  async getIpInfo(ip: string): Promise<BlacklistEntry | null> {
+    return this.getBlockInfo(ip);
   }
 
   /**
    * 차단 이유 조회
    */
   async getBlockReason(ip: string): Promise<string | null> {
-    const key = this.getKey(ip);
-    const entry = await this.cache.get<BlacklistEntry>(key);
-    return entry ? entry.reason : null;
-  }
-
-  /**
-   * 차단 정보 조회 (별칭 추가)
-   */
-  async getBlockInfo(ip: string): Promise<BlacklistEntry | null> {
-    return this.getIpInfo(ip);
-  }
-
-  /**
-   * IP 정보 조회
-   */
-  async getIpInfo(ip: string): Promise<BlacklistEntry | null> {
-    const key = this.getKey(ip);
-    return await this.cache.get<BlacklistEntry>(key);
-  }
-
-  /**
-   * 모든 차단된 IP 조회 (별칭 추가)
-   */
-  async getAllBlockedIps(): Promise<BlacklistEntry[]> {
-    return this.getAllBlacklistedIps();
+    const info = await this.getBlockInfo(ip);
+    return info ? info.reason : null;
   }
 
   /**
    * 모든 차단된 IP 조회
    */
-  async getAllBlacklistedIps(): Promise<BlacklistEntry[]> {
+  async getAllBlockedIps(): Promise<string[]> {
     const pattern = `${this.keyPrefix}:*`;
     const keys = await this.cache.keys(pattern);
     
-    if (keys.length === 0) {
-      return [];
+    return keys.map(key => key.replace(`${this.keyPrefix}:`, ''));
+  }
+
+  /**
+   * 모든 차단된 IP 조회 (별칭)
+   */
+  async getAllBlacklistedIps(): Promise<string[]> {
+    return this.getAllBlockedIps();
+  }
+
+  /**
+   * 차단 목록 조회 (상세 정보 포함)
+   */
+  async getBlocklist(): Promise<BlacklistEntry[]> {
+    const ips = await this.getAllBlockedIps();
+    const entries: BlacklistEntry[] = [];
+    
+    for (const ip of ips) {
+      const entry = await this.getBlockInfo(ip);
+      if (entry) {
+        entries.push(entry);
+      }
     }
     
-    const entries = await this.cache.getMany<BlacklistEntry>(keys);
-    return entries.filter((entry): entry is BlacklistEntry => entry !== null);
+    return entries;
   }
 
   /**
    * 차단 목록 초기화
    */
-  async clearAll(): Promise<void> {
-    const pattern = `${this.keyPrefix}:*`;
-    const keys = await this.cache.keys(pattern);
+  async clearBlocklist(): Promise<void> {
+    const ips = await this.getAllBlockedIps();
     
-    if (keys.length > 0) {
-      await this.cache.deleteMany(keys);
-      this.logger.log(`Cleared ${keys.length} blocked IPs`);
+    for (const ip of ips) {
+      await this.unblockIp(ip);
     }
-  }
-
-  /**
-   * 통계 조회 (별칭 추가)
-   */
-  async getStats(): Promise<{
-    totalBlocked: number;
-    recentBlocks: number;
-    topReasons: Record<string, number>;
-  }> {
-    return this.getStatistics();
+    
+    this.logger.warn(`Cleared blacklist: ${ips.length} IPs removed`);
   }
 
   /**
    * 통계 조회
    */
-  async getStatistics(): Promise<{
-    totalBlocked: number;
-    recentBlocks: number;
-    topReasons: Record<string, number>;
-    redisConnected?: boolean;
-  }> {
-    const entries = await this.getAllBlockedIps();
-    const now = new Date();
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+  async getStatistics(): Promise<IpStatistics> {
+    const entries = await this.getBlocklist();
+    const now = Date.now();
+    const dayAgo = now - 86400000; // 24시간 전
     
     const recentBlocks = entries.filter(
-      (entry) => new Date(entry.blockedAt) > oneHourAgo
+      entry => entry.blockedAt.getTime() > dayAgo
     ).length;
     
-    const reasonCounts: Record<string, number> = {};
-    entries.forEach((entry) => {
-      reasonCounts[entry.reason] = (reasonCounts[entry.reason] || 0) + 1;
+    const topReasons: Record<string, number> = {};
+    entries.forEach(entry => {
+      topReasons[entry.reason] = (topReasons[entry.reason] || 0) + 1;
     });
+    
+    // Redis 연결 상태 확인
+    const redisConnected = await this.isRedisConnected();
     
     return {
       totalBlocked: entries.length,
       recentBlocks,
-      topReasons: reasonCounts,
-      redisConnected: true, // Redis 또는 메모리 캐시가 항상 작동
+      topReasons,
+      redisConnected,
     };
   }
 
   /**
-   * 자동 차단 (rate limiting 등과 연동)
+   * 만료된 항목 정리
    */
-  async autoBlock(ip: string, violations: string[]): Promise<void> {
-    const reason = `Auto-blocked: ${violations.join(', ')}` as SecurityReason;
+  async cleanupExpired(): Promise<number> {
+    const entries = await this.getBlocklist();
+    const now = new Date();
+    let cleaned = 0;
     
-    // 위반 횟수에 따라 차단 시간 증가
-    const blockInfo = await this.getBlockInfo(ip);
-    const count = blockInfo ? blockInfo.count + 1 : 1;
-    const ttl = this.calculateBlockDuration(count);
+    for (const entry of entries) {
+      if (entry.expiresAt && entry.expiresAt < now) {
+        await this.unblockIp(entry.ip);
+        cleaned++;
+      }
+    }
     
-    await this.blockIp(ip, reason, ttl);
+    if (cleaned > 0) {
+      this.logger.log(`Cleaned up ${cleaned} expired blacklist entries`);
+    }
+    
+    return cleaned;
   }
 
   /**
-   * 차단 시간 계산 (지수적 증가)
-   */
-  private calculateBlockDuration(violationCount: number): number {
-    const baseTtl = this.ttl;
-    const multiplier = Math.min(Math.pow(2, violationCount - 1), 128); // 최대 128배
-    return baseTtl * multiplier;
-  }
-
-  /**
-   * 캐시 키 생성
-   */
-  private getKey(ip: string): string {
-    // IP 주소 정규화
-    const normalizedIp = ip.trim().toLowerCase();
-    return `${this.keyPrefix}:${normalizedIp}`;
-  }
-
-  /**
-   * IP 주소 유효성 검사
+   * IP 유효성 검사
    */
   isValidIp(ip: string): boolean {
     // IPv4 패턴
-    const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-    // IPv6 패턴 (간단한 버전)
-    const ipv6Pattern = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
     
-    if (ipv4Pattern.test(ip)) {
-      // IPv4 범위 확인
+    if (ipv4Regex.test(ip)) {
       const parts = ip.split('.');
       return parts.every(part => {
         const num = parseInt(part, 10);
         return num >= 0 && num <= 255;
       });
     }
-    
-    return ipv6Pattern.test(ip);
+
+    // IPv6 패턴 (간단한 검증)
+    const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+    return ipv6Regex.test(ip);
   }
 
   /**
-   * CIDR 범위 차단 (예: 192.168.1.0/24)
+   * Redis 연결 상태 확인
    */
-  async blockCidr(cidr: string, reason: SecurityReason, ttl?: number): Promise<void> {
-    // CIDR 파싱 및 범위 내 모든 IP 차단
-    // 실제 구현은 더 복잡하지만, 기본 개념만 표시
-    this.logger.warn(`CIDR blocking not fully implemented: ${cidr}`);
-    
-    // 간단한 구현 예시 (실제로는 더 정교한 로직 필요)
-    const [baseIp, mask] = cidr.split('/');
-    if (baseIp && mask) {
-      await this.blockIp(cidr, reason, ttl);
+  private async isRedisConnected(): Promise<boolean> {
+    try {
+      // cache service가 Redis를 사용하는지 확인
+      const testKey = '__redis_connection_test__';
+      await this.cache.set(testKey, true, 1);
+      await this.cache.delete(testKey);
+      return true;
+    } catch {
+      return false;
     }
+  }
+
+  /**
+   * 키 생성
+   */
+  private getKey(ip: string): string {
+    return `${this.keyPrefix}:${ip}`;
   }
 }

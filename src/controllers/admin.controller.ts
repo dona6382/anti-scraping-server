@@ -23,18 +23,22 @@ import {
 import { SkipThrottle } from '@nestjs/throttler';
 
 // Services
-import { IpBlacklistService, BlacklistEntry } from '../common/services/ip-blacklist.service';
+import { 
+  AdminBusinessService, 
+  PaginationParams, 
+  BlacklistRequest 
+} from '../services';
 
 // DTOs
 import {
   BaseResponseDto,
   BlacklistIpRequestDto,
 } from '../common/dto';
-import { IpStatistics } from '../types';
+import { IpStatistics, BlacklistEntry } from '../types';
 
 /**
  * Admin Controller
- * 관리자 전용 기능을 제공하는 컨트롤러
+ * 관리자 전용 기능을 제공하는 컨트롤러 (비즈니스 로직 분리됨)
  */
 @ApiTags('Admin')
 @Controller('admin')
@@ -42,7 +46,7 @@ import { IpStatistics } from '../types';
 export class AdminController {
   private readonly logger = new Logger(AdminController.name);
 
-  constructor(private readonly ipBlacklistService: IpBlacklistService) {}
+  constructor(private readonly adminBusinessService: AdminBusinessService) {}
 
   // ============================================
   // IP 블랙리스트 관리
@@ -65,18 +69,18 @@ export class AdminController {
   async getBlacklistStats(): Promise<BaseResponseDto<IpStatistics>> {
     this.logger.log('Admin: Blacklist statistics requested');
 
-    const stats = await this.ipBlacklistService.getStatistics();
+    const stats = await this.adminBusinessService.getBlacklistStatistics();
     return new BaseResponseDto(stats);
   }
 
   /**
-   * 모든 차단된 IP 조회
+   * 모든 차단된 IP 조회 (페이지네이션)
    */
   @Get('blacklist/ips')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Get all blacklisted IPs',
-    description: 'Retrieve a complete list of all blacklisted IP addresses with their blocking information.'
+    description: 'Retrieve a paginated list of all blacklisted IP addresses with their blocking information.'
   })
   @ApiQuery({
     name: 'page',
@@ -126,31 +130,19 @@ export class AdminController {
   }>> {
     this.logger.log('Admin: Blacklisted IPs requested', { page, limit, sortBy, order });
 
-    // 페이지네이션 제한
-    const safePage = Math.max(1, page);
-    const safeLimit = Math.min(Math.max(1, limit), 100);
-
-    const allIps = await this.ipBlacklistService.getAllBlacklistedIps();
-    
-    // 정렬
-    const sortedIps = this.sortBlacklistEntries(allIps, sortBy, order);
-
-    // 페이지네이션
-    const startIndex = (safePage - 1) * safeLimit;
-    const endIndex = startIndex + safeLimit;
-    const paginatedIps = sortedIps.slice(startIndex, endIndex);
-
-    const result = {
-      ips: paginatedIps,
-      pagination: {
-        page: safePage,
-        limit: safeLimit,
-        total: allIps.length,
-        totalPages: Math.ceil(allIps.length / safeLimit),
-      },
+    const paginationParams: PaginationParams = {
+      page,
+      limit,
+      sortBy,
+      order
     };
 
-    return new BaseResponseDto(result);
+    const result = await this.adminBusinessService.getPaginatedBlacklistedIps(paginationParams);
+    
+    return new BaseResponseDto({
+      ips: result.items,
+      pagination: result.pagination
+    });
   }
 
   /**
@@ -167,31 +159,24 @@ export class AdminController {
     status: 201,
     description: 'IP blacklisted successfully'
   })
+  @ApiForbiddenResponse({
+    description: 'IP already blacklisted or invalid IP format'
+  })
   async addIpToBlacklist(
     @Body() blacklistDto: BlacklistIpRequestDto
   ): Promise<BaseResponseDto<{ ip: string; reason: string; ttl?: number }>> {
-    this.logger.warn('Admin: Manual IP blacklist', { 
+    this.logger.log('Admin: Adding IP to blacklist', { 
       ip: blacklistDto.ip,
       reason: blacklistDto.reason 
     });
 
-    // IP 주소 유효성 검사
-    if (!this.ipBlacklistService.isValidIp(blacklistDto.ip)) {
-      throw new Error('Invalid IP address format');
-    }
-
-    await this.ipBlacklistService.blacklistIp(
-      blacklistDto.ip,
-      blacklistDto.reason || 'MANUAL_ADMIN_ACTION',
-      blacklistDto.ttl
-    );
-
-    const result: { ip: string; reason: string; ttl?: number | undefined } = {
+    const blacklistRequest: BlacklistRequest = {
       ip: blacklistDto.ip,
-      reason: blacklistDto.reason || 'MANUAL_ADMIN_ACTION',
-      ttl: blacklistDto.ttl,
+      ...(blacklistDto.reason && { reason: blacklistDto.reason }),
+      ...(blacklistDto.ttl && { ttl: blacklistDto.ttl })
     };
 
+    const result = await this.adminBusinessService.addIpToBlacklist(blacklistRequest);
     return new BaseResponseDto(result, `IP ${blacklistDto.ip} has been blacklisted`);
   }
 
@@ -204,92 +189,80 @@ export class AdminController {
     summary: 'Remove IP from blacklist',
     description: 'Remove an IP address from the blacklist.'
   })
-  @ApiParam({ 
-    name: 'ip', 
-    description: 'IP address to remove',
+  @ApiParam({
+    name: 'ip',
+    description: 'IP address to remove from blacklist',
     example: '192.168.1.100'
   })
   @ApiResponse({
     status: 200,
     description: 'IP removed from blacklist successfully'
   })
-  @ApiNotFoundResponse({ description: 'IP not found in blacklist' })
+  @ApiNotFoundResponse({
+    description: 'IP not found in blacklist'
+  })
   async removeIpFromBlacklist(
     @Param('ip') ip: string
-  ): Promise<BaseResponseDto<{ ip: string }>> {
-    this.logger.log('Admin: IP removal from blacklist', { ip });
+  ): Promise<BaseResponseDto<{ ip: string; status: string }>> {
+    this.logger.log('Admin: Removing IP from blacklist', { ip });
 
-    // IP가 실제로 차단되어 있는지 확인
-    const isBlocked = await this.ipBlacklistService.isBlocked(ip);
-    if (!isBlocked) {
-      throw new Error('IP not found in blacklist');
-    }
-
-    await this.ipBlacklistService.removeFromBlacklist(ip);
-
-    const result = { ip };
+    const result = await this.adminBusinessService.removeIpFromBlacklist(ip);
     return new BaseResponseDto(result, `IP ${ip} has been removed from blacklist`);
   }
 
   /**
-   * 특정 IP 정보 조회
+   * 특정 IP의 블랙리스트 정보 조회
    */
   @Get('blacklist/ip/:ip')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
-    summary: 'Get IP blacklist information',
-    description: 'Retrieve detailed information about a specific IP address in the blacklist.'
+    summary: 'Get blacklist info for specific IP',
+    description: 'Retrieve detailed blacklist information for a specific IP address.'
   })
-  @ApiParam({ 
-    name: 'ip', 
+  @ApiParam({
+    name: 'ip',
     description: 'IP address to check',
     example: '192.168.1.100'
   })
   @ApiResponse({
     status: 200,
-    description: 'IP information retrieved successfully'
+    description: 'IP blacklist info retrieved successfully'
   })
-  @ApiNotFoundResponse({ description: 'IP not found in blacklist' })
-  async getIpInfo(
+  @ApiNotFoundResponse({
+    description: 'IP not found in blacklist'
+  })
+  async getBlacklistInfo(
     @Param('ip') ip: string
-  ): Promise<BaseResponseDto<{ ip: string; info: BlacklistEntry | null; isBlocked: boolean }>> {
-    this.logger.log('Admin: IP info requested', { ip });
+  ): Promise<BaseResponseDto<BlacklistEntry | null>> {
+    this.logger.log('Admin: Getting blacklist info for IP', { ip });
 
-    const info = await this.ipBlacklistService.getIpInfo(ip);
-    const isBlocked = await this.ipBlacklistService.isBlocked(ip);
+    const info = await this.adminBusinessService.getBlacklistInfo(ip);
+    
+    if (!info) {
+      return new BaseResponseDto(null, `IP ${ip} is not in blacklist`);
+    }
 
-    const result = {
-      ip,
-      info,
-      isBlocked,
-    };
-
-    return new BaseResponseDto(result);
+    return new BaseResponseDto(info, `Blacklist info retrieved for ${ip}`);
   }
 
   /**
-   * 블랙리스트 전체 초기화
+   * 만료된 블랙리스트 항목 정리
    */
-  @Delete('blacklist/clear')
+  @Post('blacklist/cleanup')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
-    summary: 'Clear entire blacklist',
-    description: '⚠️ DANGER: Clear all entries from the IP blacklist. This action cannot be undone.'
+    summary: 'Cleanup expired blacklist entries',
+    description: 'Remove expired entries from the blacklist to optimize performance.'
   })
   @ApiResponse({
     status: 200,
-    description: 'Blacklist cleared successfully'
+    description: 'Cleanup completed successfully'
   })
-  async clearBlacklist(): Promise<BaseResponseDto<{ clearedCount: number }>> {
-    this.logger.warn('Admin: DANGER - Clearing entire blacklist');
+  async cleanupExpiredEntries(): Promise<BaseResponseDto<{ removedCount: number }>> {
+    this.logger.log('Admin: Starting blacklist cleanup');
 
-    const stats = await this.ipBlacklistService.getStatistics();
-    const clearedCount = stats.totalBlocked;
-
-    await this.ipBlacklistService.clearAll();
-
-    const result = { clearedCount };
-    return new BaseResponseDto(result, `Cleared ${clearedCount} entries from blacklist`);
+    const result = await this.adminBusinessService.cleanupExpiredEntries();
+    return new BaseResponseDto(result, `Cleanup completed: ${result.removedCount} entries removed`);
   }
 
   // ============================================
@@ -297,220 +270,40 @@ export class AdminController {
   // ============================================
 
   /**
-   * 시스템 통계 조회
+   * 시스템 상태 조회
    */
-  @Get('system/stats')
+  @Get('system/status')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
-    summary: 'Get system statistics',
-    description: 'Retrieve comprehensive system statistics and performance metrics.'
+    summary: 'Get system status',
+    description: 'Retrieve overall system health and status information.'
   })
   @ApiResponse({
     status: 200,
-    description: 'System statistics retrieved successfully'
+    description: 'System status retrieved successfully'
   })
-  async getSystemStats(): Promise<BaseResponseDto<{
+  async getSystemStatus(): Promise<BaseResponseDto<{
+    status: string;
     uptime: number;
-    memory: {
-      used: number;
-      total: number;
-      percentage: number;
-    };
-    requests: {
-      total: number;
-      blocked: number;
-      allowed: number;
-      blockRate: number;
-    };
-    performance: {
-      avgResponseTime: number;
-      p95ResponseTime: number;
-      p99ResponseTime: number;
-    };
-    timestamp: string;
+    memory: any;
+    security: any;
   }>> {
-    this.logger.log('Admin: System statistics requested');
+    this.logger.log('Admin: System status requested');
 
-    // 실제 시스템 통계 (예시)
-    const stats = {
+    // 컨트롤러에서는 단순한 데이터 조합만 수행
+    const systemInfo = {
+      status: 'operational',
       uptime: process.uptime(),
       memory: {
         used: process.memoryUsage().heapUsed,
         total: process.memoryUsage().heapTotal,
-        percentage: (process.memoryUsage().heapUsed / process.memoryUsage().heapTotal) * 100,
       },
-      requests: {
-        total: Math.floor(Math.random() * 10000) + 5000,
-        blocked: Math.floor(Math.random() * 500) + 100,
-        allowed: Math.floor(Math.random() * 9500) + 4900,
-        blockRate: 0, // 계산될 예정
-      },
-      performance: {
-        avgResponseTime: Math.random() * 100 + 50,
-        p95ResponseTime: Math.random() * 200 + 150,
-        p99ResponseTime: Math.random() * 500 + 300,
-      },
-      timestamp: new Date().toISOString(),
-    };
-
-    // 차단율 계산
-    stats.requests.blockRate = (stats.requests.blocked / stats.requests.total) * 100;
-
-    return new BaseResponseDto(stats);
-  }
-
-  /**
-   * 시스템 헬스 체크
-   */
-  @Get('system/health')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'System health check',
-    description: 'Perform comprehensive health check of all system components.'
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Health check completed'
-  })
-  async getSystemHealth(): Promise<BaseResponseDto<{
-    status: 'healthy' | 'degraded' | 'unhealthy';
-    components: Record<string, {
-      status: 'up' | 'down';
-      responseTime?: number;
-      error?: string;
-    }>;
-    timestamp: string;
-  }>> {
-    this.logger.log('Admin: System health check requested');
-
-    const components: Record<string, { status: 'up' | 'down'; responseTime?: number; error?: string }> = {};
-
-    // 메모리 체크
-    const memoryUsage = process.memoryUsage();
-    components.memory = {
-      status: memoryUsage.heapUsed / memoryUsage.heapTotal < 0.9 ? 'up' : 'down',
-      responseTime: 1,
-    };
-
-    // 캐시 체크 (IP 블랙리스트 서비스 확인)
-    try {
-      const start = Date.now();
-      await this.ipBlacklistService.getStatistics();
-      components.cache = {
-        status: 'up',
-        responseTime: Date.now() - start,
-      };
-    } catch (error) {
-      components.cache = {
-        status: 'down',
-        error: 'Cache service unavailable',
-      };
-    }
-
-    // 전체 상태 결정
-    const allComponentsUp = Object.values(components).every(comp => comp.status === 'up');
-    const anyComponentDown = Object.values(components).some(comp => comp.status === 'down');
-
-    let overallStatus: 'healthy' | 'degraded' | 'unhealthy';
-    if (allComponentsUp) {
-      overallStatus = 'healthy';
-    } else if (anyComponentDown) {
-      overallStatus = 'unhealthy';
-    } else {
-      overallStatus = 'degraded';
-    }
-
-    const result = {
-      status: overallStatus,
-      components,
-      timestamp: new Date().toISOString(),
-    };
-
-    return new BaseResponseDto(result);
-  }
-
-  /**
-   * 설정 정보 조회
-   */
-  @Get('config')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'Get system configuration',
-    description: 'Retrieve current system configuration (sensitive values are masked).'
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Configuration retrieved successfully'
-  })
-  getConfiguration(): BaseResponseDto<{
-    security: {
-      strictMode: boolean;
-      recaptchaEnabled: boolean;
-      redisEnabled: boolean;
-    };
-    performance: {
-      defaultRateLimit: number;
-      defaultRateTtl: number;
-    };
-    environment: {
-      nodeEnv: string;
-      port: number;
-      timestamp: string;
-    };
-  }> {
-    this.logger.log('Admin: Configuration requested');
-
-    const config = {
       security: {
-        strictMode: process.env.SECURITY_STRICT_MODE === 'true',
-        recaptchaEnabled: !!process.env.RECAPTCHA_SECRET_KEY,
-        redisEnabled: !!process.env.REDIS_HOST,
-      },
-      performance: {
-        defaultRateLimit: 20,
-        defaultRateTtl: 10000,
-      },
-      environment: {
-        nodeEnv: process.env.NODE_ENV || 'development',
-        port: parseInt(process.env.PORT || '3000', 10),
-        timestamp: new Date().toISOString(),
-      },
+        blacklistedIps: 'Available via /admin/blacklist/stats',
+        activeGuards: ['UserAgent', 'IPBlacklist', 'Honeypot', 'reCAPTCHA']
+      }
     };
 
-    return new BaseResponseDto(config);
-  }
-
-  // ============================================
-  // Helper Methods
-  // ============================================
-
-  /**
-   * 블랙리스트 엔트리 정렬
-   */
-  private sortBlacklistEntries(
-    entries: BlacklistEntry[],
-    sortBy: 'ip' | 'blockedAt' | 'count' | 'reason',
-    order: 'asc' | 'desc'
-  ): BlacklistEntry[] {
-    return entries.sort((a, b) => {
-      let comparison = 0;
-
-      switch (sortBy) {
-        case 'ip':
-          comparison = a.ip.localeCompare(b.ip);
-          break;
-        case 'blockedAt':
-          comparison = new Date(a.blockedAt).getTime() - new Date(b.blockedAt).getTime();
-          break;
-        case 'count':
-          comparison = a.count - b.count;
-          break;
-        case 'reason':
-          comparison = a.reason.localeCompare(b.reason);
-          break;
-      }
-
-      return order === 'asc' ? comparison : -comparison;
-    });
+    return new BaseResponseDto(systemInfo, 'System status retrieved successfully');
   }
 }

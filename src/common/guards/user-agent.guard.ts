@@ -1,102 +1,136 @@
 import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { BaseSecurityGuard } from './base-security.guard';
-import { ConfigurationService } from '../../modules/configuration/configuration.service';
-import { BLOCKED_USER_AGENTS, SUSPICIOUS_PATTERNS } from '../constants/security.constants';
 import { ExtendedRequest } from '../../types';
+import { InvalidUserAgentException } from '../exceptions';
 
 /**
- * User-Agent 기반 차단 Guard
- * 악성 봇과 스크래퍼의 User-Agent를 탐지하고 차단
+ * User-Agent Guard
+ * 악성 User-Agent를 차단하는 가드
  */
 @Injectable()
 export class UserAgentGuard extends BaseSecurityGuard {
   protected override readonly logger = new Logger(UserAgentGuard.name);
-  
-  private readonly blockedAgents: Set<string>;
-  private readonly suspiciousPatterns: RegExp[];
+  private readonly blockedUserAgents: string[];
   private readonly strictMode: boolean;
 
-  constructor(private readonly configService: ConfigurationService) {
+  constructor(private readonly configService: ConfigService) {
     super();
+    
+    // 차단할 User-Agent 목록 로드
+    const blockedAgents = this.configService.get<string>('BLOCKED_USER_AGENTS', '');
+    this.blockedUserAgents = blockedAgents
+      .split(',')
+      .map(agent => agent.trim().toLowerCase())
+      .filter(agent => agent.length > 0);
 
-    // 설정에서 차단할 User-Agent 목록 로드
-    const configuredAgents = this.configService.get<string[]>('app.blockedUserAgents', []);
-    this.blockedAgents = new Set(
-      [...BLOCKED_USER_AGENTS, ...configuredAgents].map((agent) => agent.toLowerCase()),
-    );
+    this.strictMode = this.configService.get<boolean>('SECURITY_STRICT_MODE', false);
 
-    // 의심스러운 패턴 설정
-    this.suspiciousPatterns = SUSPICIOUS_PATTERNS.map((pattern) => new RegExp(pattern, 'i'));
-
-    // Strict 모드 설정
-    this.strictMode = this.configService.get<boolean>('app.security.strictMode', false);
-
-    this.logger.log(
-      `Initialized with ${this.blockedAgents.size} blocked agents, strict mode: ${this.strictMode}`,
-    );
+    this.logger.log(`Initialized with ${this.blockedUserAgents.length} blocked agents, strict mode: ${this.strictMode}`);
   }
 
-  /**
-   * canActivate 메서드 구현
-   */
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<ExtendedRequest>();
-    return this.validateRequest(request);
+    const ip = this.getClientIp(request);
+    const userAgent = this.getUserAgent(request);
+
+    try {
+      const isValid = await this.validateRequest(request);
+      
+      if (!isValid) {
+        // 보안 위반 로깅 (내부용)
+        this.logSecurityViolation(request, `Invalid User-Agent detected: ${userAgent.substring(0, 100)}`);
+        
+        // 통합된 예외 발생
+        throw new InvalidUserAgentException(ip, userAgent);
+      }
+      
+      return true;
+    } catch (error) {
+      // 이미 우리의 예외인 경우 그대로 전달
+      if (error instanceof InvalidUserAgentException) {
+        throw error;
+      }
+      
+      // 예상치 못한 에러
+      this.logger.error(`Unexpected error in User-Agent check:`, error);
+      
+      // 에러 시 허용 (fail-open)
+      return true;
+    }
   }
 
   protected getGuardName(): string {
     return 'UserAgentGuard';
   }
 
-  protected validateRequest(request: ExtendedRequest): boolean {
+  protected async validateRequest(request: ExtendedRequest): Promise<boolean> {
     const userAgent = this.getUserAgent(request).toLowerCase();
-    
+
     // User-Agent가 없는 경우
-    if (!userAgent || userAgent === '') {
+    if (!userAgent || userAgent.length === 0) {
       if (this.strictMode) {
-        this.logger.warn(`Blocked request with missing User-Agent from ${this.getClientIp(request)}`);
+        this.logger.warn('Empty User-Agent blocked in strict mode');
         return false;
       }
       return true;
     }
 
-    // 차단된 User-Agent 확인
-    if (this.isBlockedUserAgent(userAgent)) {
-      this.logger.warn(`Blocked User-Agent: ${userAgent} from ${this.getClientIp(request)}`);
+    // 차단된 User-Agent 검사
+    const isBlocked = this.blockedUserAgents.some(blocked => 
+      userAgent.includes(blocked)
+    );
+
+    if (isBlocked) {
       return false;
     }
 
-    // 의심스러운 패턴 확인
-    if (this.strictMode && this.hasSuspiciousPattern(userAgent)) {
-      this.logger.warn(`Suspicious User-Agent pattern: ${userAgent} from ${this.getClientIp(request)}`);
-      return false;
+    // 추가 의심스러운 패턴 검사 (strict mode에서만)
+    if (this.strictMode) {
+      const suspiciousPatterns = [
+        /bot/i,
+        /spider/i,
+        /crawl/i,
+        /scrape/i,
+        /harvest/i,
+        /extract/i,
+        /grab/i,
+        /fetch/i,
+        /mine/i,
+        /scan/i,
+      ];
+
+      // 알려진 정상 봇 제외
+      const allowedBots = [
+        'googlebot',
+        'bingbot',
+        'slackbot',
+        'twitterbot',
+        'facebookexternalhit',
+        'linkedinbot',
+        'whatsapp',
+        'telegram',
+      ];
+
+      const isAllowedBot = allowedBots.some(bot => userAgent.includes(bot));
+      
+      if (!isAllowedBot) {
+        const isSuspicious = suspiciousPatterns.some(pattern => 
+          pattern.test(userAgent)
+        );
+        
+        if (isSuspicious) {
+          this.logger.warn(`Suspicious User-Agent pattern detected: ${userAgent.substring(0, 100)}`);
+          return false;
+        }
+      }
     }
 
     return true;
   }
 
-  /**
-   * 차단된 User-Agent인지 확인
-   */
-  private isBlockedUserAgent(userAgent: string): boolean {
-    // 정확한 매칭
-    for (const blocked of this.blockedAgents) {
-      if (userAgent.includes(blocked)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * 의심스러운 패턴이 있는지 확인
-   */
-  private hasSuspiciousPattern(userAgent: string): boolean {
-    return this.suspiciousPatterns.some((pattern) => pattern.test(userAgent));
-  }
-
   protected getFailureMessage(request: ExtendedRequest): string {
-    const userAgent = this.getUserAgent(request);
-    return `Blocked User-Agent: ${userAgent}`;
+    // 이 메서드는 더 이상 직접 사용되지 않음 (예외 시스템 사용)
+    return 'Access denied';
   }
 }

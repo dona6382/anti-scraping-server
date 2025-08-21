@@ -15,11 +15,11 @@ export class ConfigurationService {
   get<T = any>(key: string, defaultValue?: T): T {
     // 중첩된 키 지원 (예: 'app.security.strictMode')
     const keys = key.split('.');
-    let value: any = this.nestConfigService.get(keys[0]);
+    let value: any = this.nestConfigService.get(keys[0] || key);
     
     for (let i = 1; i < keys.length; i++) {
-      if (value && typeof value === 'object') {
-        value = value[keys[i]];
+      if (value && typeof value === 'object' && keys[i]) {
+        value = value[keys[i] as keyof typeof value];
       } else {
         value = undefined;
         break;
@@ -31,7 +31,7 @@ export class ConfigurationService {
       value = this.nestConfigService.get(key);
     }
     
-    return value !== undefined ? value : defaultValue;
+    return value !== undefined ? value : (defaultValue as T);
   }
 
   /**

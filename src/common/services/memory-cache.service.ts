@@ -53,12 +53,15 @@ export class MemoryCacheService extends BaseCacheService {
     if (this.cache.size >= this.maxSize && !this.cache.has(prefixedKey)) {
       // LRU 방식으로 가장 오래된 항목 제거
       const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
+      if (firstKey) {
+        this.cache.delete(firstKey);
+      }
     }
     
+    const expiresAt = ttl ? Date.now() + ttl * 1000 : undefined;
     const entry: CacheEntry<T> = {
       value,
-      expiresAt: ttl ? Date.now() + ttl * 1000 : undefined,
+      ...(expiresAt && { expiresAt }),
     };
     
     this.cache.set(prefixedKey, entry);

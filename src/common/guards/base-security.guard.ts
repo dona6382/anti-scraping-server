@@ -1,5 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/common';
 import { ExtendedRequest } from '../../types';
+import { RequestUtils } from '../utils/request.utils';
 
 /**
  * Base Security Guard
@@ -30,45 +31,17 @@ export abstract class BaseSecurityGuard implements CanActivate {
   protected abstract getFailureMessage(request: ExtendedRequest): string;
 
   /**
-   * 클라이언트 IP 주소 추출
+   * 클라이언트 IP 주소 추출 (RequestUtils 사용)
    */
   protected getClientIp(request: ExtendedRequest): string {
-    // X-Forwarded-For 헤더에서 첫 번째 IP 추출
-    const forwardedFor = request.headers['x-forwarded-for'];
-    if (forwardedFor) {
-      const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-      if (ips) {
-        return ips.split(',')[0]?.trim() || 'unknown';
-      }
-    }
-
-    // X-Real-IP 헤더 확인
-    const realIp = request.headers['x-real-ip'];
-    if (realIp) {
-      return Array.isArray(realIp) ? (realIp[0] || 'unknown') : (realIp || 'unknown');
-    }
-
-    // X-Client-IP 헤더 확인
-    const clientIp = request.headers['x-client-ip'];
-    if (clientIp) {
-      return Array.isArray(clientIp) ? (clientIp[0] || 'unknown') : (clientIp || 'unknown');
-    }
-
-    // 기본 IP 주소들 확인
-    return (
-      request.connection?.remoteAddress ||
-      request.socket?.remoteAddress ||
-      request.ip ||
-      'unknown'
-    );
+    return RequestUtils.extractClientIp(request);
   }
 
   /**
-   * User-Agent 추출
+   * User-Agent 추출 (RequestUtils 사용)
    */
   protected getUserAgent(request: ExtendedRequest): string {
-    const userAgent = request.headers['user-agent'];
-    return Array.isArray(userAgent) ? userAgent[0] || '' : userAgent || '';
+    return RequestUtils.extractUserAgent(request);
   }
 
   /**
@@ -103,11 +76,10 @@ export abstract class BaseSecurityGuard implements CanActivate {
   }
 
   /**
-   * 요청 헤더 안전하게 가져오기
+   * 요청 헤더 안전하게 가져오기 (RequestUtils 사용)
    */
   protected getHeader(request: ExtendedRequest, headerName: string): string | undefined {
-    const header = request.headers[headerName.toLowerCase()];
-    return Array.isArray(header) ? header[0] : header;
+    return RequestUtils.extractHeader(request, headerName);
   }
 
   /**
@@ -190,23 +162,10 @@ export abstract class BaseSecurityGuard implements CanActivate {
   }
 
   /**
-   * IP 주소 유효성 검사
+   * IP 주소 유효성 검사 (RequestUtils 사용)
    */
   protected isValidIpAddress(ip: string): boolean {
-    // IPv4 패턴
-    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-    // IPv6 패턴 (간단한 버전)
-    const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-
-    if (ipv4Regex.test(ip)) {
-      const parts = ip.split('.');
-      return parts.every(part => {
-        const num = parseInt(part, 10);
-        return num >= 0 && num <= 255;
-      });
-    }
-
-    return ipv6Regex.test(ip);
+    return RequestUtils.isValidIpAddress(ip);
   }
 
   /**

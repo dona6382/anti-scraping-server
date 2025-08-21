@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { RequestUtils } from '../utils/request.utils';
 import { 
   BaseApplicationException,
   SystemException,
@@ -300,7 +301,7 @@ export class EnhancedGlobalExceptionFilter implements ExceptionFilter {
     // 이메일 마스킹
     if (/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(value)) {
       const [local, domain] = value.split('@');
-      return `${local.substring(0, 2)}***@${domain}`;
+      return local ? `${local.substring(0, 2)}***@${domain}` : value;
     }
 
     // 신용카드 번호 패턴
@@ -377,19 +378,9 @@ export class EnhancedGlobalExceptionFilter implements ExceptionFilter {
   }
 
   /**
-   * 클라이언트 IP 추출
+   * 클라이언트 IP 추출 (RequestUtils 사용)
    */
   private getClientIp(request: Request): string {
-    const forwardedFor = request.headers['x-forwarded-for'];
-    if (forwardedFor) {
-      const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-      return ips.split(',')[0]?.trim() || 'unknown';
-    }
-
-    return (
-      (request.headers['x-real-ip'] as string) ||
-      request.ip ||
-      'unknown'
-    );
+    return RequestUtils.extractClientIp(request);
   }
 }

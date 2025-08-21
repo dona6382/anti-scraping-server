@@ -38,7 +38,10 @@ export abstract class BaseApplicationException extends HttpException {
     this.category = category;
     this.severity = severity;
     this.timestamp = new Date();
-    this.internalDetails = internalDetails;
+    // undefined 체크를 통해 안전하게 할당
+    if (internalDetails !== undefined) {
+      this.internalDetails = internalDetails;
+    }
     
     // 내부 로깅
     this.logError();
@@ -47,7 +50,7 @@ export abstract class BaseApplicationException extends HttpException {
   /**
    * 환경에 따른 응답 생성
    */
-  public getResponse(mode: ErrorResponseMode = ErrorResponseMode.PRODUCTION): Record<string, any> {
+  public override getResponse(mode: ErrorResponseMode = ErrorResponseMode.PRODUCTION): Record<string, any> {
     const baseResponse = {
       success: false,
       error: {
@@ -168,7 +171,7 @@ export class SecurityException extends BaseApplicationException {
       {
         category: ErrorCategory.SECURITY,
         severity: ErrorSeverity.HIGH,
-        context,
+        context: context || {},
       },
       message
     );
@@ -247,7 +250,7 @@ export class BusinessLogicException extends BaseApplicationException {
       {
         category: ErrorCategory.BUSINESS_LOGIC,
         severity: ErrorSeverity.MEDIUM,
-        context,
+        context: context || {},
       },
       message
     );
@@ -289,13 +292,20 @@ export class ExternalServiceException extends BaseApplicationException {
       ErrorCategory.EXTERNAL_SERVICE,
       ErrorSeverity.HIGH,
       HttpStatus.SERVICE_UNAVAILABLE,
-      {
+      originalError ? {
         category: ErrorCategory.EXTERNAL_SERVICE,
         severity: ErrorSeverity.HIGH,
-        originalError,
+        originalError: originalError,
         context: {
           serviceName,
-          timeout,
+          timeout: timeout || false,
+        },
+      } : {
+        category: ErrorCategory.EXTERNAL_SERVICE,
+        severity: ErrorSeverity.HIGH,
+        context: {
+          serviceName,
+          timeout: timeout || false,
         },
       }
     );
@@ -316,11 +326,15 @@ export class SystemException extends BaseApplicationException {
       ErrorCategory.SYSTEM,
       ErrorSeverity.CRITICAL,
       HttpStatus.INTERNAL_SERVER_ERROR,
-      {
+      originalError ? {
         category: ErrorCategory.SYSTEM,
         severity: ErrorSeverity.CRITICAL,
-        originalError,
-        context,
+        originalError: originalError,
+        context: context || {},
+      } : {
+        category: ErrorCategory.SYSTEM,
+        severity: ErrorSeverity.CRITICAL,
+        context: context || {},
       },
       message
     );

@@ -55,7 +55,12 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
         statusCode: HttpStatus.FORBIDDEN,
         message: 'Access denied',
         error: 'Forbidden',
-        details: exception.getInternalDetails(),
+        details: {
+          guardName: exception.guardName,
+          reason: exception.reason,
+          ip: exception.ip,
+          metadata: exception.metadata
+        },
         stack: exception.stack,
       };
     }

@@ -40,3 +40,12 @@ docker-compose.override.yml
 # Temporary files
 tmp/
 temp/
+
+# Cleanup archives (can be deleted after review)
+cleanup-archive/
+cleanup-backup-*/
+
+# Backup files
+*.backup.ts
+*.backup.js
+*.bak

@@ -1,107 +1,64 @@
-# 🛡️ NestJS Anti-Scraping Server
+# 🛡️ Anti-Scraping Server v2.0
 
-Production-ready anti-scraping solution with multiple protection layers.
+Production-ready anti-scraping solution with modular architecture and comprehensive security features.
 
 ## 🚀 Quick Start
 
-### Using Script (Recommended)
 ```bash
-# Make scripts executable
-chmod +x make-executable.sh
-./make-executable.sh
+# Clone or navigate to project
+cd anti-scraping-server
 
-# Check code
-./check-code.sh
+# Start the server (installs dependencies automatically)
+chmod +x start.sh && ./start.sh
 
-# Start server
-./start.sh
-```
-
-### Manual Setup
-```bash
-# Install dependencies
+# Or manually
 npm install
-
-# Copy environment file
-cp .env.example .env
-
-# Start development server
 npm run start:dev
-
-# Production build
-npm run build
-npm run start:prod
 ```
 
-### Using Docker
+**Server will be available at:** http://localhost:3000
+
+## 🛡️ Security Features
+
+- **🔒 IP Blacklisting** - Dynamic IP blocking with Redis/Memory cache
+- **🤖 Bot Detection** - User-Agent filtering and pattern matching
+- **⚡ Rate Limiting** - Request throttling per IP address
+- **🍯 Honeypot Protection** - Hidden fields to catch automated tools
+- **👻 Headless Browser Detection** - Blocks Puppeteer, Selenium, etc.
+- **🔍 Client Analysis** - Advanced fingerprinting and risk scoring
+
+## 📊 API Endpoints
+
+### Health & System
 ```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f app
-
-# Stop services
-docker-compose down
+GET  /health              # Basic health check
+GET  /health/detailed     # System metrics
 ```
 
-## 🛡️ Protection Features
-
-### 1. **IP Blacklisting**
-- Dynamic IP blocking
-- Redis-backed persistence
-- TTL support
-- Manual block/unblock API
-
-### 2. **User-Agent Filtering**
-- Blocks known bots and scrapers
-- Customizable block list
-- Pattern matching
-- Strict mode option
-
-### 3. **Rate Limiting**
-- Request throttling per IP
-- Configurable limits
-- Redis storage support
-- Bypass for admin endpoints
-
-### 4. **Headless Browser Detection**
-- Detects Puppeteer, Playwright, Selenium
-- Chrome DevTools Protocol detection
-- Missing header analysis
-- Browser fingerprinting
-
-### 5. **Honeypot Fields**
-- Hidden form fields
-- Timing analysis
-- Bot trap endpoints
-- Automatic blocking
-
-### 6. **reCAPTCHA v3**
-- Google reCAPTCHA integration
-- Score-based validation
-- Configurable thresholds
-- Fail-open support
-
-## 📁 Project Structure
-
-```
-src/
-├── api/                    # Business logic endpoints
-├── common/                 # Shared modules
-│   ├── guards/            # Security guards
-│   ├── middleware/        # Express middleware
-│   ├── services/          # Core services
-│   ├── strategies/        # Security strategies
-│   ├── types/            # TypeScript types
-│   └── utils/            # Utility functions
-├── app.module.ts          # Root module
-└── main.ts               # Application entry
+### Public APIs
+```bash
+GET  /api/public/data     # Public data access
+GET  /api/public/health   # Public health status
 ```
 
-## 🔧 Configuration
+### Admin Panel
+```bash
+GET  /admin/system/info   # System information
+GET  /admin/security/statistics  # Security metrics
+POST /admin/security/blacklist/ip    # Block IP
+DELETE /admin/security/blacklist/ip/:ip  # Unblock IP
+```
 
-### Environment Variables
+### Testing
+```bash
+GET  /test                # Basic functionality test
+GET  /test/security-full  # Comprehensive security test
+```
+
+## ⚙️ Configuration
+
+Copy `.env.example` to `.env` and configure:
+
 ```env
 # Server
 PORT=3000
@@ -109,65 +66,45 @@ NODE_ENV=development
 
 # Security
 SECURITY_STRICT_MODE=false
+BLOCKED_USER_AGENTS=scrapy,python-requests,curl,bot
 
 # Rate Limiting
-THROTTLE_TTL=10
+THROTTLE_TTL=60
 THROTTLE_LIMIT=20
 
-# Redis (Optional)
+# Redis (Optional - falls back to memory)
 REDIS_HOST=localhost
 REDIS_PORT=6379
-REDIS_PASSWORD=
-
-# IP Blacklist
-IP_BLACKLIST_TTL=86400
-
-# User Agent Blocking
-BLOCKED_USER_AGENTS=scrapy,python-requests,curl
-
-# Honeypot
-HONEYPOT_FIELD_NAME=email_confirm
-
-# reCAPTCHA (Optional)
-RECAPTCHA_SECRET_KEY=your_key_here
-RECAPTCHA_SCORE_THRESHOLD=0.5
 ```
 
-## 📊 API Endpoints
+## 📁 Project Structure
 
-### Health Check
-```bash
-GET /health
-GET /health/redis
+```
+src/
+├── core/           # Core infrastructure (config, cache, types)
+├── shared/         # Shared components (guards, utils, filters)
+├── features/       # Business modules (security, health, admin)
+├── api/           # API versioning (v1)
+└── legacy/        # Legacy compatibility
 ```
 
-### IP Blacklist Management
-```bash
-POST   /admin/blacklist/ip        # Add IP to blacklist
-DELETE /admin/blacklist/ip/:ip    # Remove IP
-GET    /admin/blacklist           # List all blocked IPs
-GET    /admin/blacklist/ip/:ip    # Get IP info
-```
+## 🐳 Docker Support
 
-### Test Endpoints
 ```bash
-GET  /test/protected    # Test all guards
-POST /test/honeypot     # Test honeypot
-POST /test/user-agent   # Test user-agent blocking
-```
+# Start with Docker Compose
+docker-compose up -d
 
-### Business API
-```bash
-GET  /api/data          # Protected data endpoint
-POST /api/contact       # Contact form with protections
-GET  /api/search        # Search with rate limiting
+# View logs
+docker-compose logs -f app
+
+# Stop
+docker-compose down
 ```
 
 ## 🧪 Testing
 
-### Run Tests
 ```bash
-# Unit tests
+# Run tests
 npm test
 
 # Test coverage
@@ -175,137 +112,46 @@ npm run test:cov
 
 # E2E tests
 npm run test:e2e
+
+# Test security features
+curl http://localhost:3000/test/security-full
 ```
 
-### Test Interface
-Open browser to: `http://localhost:3000/public/index.html`
+## 🔧 Development
 
-## 🐳 Docker Deployment
-
-### Build Image
-```bash
-docker build -t anti-scraping-server .
-```
-
-### Run Container
-```bash
-docker run -d \
-  -p 3000:3000 \
-  -e NODE_ENV=production \
-  -e REDIS_HOST=redis \
-  --name anti-scraping-server \
-  anti-scraping-server
-```
-
-### Docker Compose
-```bash
-# Start all services
-docker-compose up -d
-
-# Scale application
-docker-compose up -d --scale app=3
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-## 📈 Monitoring
-
-### Metrics Available
-- Request rate per IP
-- Blocked requests count
-- Guard trigger statistics
-- Redis connection status
-- Memory usage
-- Response times
-
-### Health Endpoints
-```json
-GET /health
-
-{
-  "status": "healthy",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "uptime": 3600,
-  "services": {
-    "database": { "status": "healthy" },
-    "redis": { "status": "healthy", "connected": true },
-    "memory": { "status": "healthy", "percentage": "45%" }
-  }
-}
-```
-
-## 🔒 Security Best Practices
-
-1. **Environment Variables**
-   - Never commit `.env` files
-   - Use secrets management in production
-   - Rotate keys regularly
-
-2. **Rate Limiting**
-   - Adjust limits based on traffic
-   - Monitor for false positives
-   - Implement gradual blocking
-
-3. **IP Blocking**
-   - Review blocked IPs regularly
-   - Implement appeals process
-   - Consider geographic restrictions
-
-4. **Monitoring**
-   - Set up alerts for high block rates
-   - Monitor performance impact
-   - Track false positive rates
-
-## 📝 Development
-
-### Code Style
 ```bash
 # Lint code
 npm run lint
 
-# Fix lint issues
-npm run lint:fix
-
 # Format code
 npm run format
+
+# Build for production
+npm run build
+npm run start:prod
 ```
 
-### Git Hooks
-Pre-commit hooks automatically:
-- Run ESLint
-- Format with Prettier
-- Check TypeScript types
+## 📈 Monitoring
+
+The server includes built-in monitoring endpoints:
+
+- System health and metrics
+- Security event logging
+- Real-time threat detection
+- Performance statistics
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create feature branch
-3. Commit changes
-4. Push to branch
-5. Open pull request
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
-
-## 🆘 Support
-
-- GitHub Issues: [Report bugs](https://github.com/your-repo/issues)
-- Documentation: [Wiki](https://github.com/your-repo/wiki)
-- Email: support@example.com
-
-## 🏆 Credits
-
-Built with:
-- [NestJS](https://nestjs.com/) - Node.js framework
-- [Redis](https://redis.io/) - In-memory data store
-- [TypeScript](https://www.typescriptlang.org/) - Type safety
-- [Docker](https://www.docker.com/) - Containerization
+MIT License - see LICENSE file for details.
 
 ---
 
-Made with ❤️ by Your Team
+**Built with ❤️ using NestJS, TypeScript, and Redis**

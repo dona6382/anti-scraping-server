@@ -1,46 +1,43 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
-// Core Modules
-import { ConfigurationModule } from './modules/configuration/configuration.module';
-import { SecurityModule } from './modules/security/security.module';
-import { HealthModule } from './modules/health/health.module';
-import { ClientInfoModule } from './modules/client-info/client-info.module';
+// Core modules
+import { CoreModule } from './core/core.module';
 
-// New Modular Structure
-import { ControllersModule } from './controllers/controllers.module';
-
-// Common
+// Common modules
 import { CommonModule } from './common/common.module';
+
+// API modules
+import { ApiModule } from './api/api.module';
+
+// Global filter
 import { UnifiedExceptionFilter } from './common/filters/global-exception.filter';
 
-// Main App Controller (simplified)
+// App controller and service
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
 /**
  * Root Application Module
- * 모듈화된 아키텍처로 각 기능이 분리됨
+ * 
+ * Clean modular architecture:
+ * - Core: Infrastructure (Config, Cache, Types)
+ * - Common: Shared components (Guards, Filters, Utils, Services)
+ * - API: Versioned API endpoints
  */
 @Module({
   imports: [
-    // Configuration (must be first)
-    ConfigurationModule,
+    // Core infrastructure (must be first)
+    CoreModule,
     
-    // Common services and guards  
+    // Common services and components
     CommonModule,
     
-    // Feature modules
-    SecurityModule,
-    HealthModule,
-    ClientInfoModule,
-    
-    // Controllers module (all API endpoints)
-    ControllersModule,
+    // API modules
+    ApiModule,
   ],
   controllers: [
-    // Only the main app controller remains here
     AppController,
   ],
   providers: [
@@ -52,7 +49,7 @@ import { AppService } from './app.service';
       useClass: ThrottlerGuard,
     },
     
-    // Global filters
+    // Global exception filter
     {
       provide: APP_FILTER,
       useClass: UnifiedExceptionFilter,

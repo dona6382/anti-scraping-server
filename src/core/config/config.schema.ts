@@ -1,0 +1,112 @@
+// src/core/config/config.schema.ts
+
+export interface AppConfig {
+  server: {
+    port: number;
+    nodeEnv: 'development' | 'production' | 'test';
+    corsOrigins: string[];
+  };
+  security: {
+    strictMode: boolean;
+    recaptcha: {
+      secretKey?: string;
+      scoreThreshold: number;
+    };
+    rateLimit: {
+      ttl: number;
+      limit: number;
+    };
+    ipBlacklist: {
+      ttl: number;
+      enabled: boolean;
+    };
+    userAgent: {
+      blockedAgents: string[];
+      strictMode: boolean;
+    };
+    honeypot: {
+      fieldName: string;
+      enabled: boolean;
+    };
+  };
+  redis: {
+    host: string;
+    port: number;
+    password?: string;
+    db: number;
+  };
+  database: {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    database: string;
+    synchronize: boolean;
+  };
+  logging: {
+    level: 'error' | 'warn' | 'info' | 'debug';
+    enableFileLogging: boolean;
+  };
+}
+
+// Basic validation function (without Joi for now)
+export function validateConfig(): AppConfig {
+  const config = process.env;
+  
+  // Basic validation
+  if (config.NODE_ENV && !['development', 'production', 'test'].includes(config.NODE_ENV)) {
+    throw new Error(`Invalid NODE_ENV: ${config.NODE_ENV}`);
+  }
+
+  return configFactory();
+}
+
+export const configFactory = (): AppConfig => ({
+  server: {
+    port: parseInt(process.env.PORT, 10) || 3000,
+    nodeEnv: process.env.NODE_ENV as any || 'development',
+    corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+  },
+  security: {
+    strictMode: process.env.SECURITY_STRICT_MODE === 'true',
+    recaptcha: {
+      secretKey: process.env.RECAPTCHA_SECRET_KEY,
+      scoreThreshold: parseFloat(process.env.RECAPTCHA_SCORE_THRESHOLD) || 0.5,
+    },
+    rateLimit: {
+      ttl: parseInt(process.env.THROTTLE_TTL, 10) || 60,
+      limit: parseInt(process.env.THROTTLE_LIMIT, 10) || 20,
+    },
+    ipBlacklist: {
+      ttl: parseInt(process.env.IP_BLACKLIST_TTL, 10) || 86400,
+      enabled: process.env.IP_BLACKLIST_ENABLED !== 'false',
+    },
+    userAgent: {
+      blockedAgents: process.env.BLOCKED_USER_AGENTS?.split(',') || 
+        ['scrapy', 'python-requests', 'curl', 'bot'],
+      strictMode: process.env.USER_AGENT_STRICT_MODE === 'true',
+    },
+    honeypot: {
+      fieldName: process.env.HONEYPOT_FIELD_NAME || 'email_confirm',
+      enabled: process.env.HONEYPOT_ENABLED !== 'false',
+    },
+  },
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    password: process.env.REDIS_PASSWORD,
+    db: parseInt(process.env.REDIS_DB, 10) || 0,
+  },
+  database: {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT, 10) || 5432,
+    username: process.env.DB_USERNAME || 'postgres',
+    password: process.env.DB_PASSWORD || 'password',
+    database: process.env.DB_DATABASE || 'anti_scraping',
+    synchronize: process.env.DB_SYNCHRONIZE === 'true',
+  },
+  logging: {
+    level: process.env.LOG_LEVEL as any || 'info',
+    enableFileLogging: process.env.ENABLE_FILE_LOGGING !== 'false',
+  },
+});

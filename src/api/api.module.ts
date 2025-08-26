@@ -1,19 +1,16 @@
 import { Module } from '@nestjs/common';
-import { ApiController } from './api.controller';
-import { ApiService } from './api.service';
-import { CommonModule } from '../common/common.module';
+
+import { ApiV1Module } from './v1/v1.module';
 
 /**
  * API Module
- * API 엔드포인트와 안티 스크래핑 기능을 제공
- * 핵심 기능에만 집중 (비즈니스 모듈들 제거됨)
+ * 
+ * 모든 API 버전을 관리하는 루트 API 모듈
  */
 @Module({
   imports: [
-    CommonModule,
+    ApiV1Module,
+    // TODO: Add v2 when needed
   ],
-  controllers: [ApiController],
-  providers: [ApiService],
-  exports: [ApiService],
 })
 export class ApiModule {}

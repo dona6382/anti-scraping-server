@@ -279,7 +279,7 @@ export class DatabaseIpBlacklistService {
 
       await this.securityEventRepository.save(event);
     } catch (error) {
-      this.logger.error(`Failed to log security event: ${error.message}`);
+      this.logger.error(`Failed to log security event: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

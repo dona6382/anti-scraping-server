@@ -9,7 +9,7 @@ import { ICacheService } from './cache.service';
 export class MemoryCacheService implements ICacheService {
   private readonly logger = new Logger(MemoryCacheService.name);
   private readonly cache = new Map<string, { value: any; expiresAt?: number }>();
-  private readonly cleanupInterval: NodeJS.Timer;
+  private readonly cleanupInterval: NodeJS.Timeout;
 
   constructor() {
     // 5분마다 만료된 항목 정리
@@ -147,7 +147,7 @@ export class MemoryCacheService implements ICacheService {
    */
   onModuleDestroy() {
     if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
+      clearInterval(this.cleanupInterval as any);
     }
   }
 }

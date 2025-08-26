@@ -1,70 +1,28 @@
 import * as crypto from 'crypto';
 import { Request } from 'express';
+import { RequestUtils } from './request.utils';
 
 /**
  * Security Utilities
  * 보안 관련 유틸리티 함수들
+ * 
+ * Note: IP 추출 로직은 RequestUtils로 이동됨 (중복 제거)
  */
 
 /**
- * IP 주소 추출 (통합)
+ * IP 주소 추출 (RequestUtils 사용)
+ * @deprecated Use RequestUtils.extractClientIp instead
  */
 export function extractClientIp(request: Request): string {
-  // X-Forwarded-For 헤더 확인
-  const forwardedFor = request.headers['x-forwarded-for'];
-  if (forwardedFor) {
-    const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-    if (ips) {
-      return ips.split(',')[0]?.trim() || 'unknown';
-    }
-  }
-
-  // 다른 프록시 헤더들 확인
-  const proxyHeaders = [
-    'x-real-ip',
-    'x-client-ip',
-    'cf-connecting-ip', // Cloudflare
-    'true-client-ip', // Cloudflare Enterprise
-    'x-cluster-client-ip',
-  ];
-
-  for (const header of proxyHeaders) {
-    const value = request.headers[header];
-    if (value) {
-      const headerValue = Array.isArray(value) ? value[0] : value;
-      if (headerValue) {
-        return headerValue;
-      }
-    }
-  }
-
-  // 기본 IP 주소
-  return (
-    (request as any).connection?.remoteAddress ||
-    (request as any).socket?.remoteAddress ||
-    request.ip ||
-    'unknown'
-  );
+  return RequestUtils.extractClientIp(request);
 }
 
 /**
- * IP 주소 유효성 검사
+ * IP 주소 유효성 검사 (RequestUtils 사용)
+ * @deprecated Use RequestUtils.isValidIpAddress instead
  */
 export function isValidIpAddress(ip: string): boolean {
-  // IPv4 패턴
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  
-  if (ipv4Regex.test(ip)) {
-    const parts = ip.split('.');
-    return parts.every(part => {
-      const num = parseInt(part, 10);
-      return num >= 0 && num <= 255;
-    });
-  }
-
-  // IPv6 패턴 (간단한 검증)
-  const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
-  return ipv6Regex.test(ip);
+  return RequestUtils.isValidIpAddress(ip);
 }
 
 /**
@@ -107,42 +65,6 @@ export function generateSecureToken(length: number = 32): string {
 }
 
 /**
- * 비밀번호 해싱 (bcrypt 대신 crypto 사용)
- */
-export function hashPassword(password: string, salt?: string): string {
-  const actualSalt = salt || crypto.randomBytes(16).toString('hex');
-  const hash = crypto
-    .pbkdf2Sync(password, actualSalt, 10000, 64, 'sha512')
-    .toString('hex');
-  
-  return `${actualSalt}:${hash}`;
-}
-
-/**
- * 비밀번호 검증
- */
-export function verifyPassword(
-  password: string,
-  hashedPassword: string
-): boolean {
-  const parts = hashedPassword.split(':');
-  if (parts.length !== 2) {
-    return false;
-  }
-  
-  const [salt, hash] = parts;
-  if (!salt || !hash) {
-    return false;
-  }
-  
-  const verifyHash = crypto
-    .pbkdf2Sync(password, salt, 10000, 64, 'sha512')
-    .toString('hex');
-  
-  return hash === verifyHash;
-}
-
-/**
  * Request Fingerprint 생성
  */
 export function generateRequestFingerprint(request: Request): string {
@@ -151,7 +73,7 @@ export function generateRequestFingerprint(request: Request): string {
     request.headers['accept-language'] || '',
     request.headers['accept-encoding'] || '',
     request.headers['accept'] || '',
-    extractClientIp(request),
+    RequestUtils.extractClientIp(request), // RequestUtils 사용
   ];
 
   return generateHash(components.join('|'));
@@ -179,83 +101,10 @@ export function generateRateLimitKey(
 }
 
 /**
- * 시간 기반 OTP 생성
- */
-export function generateTOTP(
-  secret: string,
-  window: number = 30
-): string {
-  try {
-    const counter = Math.floor(Date.now() / 1000 / window);
-    const hmac = crypto
-      .createHmac('sha1', secret)
-      .update(Buffer.from(counter.toString()))
-      .digest();
-    
-    if (!hmac || hmac.length < 20) {
-      return '000000';
-    }
-    
-    // 마지막 바이트를 안전하게 가져오기
-    const lastByte = hmac[hmac.length - 1];
-    if (lastByte === undefined) {
-      return '000000';
-    }
-    
-    const offset = lastByte & 0xf;
-    
-    // 범위 체크 - HMAC-SHA1은 20바이트이므로 offset + 3 < 20이어야 함
-    if (offset + 3 >= hmac.length) {
-      return '000000';
-    }
-    
-    // 각 바이트를 안전하게 가져오기
-    const byte1 = hmac[offset];
-    const byte2 = hmac[offset + 1];
-    const byte3 = hmac[offset + 2];
-    const byte4 = hmac[offset + 3];
-    
-    if (byte1 === undefined || byte2 === undefined || byte3 === undefined || byte4 === undefined) {
-      return '000000';
-    }
-    
-    const code = (
-      ((byte1 & 0x7f) << 24) |
-      ((byte2 & 0xff) << 16) |
-      ((byte3 & 0xff) << 8) |
-      (byte4 & 0xff)
-    ) % 1000000;
-    
-    return code.toString().padStart(6, '0');
-  } catch (error) {
-    // 에러 발생 시 기본값 반환
-    return '000000';
-  }
-}
-
-/**
  * CSRF 토큰 생성
  */
 export function generateCsrfToken(): string {
   return generateSecureToken(24);
-}
-
-/**
- * CSRF 토큰 검증
- */
-export function verifyCsrfToken(
-  token: string,
-  sessionToken: string
-): boolean {
-  if (!token || !sessionToken) {
-    return false;
-  }
-  
-  // 타이밍 공격 방지를 위한 안전한 비교
-  return crypto.timingSafeEqual(
-    Buffer.from(token),
-    Buffer.from(sessionToken)
-  );
 }
 
 /**

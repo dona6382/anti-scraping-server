@@ -63,7 +63,7 @@ export function validateConfig(): AppConfig {
 
 export const configFactory = (): AppConfig => ({
   server: {
-    port: parseInt(process.env.PORT, 10) || 3000,
+    port: parseInt(process.env.PORT || '3000', 10),
     nodeEnv: process.env.NODE_ENV as any || 'development',
     corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
   },
@@ -71,14 +71,14 @@ export const configFactory = (): AppConfig => ({
     strictMode: process.env.SECURITY_STRICT_MODE === 'true',
     recaptcha: {
       secretKey: process.env.RECAPTCHA_SECRET_KEY,
-      scoreThreshold: parseFloat(process.env.RECAPTCHA_SCORE_THRESHOLD) || 0.5,
+      scoreThreshold: parseFloat(process.env.RECAPTCHA_SCORE_THRESHOLD || '0.5'),
     },
     rateLimit: {
-      ttl: parseInt(process.env.THROTTLE_TTL, 10) || 60,
-      limit: parseInt(process.env.THROTTLE_LIMIT, 10) || 20,
+      ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
+      limit: parseInt(process.env.THROTTLE_LIMIT || '20', 10),
     },
     ipBlacklist: {
-      ttl: parseInt(process.env.IP_BLACKLIST_TTL, 10) || 86400,
+      ttl: parseInt(process.env.IP_BLACKLIST_TTL || '86400', 10),
       enabled: process.env.IP_BLACKLIST_ENABLED !== 'false',
     },
     userAgent: {
@@ -93,13 +93,13 @@ export const configFactory = (): AppConfig => ({
   },
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
     password: process.env.REDIS_PASSWORD,
-    db: parseInt(process.env.REDIS_DB, 10) || 0,
+    db: parseInt(process.env.REDIS_DB || '0', 10),
   },
   database: {
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT, 10) || 5432,
+    port: parseInt(process.env.DB_PORT || '5432', 10),
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
     database: process.env.DB_DATABASE || 'anti_scraping',

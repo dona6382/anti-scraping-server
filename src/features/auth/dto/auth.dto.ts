@@ -1,20 +1,31 @@
 /**
- * Login DTO
+ * Auth DTO (for login)
  */
-export class LoginDto {
+export class AuthDto {
   username: string;
   password: string;
 }
 
 /**
- * Create User DTO
+ * Login DTO (alias for AuthDto)
  */
-export class CreateUserDto {
+export class LoginDto extends AuthDto {}
+
+/**
+ * Register DTO
+ */
+export class RegisterDto {
   username: string;
   email: string;
   password: string;
   firstName?: string;
   lastName?: string;
+}
+
+/**
+ * Create User DTO (extends RegisterDto with role)
+ */
+export class CreateUserDto extends RegisterDto {
   role?: 'admin' | 'user' | 'readonly';
 }
 

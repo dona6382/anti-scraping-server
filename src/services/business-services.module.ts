@@ -1,34 +1,25 @@
 import { Module } from '@nestjs/common';
 
-// Import business services
-import { AdminBusinessService } from './admin/admin-business.service';
-import { SecurityBusinessService } from './security/security-business.service';
-import { TestingBusinessService } from './testing/testing-business.service';
+// 실제 존재하는 서비스만 import
+import { BusinessService } from './business.service';
 
-// Import dependencies
-import { IpBlacklistService } from '../common/services/ip-blacklist.service';
-import { FingerprintService } from '../common/services/fingerprint/fingerprint.service';
+// Common 모듈의 서비스들도 필요
+import { CommonModule } from '../common/common.module';
 
 /**
  * Business Services Module
- * 모든 비즈니스 로직 서비스들을 중앙 관리하는 모듈
+ * 정리된 비즈니스 서비스들을 관리
+ * 
+ * Note: 중복된 services/admin, services/security 등은 
+ * features/ 모듈로 이동되었습니다.
  */
 @Module({
+  imports: [CommonModule],
   providers: [
-    // Business Services
-    AdminBusinessService,
-    SecurityBusinessService,
-    TestingBusinessService,
-    
-    // Dependencies (Common Services)
-    IpBlacklistService,
-    FingerprintService,
+    BusinessService,
   ],
   exports: [
-    // Export business services for use in controllers
-    AdminBusinessService,
-    SecurityBusinessService,
-    TestingBusinessService,
+    BusinessService,
   ],
 })
 export class BusinessServicesModule {}

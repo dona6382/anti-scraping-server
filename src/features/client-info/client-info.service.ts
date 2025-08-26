@@ -240,7 +240,7 @@ export class ClientInfoService {
     });
     
     return {
-      all: request.headers,
+      all: request.headers as Record<string, string | string[]>,
       suspicious: suspiciousHeaders,
       missing,
     };

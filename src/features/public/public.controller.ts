@@ -21,7 +21,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 
 import { PublicService } from './public.service';
-import { UserAgentGuard } from '../../shared/guards';
+import { UserAgentGuard } from '../../common/guards/user-agent.guard';
 
 /**
  * Public API Controller

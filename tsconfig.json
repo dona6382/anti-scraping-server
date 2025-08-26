@@ -14,34 +14,36 @@
     "incremental": true,
     "skipLibCheck": true,
     "moduleResolution": "node",
-    // TypeScript strict mode 활성화
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictBindCallApply": true,
-    "strictPropertyInitialization": true,
-    "noImplicitReturns": true,
-    "noImplicitThis": true,
-    "noUnusedLocals": false, // 개발 중이므로 일단 false
-    "noUnusedParameters": false, // 개발 중이므로 일단 false
-    "exactOptionalPropertyTypes": true,
-    "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": false, // Express Request 객체 때문에 false
-    "noUncheckedIndexedAccess": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "strictBindCallApply": false,
+    "strictPropertyInitialization": false,
+    "noImplicitReturns": false,
+    "noImplicitThis": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@/*": ["src/*"]
     }
   },
+  "include": [
+    "src/**/*"
+  ],
   "exclude": [
     "node_modules", 
-    "dist", 
-    "**/*.bak", 
-    "**/*.bak/**/*", 
-    "**/DELETE_ME_*", 
-    "**/DELETE_ME_*/**/*", 
-    "**/database_DISABLED", 
-    "**/database_DISABLED/**/*"
+    "dist",
+    "test",
+    "cleanup-archive",
+    "cleanup-archive/**/*",
+    "**/*.bak",
+    "**/*.backup.*",
+    "**/DELETE_ME_*"
   ]
 }

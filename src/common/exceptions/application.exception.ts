@@ -158,10 +158,19 @@ export class ValidationException extends BaseApplicationException {
  * Security Exception
  */
 export class SecurityException extends BaseApplicationException {
+  public guardName?: string;
+  public reason?: string;
+  public ip?: string;
+  public metadata?: Record<string, any>;
+
   constructor(
     errorCode: string = ErrorCodes.SECURITY_VIOLATION,
     message?: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
+    guardName?: string,
+    reason?: string,
+    ip?: string,
+    metadata?: Record<string, any>
   ) {
     super(
       errorCode,
@@ -171,10 +180,15 @@ export class SecurityException extends BaseApplicationException {
       {
         category: ErrorCategory.SECURITY,
         severity: ErrorSeverity.HIGH,
-        context: context || {},
+        context: { ...context, guardName, reason, ip, metadata },
       },
       message
     );
+    
+    this.guardName = guardName;
+    this.reason = reason;
+    this.ip = ip;
+    this.metadata = metadata;
   }
 }
 

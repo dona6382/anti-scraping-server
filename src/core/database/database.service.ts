@@ -28,7 +28,7 @@ export class DatabaseService {
       await this.dataSource.query('SELECT 1');
       return true;
     } catch (error) {
-      this.logger.error(`Database connection check failed: ${error.message}`);
+      this.logger.error(`Database connection check failed: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }
@@ -63,7 +63,7 @@ export class DatabaseService {
         );
         connectionCount = parseInt(connectionResult[0]?.count || '0');
       } catch (error) {
-        this.logger.warn(`Failed to get database stats: ${error.message}`);
+        this.logger.warn(`Failed to get database stats: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
     
@@ -91,7 +91,7 @@ export class DatabaseService {
       await this.createInitialData();
       this.logger.log('Database initialization completed');
     } catch (error) {
-      this.logger.error(`Database initialization failed: ${error.message}`);
+      this.logger.error(`Database initialization failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -131,7 +131,7 @@ export class DatabaseService {
         status: 'unhealthy',
         responseTime: Date.now() - startTime,
         details: {
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         }
       };
     }
@@ -151,7 +151,7 @@ export class DatabaseService {
       await this.dataSource.queryResultCache?.clear();
       this.logger.log('Database cache cleared');
     } catch (error) {
-      this.logger.error(`Database cleanup failed: ${error.message}`);
+      this.logger.error(`Database cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

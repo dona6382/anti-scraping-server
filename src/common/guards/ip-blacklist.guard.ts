@@ -2,11 +2,12 @@ import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
 import { BaseSecurityGuard } from './base-security.guard';
 import { IpBlacklistService } from '../services/ip-blacklist.service';
 import { ExtendedRequest } from '../../types';
-import { IpBlockedException } from '../exceptions';
+import { IpBlockedException } from '../exceptions/application.exception';
 
 /**
  * IP Blacklist Guard
- * 차단된 IP 주소로부터의 접근을 막는 가드
+ * Enhanced security implementation with privacy protection
+ * (Unified from basic + enhanced versions)
  */
 @Injectable()
 export class IpBlacklistGuard extends BaseSecurityGuard {
@@ -16,42 +17,43 @@ export class IpBlacklistGuard extends BaseSecurityGuard {
     super();
   }
 
-  /**
-   * canActivate 메서드 구현
-   */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<ExtendedRequest>();
     const ip = this.getClientIp(request);
     
     try {
-      const isValid = await this.validateRequest(request);
+      const isBlocked = await this.ipBlacklistService.isBlocked(ip);
       
-      if (!isValid) {
+      if (isBlocked) {
+        // 차단 이유는 로깅만 하고 클라이언트에는 노출하지 않음
         const reason = await this.ipBlacklistService.getBlockReason(ip);
         
-        // 보안 위반 로깅 (내부용)
-        this.logSecurityViolation(request, `IP blocked: ${reason || 'Unknown reason'}`);
+        // 내부 로깅 (상세 정보)
+        this.logger.warn(`IP blocked`, {
+          ip: this.hashIp(ip), // IP를 해시화하여 로깅
+          reason,
+          userAgent: this.sanitizeUserAgent(request),
+          path: request.url,
+        });
         
-        // 통합된 예외 발생 (null을 undefined로 변환)
-        throw new IpBlockedException(ip, reason ?? undefined);
+        // 보안 예외 발생 (최소 정보만 포함)
+        throw new IpBlockedException(this.hashIp(ip), 'Security policy');
       }
       
       return true;
     } catch (error) {
-      // 이미 우리의 예외인 경우 그대로 전달
       if (error instanceof IpBlockedException) {
         throw error;
       }
       
-      // 예상치 못한 에러 로깅
-      this.logger.error(`Unexpected error in IP check for ${ip}:`, error);
+      // 서비스 에러는 로깅만 하고 fail-open
+      this.logger.error(`IP check service error`, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        ip: this.hashIp(ip),
+      });
       
-      // 프로덕션에서는 fail-open, 개발에서는 fail-closed
-      if (process.env.NODE_ENV === 'production') {
-        return true; // fail-open: 에러 시 허용
-      }
-      
-      throw new IpBlockedException(ip, 'Service error');
+      // Production에서는 fail-open (서비스 장애 시 허용)
+      return process.env.NODE_ENV === 'production';
     }
   }
 
@@ -62,20 +64,40 @@ export class IpBlacklistGuard extends BaseSecurityGuard {
   protected async validateRequest(request: ExtendedRequest): Promise<boolean> {
     const ip = this.getClientIp(request);
     
-    // IP 유효성 검사
     if (!this.isValidIpAddress(ip) || ip === 'unknown') {
-      this.logger.warn(`Invalid IP address: ${ip}`);
+      // 유효하지 않은 IP는 로깅만
+      this.logger.debug(`Invalid IP format: ${this.hashIp(ip)}`);
       return false;
     }
     
-    // IP 차단 여부 확인
-    const isBlocked = await this.ipBlacklistService.isBlocked(ip);
-    
-    return !isBlocked;
+    return !(await this.ipBlacklistService.isBlocked(ip));
   }
 
-  protected getFailureMessage(request: ExtendedRequest): string {
-    // 이 메서드는 더 이상 직접 사용되지 않음 (예외 시스템 사용)
+  protected getFailureMessage(): string {
+    // 일반적인 메시지만 반환 (상세 정보 노출 방지)
     return 'Access denied';
+  }
+
+  /**
+   * IP 해시화 (로깅용)
+   */
+  private hashIp(ip: string): string {
+    const crypto = require('crypto');
+    return crypto
+      .createHash('sha256')
+      .update(ip + process.env.IP_HASH_SALT || 'default-salt')
+      .digest('hex')
+      .substring(0, 16);
+  }
+
+  /**
+   * User-Agent 정제 (민감 정보 제거)
+   */
+  private sanitizeUserAgent(request: ExtendedRequest): string {
+    const userAgent = this.getUserAgent(request);
+    // 버전 정보 제거
+    return userAgent
+      .replace(/\/[\d.]+/g, '/x.x')
+      .substring(0, 100);
   }
 }

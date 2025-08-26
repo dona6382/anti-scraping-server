@@ -60,7 +60,7 @@ export class CacheFactory {
       return {
         type: 'redis',
         connected: true,
-        info,
+        info: info || undefined,
       };
     }
     

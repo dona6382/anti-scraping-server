@@ -45,6 +45,7 @@ export class ControllerHelperService {
       const normalizedErrors = this.normalizeValidationErrors(validation.errors);
       
       throw new ValidationException(
+        'Validation failed',
         normalizedErrors
       );
     }
@@ -126,7 +127,7 @@ export class ControllerHelperService {
     
     if (updatedFields.length === 0) {
       throw new ValidationException(
-        { general: ['No fields to update'] }
+        'No fields to update'
       );
     }
 
@@ -217,7 +218,7 @@ export class ControllerHelperService {
     // 데이터 검증
     if (!data || Object.keys(data).length === 0) {
       throw new ValidationException(
-        { data: ['No data provided for bulk operation'] }
+        'No data provided for bulk operation'
       );
     }
 
@@ -335,9 +336,7 @@ export class ControllerHelperService {
     
     if (missingFields.length > 0) {
       throw new ValidationException(
-        { 
-          required: missingFields.map(f => `${f} is required`) 
-        }
+        `Required fields missing: ${missingFields.join(', ')}`
       );
     }
 
@@ -346,7 +345,7 @@ export class ControllerHelperService {
       case 'delete_account':
         if (!actionDto.parameters?.confirmationPhrase) {
           throw new ValidationException(
-            { confirmation: ['Confirmation phrase required for account deletion'] }
+            'Confirmation phrase required for account deletion'
           );
         }
         break;
@@ -354,7 +353,7 @@ export class ControllerHelperService {
       case 'transfer_ownership':
         if (!actionDto.parameters?.newOwnerEmail) {
           throw new ValidationException(
-            { email: ['New owner email required'] }
+            'New owner email required'
           );
         }
         break;

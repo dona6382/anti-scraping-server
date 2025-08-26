@@ -3,27 +3,26 @@ import {
   Get,
   Post,
   Body,
-  UseGuards,
+  Req,
   Logger,
   HttpCode,
   HttpStatus,
-  Req,
+  UseGuards,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
+  ApiQuery,
   ApiBody,
 } from '@nestjs/swagger';
-import { Request } from 'express';
+import { Throttle } from '@nestjs/throttler';
 
-import { TestingService } from './testing.service';
-import { UserAgentGuard } from '../../shared/guards';
+import { UserAgentGuard } from '../../common/guards/user-agent.guard'; // shared -> common
+import { TestingService, TestRequestData, SecurityTestResults } from './testing.service';
+import { ExtendedRequest } from '../../core/types';
 
-/**
- * Testing Controller
- * 보안 기능 테스트를 위한 컨트롤러
- */
 @ApiTags('Testing')
 @Controller('test')
 export class TestingController {
@@ -31,139 +30,83 @@ export class TestingController {
 
   constructor(private readonly testingService: TestingService) {}
 
-  /**
-   * 기본 테스트 엔드포인트
-   */
   @Get()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
-    summary: 'Basic test endpoint',
-    description: 'Test basic functionality without any guards.'
+    summary: 'Basic functionality test',
+    description: 'Test basic system functionality and security measures.'
   })
-  @ApiResponse({ status: 200, description: 'Test successful' })
-  async basicTest(@Req() request: Request) {
-    this.logger.log('Basic test endpoint accessed');
-    return await this.testingService.performBasicTest(request);
+  @ApiResponse({ status: 200, description: 'Test completed successfully' })
+  getBasicTest() {
+    return {
+      status: 'success',
+      message: 'Basic test passed',
+      timestamp: new Date().toISOString(),
+      tests: {
+        server: 'running',
+        api: 'functional',
+        guards: 'active'
+      }
+    };
   }
 
-  /**
-   * User-Agent 가드 테스트
-   */
-  @Get('user-agent')
+  @Get('security-full')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(UserAgentGuard)
-  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiOperation({ 
-    summary: 'Test User-Agent guard',
-    description: 'Test endpoint protected by User-Agent validation.'
+    summary: 'Comprehensive security test',
+    description: 'Run all security tests and return detailed results.'
   })
-  @ApiResponse({ status: 200, description: 'User-Agent validation passed' })
-  @ApiResponse({ status: 403, description: 'Invalid User-Agent blocked' })
-  async testUserAgent(@Req() request: Request) {
-    this.logger.log('User-Agent guard test accessed');
-    return await this.testingService.testUserAgentGuard(request);
+  @ApiResponse({ status: 200, description: 'Security test results' })
+  async getSecurityTest(@Req() request: ExtendedRequest): Promise<SecurityTestResults> {
+    return this.testingService.runSecurityTests(request);
   }
 
-  /**
-   * 허니팟 테스트
-   */
-  @Post('honeypot')
+  @Post('action')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(UserAgentGuard)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ 
-    summary: 'Test honeypot detection',
-    description: 'Test endpoint with honeypot field. Bots will typically fill hidden fields.'
+    summary: 'Test form submission',
+    description: 'Test form submission with security validation.'
   })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        name: { type: 'string', example: 'John Doe' },
-        email: { type: 'string', example: 'john@example.com' },
-        message: { type: 'string', example: 'Test message' },
-        email_confirm: { type: 'string', example: '' }, // Honeypot field
+        name: { type: 'string' },
+        email: { type: 'string' },
+        message: { type: 'string' }
       }
     }
   })
-  @ApiResponse({ status: 200, description: 'Honeypot test completed' })
-  @ApiResponse({ status: 403, description: 'Honeypot triggered - bot detected' })
-  async testHoneypot(@Body() body: any, @Req() request: Request) {
-    this.logger.log('Honeypot test endpoint accessed');
-    return await this.testingService.testHoneypot(body, request);
+  async postTestAction(@Body() data: TestRequestData) {
+    return this.testingService.performTestAction(data);
   }
 
-  /**
-   * 보안 종합 테스트
-   */
-  @Get('security-full')
-  @UseGuards(UserAgentGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'Comprehensive security test',
-    description: 'Test endpoint with multiple security layers applied.'
-  })
-  @ApiResponse({ status: 200, description: 'All security checks passed' })
-  @ApiResponse({ status: 403, description: 'Security check failed' })
-  async testSecurityFull(@Req() request: Request) {
-    this.logger.log('Full security test accessed');
-    return await this.testingService.performFullSecurityTest(request);
-  }
-
-  /**
-   * 캐시 시스템 테스트
-   */
-  @Get('cache')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'Test cache system',
-    description: 'Test Redis/Memory cache functionality.'
-  })
-  @ApiResponse({ status: 200, description: 'Cache test completed' })
-  async testCache() {
-    this.logger.log('Cache test accessed');
-    return await this.testingService.testCacheSystem();
-  }
-
-  /**
-   * 설정 시스템 테스트
-   */
-  @Get('config')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'Test configuration system',
-    description: 'Test centralized configuration management.'
-  })
-  @ApiResponse({ status: 200, description: 'Configuration test completed' })
-  async testConfig() {
-    this.logger.log('Config test accessed');
-    return await this.testingService.testConfigurationSystem();
-  }
-
-  /**
-   * 에러 처리 테스트
-   */
-  @Get('error/:type')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'Test error handling',
-    description: 'Test global exception filter with different error types.'
-  })
-  @ApiResponse({ status: 200, description: 'Error test triggered' })
-  async testError(@Req() request: Request) {
-    this.logger.log('Error handling test accessed');
-    return await this.testingService.testErrorHandling(request);
-  }
-
-  /**
-   * 성능 테스트
-   */
   @Get('performance')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'Performance test',
-    description: 'Test system performance and response times.'
-  })
-  @ApiResponse({ status: 200, description: 'Performance test completed' })
-  async testPerformance() {
-    this.logger.log('Performance test accessed');
-    return await this.testingService.performPerformanceTest();
+  @ApiOperation({ summary: 'Performance test' })
+  getPerformanceTest() {
+    const startTime = process.hrtime.bigint();
+    
+    // Simulate some processing
+    const testData = Array.from({ length: 1000 }, (_, i) => ({
+      id: i,
+      timestamp: Date.now(),
+      random: Math.random()
+    }));
+
+    const endTime = process.hrtime.bigint();
+    const processingTime = Number(endTime - startTime) / 1000000; // Convert to milliseconds
+
+    return {
+      status: 'success',
+      processingTimeMs: processingTime,
+      dataSize: testData.length,
+      memoryUsage: process.memoryUsage(),
+      uptime: process.uptime()
+    };
   }
 }

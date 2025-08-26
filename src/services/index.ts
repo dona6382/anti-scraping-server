@@ -1,21 +1,21 @@
-export { AdminBusinessService } from './admin/admin-business.service';
-export { SecurityBusinessService } from './security/security-business.service';
-export { TestingBusinessService } from './testing/testing-business.service';
+/**
+ * Business Services Index
+ * 정리된 비즈니스 서비스들만 export
+ */
 
-// Re-export types for convenience
-export type {
-  PaginationParams,
-  BlacklistRequest,
-  PaginatedResponse
-} from './admin/admin-business.service';
+// 실제로 존재하는 서비스들만 export
+export { BusinessService } from './business.service';
 
-export type {
-  BotDetectionResult,
-  FingerprintValidationRequest
-} from './security/security-business.service';
+// 타입들은 각 feature 모듈에서 직접 정의
+export interface PaginationParams {
+  page: number;
+  limit: number;
+  sortBy?: string;
+  order?: 'asc' | 'desc';
+}
 
-export type {
-  TestRequestData,
-  TestResult,
-  SecurityTestResults
-} from './testing/testing-business.service';
+export interface BlacklistRequest {
+  ip: string;
+  reason?: string;
+  ttl?: number;
+}

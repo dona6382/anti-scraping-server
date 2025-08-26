@@ -67,7 +67,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
       await this.client.ping();
       
     } catch (error) {
-      this.logger.error(`Failed to initialize Redis: ${error.message}`);
+      this.logger.error(`Failed to initialize Redis: ${error instanceof Error ? error.message : String(error)}`);
       this.client = null;
     }
   }
@@ -86,7 +86,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
       
       return JSON.parse(value);
     } catch (error) {
-      this.logger.error(`Redis GET error for key ${key}: ${error.message}`);
+      this.logger.error(`Redis GET error for key ${key}: ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
   }
@@ -109,7 +109,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
         await this.client.set(key, serialized);
       }
     } catch (error) {
-      this.logger.error(`Redis SET error for key ${key}: ${error.message}`);
+      this.logger.error(`Redis SET error for key ${key}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -124,7 +124,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
     try {
       await this.client.del(key);
     } catch (error) {
-      this.logger.error(`Redis DELETE error for key ${key}: ${error.message}`);
+      this.logger.error(`Redis DELETE error for key ${key}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -140,7 +140,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
       const result = await this.client.exists(key);
       return result === 1;
     } catch (error) {
-      this.logger.error(`Redis EXISTS error for key ${key}: ${error.message}`);
+      this.logger.error(`Redis EXISTS error for key ${key}: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }
@@ -157,7 +157,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
       await this.client.flushdb();
       this.logger.log('Redis cache cleared');
     } catch (error) {
-      this.logger.error(`Redis CLEAR error: ${error.message}`);
+      this.logger.error(`Redis CLEAR error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -180,7 +180,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
         }
       });
     } catch (error) {
-      this.logger.error(`Redis MGET error: ${error.message}`);
+      this.logger.error(`Redis MGET error: ${error instanceof Error ? error.message : String(error)}`);
       return keys.map(() => null);
     }
   }
@@ -207,7 +207,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
       
       await pipeline.exec();
     } catch (error) {
-      this.logger.error(`Redis MSET error: ${error.message}`);
+      this.logger.error(`Redis MSET error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -222,7 +222,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
     try {
       await this.client.del(...keys);
     } catch (error) {
-      this.logger.error(`Redis DELETE MANY error: ${error.message}`);
+      this.logger.error(`Redis DELETE MANY error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -237,7 +237,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
     try {
       return await this.client.ttl(key);
     } catch (error) {
-      this.logger.error(`Redis TTL error for key ${key}: ${error.message}`);
+      this.logger.error(`Redis TTL error for key ${key}: ${error instanceof Error ? error.message : String(error)}`);
       return -1;
     }
   }
@@ -253,7 +253,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
     try {
       return await this.client.keys(pattern);
     } catch (error) {
-      this.logger.error(`Redis KEYS error for pattern ${pattern}: ${error.message}`);
+      this.logger.error(`Redis KEYS error for pattern ${pattern}: ${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
   }
@@ -287,7 +287,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
         totalKeys: this.extractKeyspaceKeys(keyspace),
       };
     } catch (error) {
-      this.logger.error(`Redis INFO error: ${error.message}`);
+      this.logger.error(`Redis INFO error: ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
   }
@@ -317,7 +317,7 @@ export class RedisCacheService implements ICacheService, OnModuleDestroy {
         await this.client.quit();
         this.logger.log('Redis connection closed gracefully');
       } catch (error) {
-        this.logger.error(`Error closing Redis connection: ${error.message}`);
+        this.logger.error(`Error closing Redis connection: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }

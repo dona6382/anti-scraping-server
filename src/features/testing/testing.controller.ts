@@ -21,7 +21,7 @@ import { Throttle } from '@nestjs/throttler';
 
 import { UserAgentGuard } from '../../common/guards/user-agent.guard'; // shared -> common
 import { TestingService, TestRequestData, SecurityTestResults } from './testing.service';
-import { ExtendedRequest } from '../../core/types';
+import { ExtendedRequest } from '../../types/security.types';
 
 @ApiTags('Testing')
 @Controller('test')

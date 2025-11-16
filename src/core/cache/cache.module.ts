@@ -1,7 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import { RedisCacheService } from './redis-cache.service';
 import { CacheFactory } from './cache.factory';
-import { MemoryCacheService } from '../../features/security/services/memory-cache.service';
+import { MemoryCacheService } from './memory-cache.service';
 
 /**
  * Core Cache Module

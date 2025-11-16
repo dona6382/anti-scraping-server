@@ -20,7 +20,7 @@ import {
 } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 
-import { IpBlacklistService } from '../services/ip-blacklist.service';
+import { IpBlacklistService } from '../../../common/services/ip-blacklist.service';
 import { IpStatistics, BlacklistEntry, SecurityReason } from '../../../core/types';
 
 /**

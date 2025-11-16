@@ -1,13 +1,10 @@
 import { Module } from '@nestjs/common';
+import { CommonModule } from '../../common/common.module';
 
 // Controllers
 import { SecurityAdminController } from './controllers/security-admin.controller';
 
-// Services
-import { IpBlacklistService } from './services/ip-blacklist.service';
-
-// 임시로 memory cache 서비스 (나중에 Redis로 교체)
-// import { MemoryCacheService } from './services/memory-cache.service';
+// Services는 CommonModule에서 제공됨
 
 /**
  * Security Feature Module
@@ -18,21 +15,15 @@ import { IpBlacklistService } from './services/ip-blacklist.service';
  * - 관리자 기능
  */
 @Module({
+  imports: [
+    CommonModule, // IpBlacklistService를 여기서 가져옴
+  ],
   controllers: [
     SecurityAdminController,
   ],
   providers: [
-    IpBlacklistService,
-    // Cache service는 CoreModule에서 제공
-    // {
-    //   provide: 'ICacheService',
-    //   useClass: MemoryCacheService, // 임시 메모리 캐시
-    // },
+    // 중복 서비스 제거 - CommonModule에서 제공
   ],
-  exports: [
-    IpBlacklistService,
-    // Cache service는 CoreModule에서 제공
-    // 'ICacheService',
-  ],
+  exports: [],
 })
 export class SecurityModule {}

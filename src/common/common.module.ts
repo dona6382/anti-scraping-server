@@ -2,14 +2,10 @@ import { Module, Global } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 
-// Configuration은 ConfigurationModule에서 이미 글로벌로 제공됨
-import { ConfigurationModule } from '../modules/configuration/configuration.module';
+// Configuration은 CoreConfigModule에서 이미 글로벌로 제공됨
+import { CoreConfigModule } from '../core/config/config.module';
 
-// Cache
-import { CacheFactory, CacheServiceProvider } from './services/cache.factory';
-import { RedisService } from './services/redis.service';
-import { MemoryCacheService } from './services/memory-cache.service';
-import { RedisCacheService } from './services/redis-cache.service';
+// Cache는 core/cache 모듈에서 제공됨 (중복 제거)
 
 // Services
 import { IpBlacklistService } from './services/ip-blacklist.service';
@@ -30,9 +26,9 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
 @Global()
 @Module({
   imports: [
-    ConfigurationModule,
+    CoreConfigModule,
     ThrottlerModule.forRootAsync({
-      imports: [ConfigurationModule],
+      imports: [CoreConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         throttlers: [
@@ -46,12 +42,7 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
     }),
   ],
   providers: [
-    // Redis
-    RedisService,
-    
-    // Cache
-    CacheFactory,
-    CacheServiceProvider,
+    // Cache는 core/cache에서 제공 (중복 제거)
     
     // Services
     IpBlacklistService,
@@ -66,10 +57,7 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
     HeadlessBrowserGuard,
   ],
   exports: [
-    // Export cache
-    'ICacheService',
-    CacheFactory,
-    RedisService,
+    // Cache는 core/cache에서 제공 (중복 제거)
     
     // Export services
     IpBlacklistService,
@@ -85,7 +73,7 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
     
     // Export modules
     ThrottlerModule,
-    ConfigurationModule,
+    CoreConfigModule,
   ],
 })
 export class CommonModule {}

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ICacheService } from './cache.service';
+import { ICacheService } from './interfaces/cache.interface';
 
 /**
  * Memory Cache Service

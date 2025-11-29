@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { ExtendedRequest } from '../../types/security.types';
+import { ExtendedRequest } from '../../core/types';
 import { RequestUtils } from '../../common/utils/request.utils'; // shared -> common
 // import { HoneypotException } from '../../shared/exceptions'; // 제거
 

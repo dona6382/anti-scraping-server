@@ -35,9 +35,6 @@ export {
 export {
   InvalidUserAgentException,
   HeadlessBrowserException,
-  HoneypotException,
-  RecaptchaException,
-  ConfigurationException,
 } from './security-specific.exception';
 
 // ============================================

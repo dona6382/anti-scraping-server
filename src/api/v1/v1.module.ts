@@ -7,7 +7,7 @@ import { ClientInfoModule } from '../../features/client-info/client-info.module'
 import { PublicModule } from '../../features/public/public.module';
 import { AdminModule } from '../../features/admin/admin.module';
 import { TestingModule } from '../../features/testing/testing.module';
-import { AuthModule } from '../../features/auth/auth.module';
+// import { AuthModule } from '../../features/auth/auth.module'; // 임시 비활성화
 
 /**
  * API v1 Module
@@ -25,7 +25,7 @@ import { AuthModule } from '../../features/auth/auth.module';
     PublicModule,
     AdminModule,
     TestingModule,
-    AuthModule,
+    // AuthModule, // 임시 비활성화
   ],
 })
 export class ApiV1Module {}

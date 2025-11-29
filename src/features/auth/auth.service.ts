@@ -7,7 +7,6 @@ import * as bcrypt from 'bcrypt';
 
 import { User } from '../../core/database/entities';
 import { AuthDto, RegisterDto, ChangePasswordDto } from './dto/auth.dto';
-import { RequestUtils } from '../../common/utils/request.utils'; // shared -> common
 
 @Injectable()
 export class AuthService {

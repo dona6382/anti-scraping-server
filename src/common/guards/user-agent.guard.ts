@@ -1,7 +1,7 @@
 import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BaseSecurityGuard } from './base-security.guard';
-import { ExtendedRequest } from '../../types';
+import { ExtendedRequest } from '../../core/types';
 import { InvalidUserAgentException } from '../exceptions';
 
 /**

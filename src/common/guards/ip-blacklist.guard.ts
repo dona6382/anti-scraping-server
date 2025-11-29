@@ -1,7 +1,7 @@
 import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
 import { BaseSecurityGuard } from './base-security.guard';
 import { IpBlacklistService } from '../services/ip-blacklist.service';
-import { ExtendedRequest } from '../../types';
+import { ExtendedRequest } from '../../core/types';
 import { IpBlockedException } from '../exceptions/application.exception';
 
 /**

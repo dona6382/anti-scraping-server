@@ -5,24 +5,20 @@ import { ThrottlerModule } from '@nestjs/throttler';
 // Configuration은 CoreConfigModule에서 이미 글로벌로 제공됨
 import { CoreConfigModule } from '../core/config/config.module';
 
-// Cache는 core/cache 모듈에서 제공됨 (중복 제거)
-
 // Services
 import { IpBlacklistService } from './services/ip-blacklist.service';
 
 // Guards
 import { UserAgentGuard } from './guards/user-agent.guard';
 import { IpBlacklistGuard } from './guards/ip-blacklist.guard';
-import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
 
 /**
- * Common Module - Recommended Configuration
- * 권장 보안 기능을 제공하는 글로벌 모듈
+ * Common Module - Minimal Configuration
+ * 최소한의 보안 기능만 제공
  * 
  * 포함된 기능:
  * - UserAgentGuard: User-Agent 기반 봇 차단
  * - IpBlacklistGuard: IP 차단 시스템
- * - HeadlessBrowserGuard: 헤드리스 브라우저 탐지
  */
 @Global()
 @Module({
@@ -49,7 +45,6 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
     // Guards
     UserAgentGuard,
     IpBlacklistGuard,
-    HeadlessBrowserGuard,
   ],
   exports: [
     // Export services
@@ -58,7 +53,6 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
     // Export guards
     UserAgentGuard,
     IpBlacklistGuard,
-    HeadlessBrowserGuard,
     
     // Export modules
     ThrottlerModule,

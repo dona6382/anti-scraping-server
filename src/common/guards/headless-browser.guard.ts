@@ -1,6 +1,6 @@
 import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
 import { BaseSecurityGuard } from './base-security.guard';
-import { ExtendedRequest } from '../../types';
+import { ExtendedRequest } from '../../core/types';
 import { HeadlessBrowserException } from '../exceptions';
 
 /**

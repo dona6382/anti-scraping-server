@@ -1,7 +1,6 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ICacheService } from './base-cache.service';
-import { BlacklistEntry, SecurityReason, IpStatistics } from '../../types';
+import { ICacheService, BlacklistEntry, SecurityReason, IpStatistics } from '../../core/types';
 
 /**
  * IP Blacklist Service

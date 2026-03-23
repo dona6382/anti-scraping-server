@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Body, Req, Res, HttpStatus, Logger, Header, Query } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { Controller, Get, Req, Logger, Query } from '@nestjs/common';
+import { Request } from 'express';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
 import { ClientInfoService, ClientInfo } from './client-info.service';
+import { RequestUtils } from '../../common/utils/request.utils';
+import { ExtendedRequest } from '../../core/types';
 
 @ApiTags('Client Info')
 @Controller('api/client')
@@ -14,7 +16,7 @@ export class ClientInfoController {
   @Get('info')
   @ApiOperation({ summary: 'Get client information' })
   async getClientInfo(@Req() request: Request, @Query('detailed') detailed?: boolean): Promise<ClientInfo> {
-    this.logger.log(`Client info requested from ${this.getClientIp(request)}`);
+    this.logger.log(`Client info requested from ${RequestUtils.extractClientIp(request as ExtendedRequest)}`);
     
     try {
       const clientInfo = await this.clientInfoService.getClientInfo(request);
@@ -72,18 +74,6 @@ export class ClientInfoController {
       suspicious: clientInfo.headers.suspicious,
       missing: clientInfo.headers.missing,
     };
-  }
-
-  private getClientIp(request: Request): string {
-    const forwarded = request.headers['x-forwarded-for'] as string;
-    const realIp = request.headers['x-real-ip'] as string;
-    if (forwarded) {
-      return forwarded.split(',')[0]?.trim() || 'unknown';
-    }
-    if (realIp) {
-      return realIp;
-    }
-    return request.socket?.remoteAddress || request.ip || 'unknown';
   }
 
   private getSimplifiedInfo(clientInfo: ClientInfo): any {

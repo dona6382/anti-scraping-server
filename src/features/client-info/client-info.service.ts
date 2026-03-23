@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Request } from 'express';
 import { AppConfigService } from '../../core/config/config.service';
+import { RequestUtils } from '../../common/utils/request.utils';
+import { ExtendedRequest } from '../../core/types';
 
 /**
  * 클라이언트 정보 인터페이스
@@ -77,8 +79,8 @@ export class ClientInfoService {
    * 전체 클라이언트 정보 수집
    */
   async getClientInfo(request: Request): Promise<ClientInfo> {
-    const ip = this.extractClientIp(request);
-    const userAgent = this.extractUserAgent(request);
+    const ip = RequestUtils.extractClientIp(request as ExtendedRequest);
+    const userAgent = RequestUtils.extractUserAgent(request as ExtendedRequest);
     
     return {
       ip: this.analyzeIp(ip),
@@ -92,41 +94,13 @@ export class ClientInfoService {
   }
 
   /**
-   * IP 주소 추출
-   */
-  private extractClientIp(request: Request): string {
-    const forwarded = request.headers['x-forwarded-for'] as string;
-    const realIp = request.headers['x-real-ip'] as string;
-    const cfConnectingIp = request.headers['cf-connecting-ip'] as string;
-    
-    if (forwarded) {
-      return forwarded.split(',')[0]?.trim() || 'unknown';
-    }
-    if (realIp) {
-      return realIp;
-    }
-    if (cfConnectingIp) {
-      return cfConnectingIp;
-    }
-    
-    return request.socket?.remoteAddress || request.ip || 'unknown';
-  }
-
-  /**
-   * User-Agent 추출
-   */
-  private extractUserAgent(request: Request): string {
-    return (request.headers['user-agent'] as string) || '';
-  }
-
-  /**
    * IP 분석
    */
   private analyzeIp(ip: string): ClientInfo['ip'] {
     const isIPv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(ip);
     const isIPv6 = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(ip);
-    
-    const isPrivate = this.isPrivateIp(ip);
+
+    const isPrivate = RequestUtils.isPrivateIp(ip);
     
     return {
       address: ip,
@@ -194,9 +168,9 @@ export class ClientInfoService {
    * 클라이언트 분석
    */
   private analyzeClient(userAgent: string): ClientInfo['client'] {
-    const isBot = this.isBotUserAgent(userAgent);
-    const isCrawler = this.isCrawlerUserAgent(userAgent);
-    const deviceType = this.detectDeviceType(userAgent);
+    const isBot = RequestUtils.isBotUserAgent(userAgent);
+    const isCrawler = RequestUtils.isCrawlerUserAgent(userAgent);
+    const deviceType = RequestUtils.detectDeviceType(userAgent);
     
     return {
       userAgent,
@@ -254,14 +228,14 @@ export class ClientInfoService {
     const threats: string[] = [];
     const recommendations: string[] = [];
     
-    const userAgent = this.extractUserAgent(request);
+    const userAgent = RequestUtils.extractUserAgent(request as ExtendedRequest);
     
     // User-Agent 기반 위험도
     if (!userAgent) {
       riskScore += 30;
       threats.push('Missing User-Agent');
       recommendations.push('Provide valid User-Agent header');
-    } else if (this.isBotUserAgent(userAgent)) {
+    } else if (RequestUtils.isBotUserAgent(userAgent)) {
       riskScore += 50;
       threats.push('Bot User-Agent detected');
     }
@@ -281,88 +255,6 @@ export class ClientInfoService {
       threats,
       recommendations,
     };
-  }
-
-  /**
-   * 프라이빗 IP 확인
-   */
-  private isPrivateIp(ip: string): boolean {
-    const privateRanges = [
-      /^10\./,
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
-      /^192\.168\./,
-      /^127\./,
-      /^::1$/,
-      /^fc00:/,
-    ];
-
-    return privateRanges.some(range => range.test(ip));
-  }
-
-  /**
-   * 봇 User-Agent 확인
-   */
-  private isBotUserAgent(userAgent: string): boolean {
-    const botPatterns = [
-      /bot/i,
-      /crawler/i,
-      /spider/i,
-      /scraper/i,
-      /curl/i,
-      /wget/i,
-      /python/i,
-      /java/i,
-      /ruby/i,
-    ];
-
-    return botPatterns.some(pattern => pattern.test(userAgent));
-  }
-
-  /**
-   * 크롤러 User-Agent 확인
-   */
-  private isCrawlerUserAgent(userAgent: string): boolean {
-    const crawlerPatterns = [
-      /crawl/i,
-      /spider/i,
-      /scrape/i,
-      /harvest/i,
-      /extract/i,
-    ];
-
-    return crawlerPatterns.some(pattern => pattern.test(userAgent));
-  }
-
-  /**
-   * 디바이스 타입 탐지
-   */
-  private detectDeviceType(userAgent: string): ClientInfo['client']['deviceType'] {
-    if (this.isBotUserAgent(userAgent)) {
-      return 'bot';
-    }
-
-    const mobilePatterns = [
-      /mobile/i,
-      /android/i,
-      /iphone/i,
-      /blackberry/i,
-      /windows phone/i,
-    ];
-
-    const tabletPatterns = [
-      /tablet/i,
-      /ipad/i,
-    ];
-
-    if (mobilePatterns.some(pattern => pattern.test(userAgent))) {
-      return 'mobile';
-    }
-
-    if (tabletPatterns.some(pattern => pattern.test(userAgent))) {
-      return 'tablet';
-    }
-
-    return 'desktop';
   }
 
   /**

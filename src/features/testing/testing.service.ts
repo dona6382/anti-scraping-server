@@ -2,8 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { ExtendedRequest } from '../../core/types';
-import { RequestUtils } from '../../common/utils/request.utils'; // shared -> common
-// import { HoneypotException } from '../../shared/exceptions'; // 제거
+import { RequestUtils } from '../../common/utils/request.utils';
 
 export interface TestRequestData {
   name?: string;
@@ -75,10 +74,7 @@ export class TestingService {
       };
     }
 
-    const suspiciousPatterns = ['curl', 'wget', 'python', 'bot', 'scraper'];
-    const isSuspicious = suspiciousPatterns.some(pattern => 
-      userAgent.toLowerCase().includes(pattern)
-    );
+    const isSuspicious = RequestUtils.isBotUserAgent(userAgent);
 
     return {
       test: 'User-Agent',

@@ -323,7 +323,7 @@
         // Test functions
         async function fetchPublicData() {
             try {
-                const response = await fetchWithFingerprint(`${API_BASE}/api/public-data`);
+                const response = await fetchWithFingerprint(`${API_BASE}/api/public/data`);
                 const data = await response.json();
                 displayResponse('public-response', data, !response.ok);
             } catch (error) {
@@ -333,7 +333,7 @@
         
         async function fetchProtectedData() {
             try {
-                const response = await fetchWithFingerprint(`${API_BASE}/api/protected-data`);
+                const response = await fetchWithFingerprint(`${API_BASE}/api/public/stats`);
                 const data = await response.json();
                 displayResponse('protected-response', data, !response.ok);
             } catch (error) {
@@ -362,7 +362,7 @@
             }
             
             try {
-                const response = await fetchWithFingerprint(`${API_BASE}/api/contact`, {
+                const response = await fetchWithFingerprint(`${API_BASE}/test/action`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -388,7 +388,7 @@
             document.getElementById('rate-counter').textContent = rateCounter;
             
             try {
-                const response = await fetchWithFingerprint(`${API_BASE}/test/rate-limit`);
+                const response = await fetchWithFingerprint(`${API_BASE}/test`);
                 const data = await response.json();
                 displayResponse('rate-response', data, !response.ok);
             } catch (error) {
@@ -405,7 +405,7 @@
             }
             
             try {
-                const response = await fetchWithFingerprint(`${API_BASE}/api/search/${encodeURIComponent(query)}`);
+                const response = await fetchWithFingerprint(`${API_BASE}/api/public/search/${encodeURIComponent(query)}`);
                 const data = await response.json();
                 displayResponse('search-response', data, !response.ok);
             } catch (error) {
@@ -416,7 +416,7 @@
         // Admin functions
         async function getBlacklistStats() {
             try {
-                const response = await fetchWithFingerprint(`${API_BASE}/admin/blacklist/stats`);
+                const response = await fetchWithFingerprint(`${API_BASE}/admin/security/statistics`);
                 const data = await response.json();
                 displayResponse('admin-response', data, !response.ok);
             } catch (error) {
@@ -438,7 +438,7 @@
             };
             
             try {
-                const response = await fetchWithFingerprint(`${API_BASE}/admin/blacklist/ip`, {
+                const response = await fetchWithFingerprint(`${API_BASE}/admin/security/blacklist/ip`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

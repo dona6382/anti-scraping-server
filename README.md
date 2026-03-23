@@ -1,260 +1,209 @@
-# 🛡️ Anti-Scraping Server
+# Anti-Scraping Server
 
-> 모듈형 아키텍처와 포괄적인 보안 기능을 갖춘 프로덕션 레디 안티 스크래핑 솔루션
+6단계 보안 레이어를 갖춘 웹 스크래핑/봇 탐지 및 차단 서버.
+NestJS + TypeScript + PostgreSQL + Redis 기반.
 
-## 📋 목차
+## 기술 스택
 
-- [주요 기능](#-주요-기능)
-- [빠른 시작](#-빠른-시작)
-- [API 문서](#-api-문서)
-- [프로젝트 구조](#-프로젝트-구조)
-- [환경 설정](#-환경-설정)
-- [개발](#-개발)
-- [테스트](#-테스트)
-- [Docker](#-docker)
-- [모니터링](#-모니터링)
+| 영역 | 기술 |
+|------|------|
+| Framework | NestJS 10 (Express) |
+| Language | TypeScript 5 |
+| Database | PostgreSQL 16 (TypeORM) |
+| Cache | Redis 7 / In-Memory fallback |
+| Auth | JWT + bcrypt + RBAC |
+| Security | helmet, throttler, IP blacklist, UA filter, headless detection |
+| Validation | class-validator + class-transformer |
+| API Docs | Swagger (OpenAPI 3.0) |
+| Container | Docker Compose |
+| Test | Jest (41 tests) |
 
-## ✨ 주요 기능
+## 보안 레이어 (6단계)
 
-### 보안 기능
-- 🔒 **IP 차단** - Redis/메모리 캐시를 활용한 동적 IP 차단
-- 🤖 **봇 탐지** - User-Agent 필터링 및 패턴 매칭
-- ⚡ **요청 제한** - IP별 요청 속도 제한
-- 🍯 **허니팟 보호** - 자동화 도구를 잡아내는 숨겨진 필드
-- 👻 **헤드리스 브라우저 탐지** - Puppeteer, Selenium 등 차단
-- 🔍 **클라이언트 분석** - 고급 핑거프린팅 및 위험 점수 산정
-
-### 시스템 기능
-- 📊 실시간 보안 통계
-- 🔧 동적 설정 관리
-- 📈 성능 모니터링
-- 🚀 자동 확장 가능한 아키텍처
-
-## 🚀 빠른 시작
-
-### 자동 설치 및 실행
-```bash
-# 프로젝트 클론
-git clone [repository-url]
-cd anti-scraping-server
-
-# 실행 권한 부여 및 서버 시작
-chmod +x start.sh && ./start.sh
+```
+Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → Honeypot → reCAPTCHA
 ```
 
-### 수동 설치
+| 레이어 | 설명 | 적용 범위 |
+|--------|------|----------|
+| Rate Limiting | IP별 요청 속도 제한 | 전역 (APP_GUARD) |
+| IP Blacklist | Redis/Memory 기반 동적 IP 차단 | 전역 (APP_GUARD) |
+| User-Agent Filter | 봇/스크래퍼 UA 패턴 매칭 | 라우트별 |
+| Headless Detection | Puppeteer, Selenium 등 자동화 탐지 (점수 기반) | 라우트별 |
+| Honeypot | 숨겨진 필드로 자동화 도구 탐지 | 라우트별 |
+| reCAPTCHA v3 | Google reCAPTCHA 통합 | 선택적 |
+
+## 빠른 시작
+
+### 사전 요구사항
+- Node.js 18+
+- PostgreSQL 14+
+- Redis 7+ (선택, 없으면 in-memory fallback)
+
+### 설치 및 실행
+
 ```bash
 # 의존성 설치
 npm install
 
+# 환경변수 설정
+cp .env.example .env
+# .env 파일에서 JWT_SECRET, DB 정보 수정
+
 # 개발 서버 실행
 npm run start:dev
-
-# 프로덕션 빌드 및 실행
-npm run build
-npm run start:prod
 ```
 
-서버 접속: http://localhost:3000
+서버 접속:
+- API: http://localhost:3000
+- Swagger: http://localhost:3000/api-docs
+- Test UI: http://localhost:3000/public
+- Health: http://localhost:3000/health
 
-## 📚 API 문서
+### Docker Compose
 
-### 상태 확인
-| 메소드 | 경로 | 설명 |
+```bash
+# JWT_SECRET, IP_HASH_SALT 설정 필요
+export JWT_SECRET=your-secret-key
+export IP_HASH_SALT=your-salt
+
+docker-compose up -d
+```
+
+서비스: app (3000) + postgres (5432) + redis (6379) + redis-commander (8081)
+
+## API 엔드포인트
+
+### Public (인증 불필요)
+| Method | Path | 설명 |
 |--------|------|------|
-| GET | `/health` | 기본 상태 확인 |
-| GET | `/health/detailed` | 상세 시스템 메트릭 |
+| GET | `/` | 서버 상태 |
+| GET | `/health` | 기본 헬스체크 |
+| GET | `/health/detailed` | 상세 헬스체크 (DB, Redis, CPU, Memory) |
+| GET | `/health/live` | Kubernetes liveness probe |
+| GET | `/health/ready` | Kubernetes readiness probe |
+| GET | `/api/public/data` | 공개 데이터 |
+| GET | `/api/public/search/:query` | 검색 |
+| GET | `/api/public/stats` | 공개 통계 |
 
-### 공개 API
-| 메소드 | 경로 | 설명 |
+### Auth (인증)
+| Method | Path | 설명 |
 |--------|------|------|
-| GET | `/api/public/data` | 공개 데이터 접근 |
-| GET | `/api/public/health` | 공개 상태 정보 |
+| POST | `/auth/login` | 로그인 (JWT 발급) |
+| POST | `/auth/register` | 회원가입 |
+| POST | `/auth/change-password` | 비밀번호 변경 (JWT 필요) |
 
-### 관리자 API
-| 메소드 | 경로 | 설명 |
+### Admin (JWT + admin 역할 필요)
+| Method | Path | 설명 |
 |--------|------|------|
-| GET | `/admin/system/info` | 시스템 정보 조회 |
-| GET | `/admin/security/statistics` | 보안 통계 조회 |
-| POST | `/admin/security/blacklist/ip` | IP 차단 추가 |
+| GET | `/admin/system/info` | 시스템 정보 |
+| GET | `/admin/system/stats` | 보안 통계 |
+| GET | `/admin/security/events` | 보안 이벤트 로그 |
+| GET | `/admin/config` | 설정 조회 |
+| DELETE | `/admin/cache` | 캐시 초기화 |
+| POST | `/admin/system/health-check` | 강제 헬스체크 |
+| POST | `/admin/security/blacklist/ip` | IP 차단 |
 | DELETE | `/admin/security/blacklist/ip/:ip` | IP 차단 해제 |
+| GET | `/admin/security/statistics` | IP 차단 통계 |
 
-### 테스트 API
-| 메소드 | 경로 | 설명 |
+### Testing
+| Method | Path | 설명 |
 |--------|------|------|
 | GET | `/test` | 기본 기능 테스트 |
-| GET | `/test/security-full` | 전체 보안 기능 테스트 |
+| GET | `/test/security-full` | 전체 보안 레이어 테스트 |
+| POST | `/test/action` | 폼 제출 테스트 |
 
-## 📁 프로젝트 구조
+## 프로젝트 구조
 
 ```
 src/
-├── core/               # 핵심 인프라
-│   ├── cache/         # 캐시 관리
-│   ├── config/        # 설정 관리
-│   ├── database/      # 데이터베이스 연결
-│   └── types/         # 타입 정의
+├── main.ts                     # Bootstrap (helmet, CORS, validation, shutdown)
+├── app.module.ts               # Root (전역 Guard/Filter 등록)
 │
-├── common/            # 공통 컴포넌트
-│   ├── guards/        # 보안 가드
-│   ├── filters/       # 예외 필터
-│   ├── services/      # 공통 서비스
-│   └── utils/         # 유틸리티
+├── core/                       # 인프라 계층 (@Global)
+│   ├── config/                 # 환경변수 관리 (AppConfigService)
+│   ├── cache/                  # Redis/Memory 캐시 (Factory 패턴)
+│   ├── database/               # TypeORM + PostgreSQL
+│   │   └── entities/           # User, IpBlacklist, SecurityEvent, SystemConfig
+│   └── types/                  # 전역 타입 정의 (단일 소스)
 │
-├── features/          # 비즈니스 모듈
-│   ├── admin/         # 관리자 기능
-│   ├── auth/          # 인증
-│   ├── client-info/   # 클라이언트 정보
-│   ├── health/        # 헬스체크
-│   ├── public/        # 공개 API
-│   ├── security/      # 보안 기능
-│   └── testing/       # 테스트 엔드포인트
+├── common/                     # 공유 계층 (@Global)
+│   ├── guards/                 # 보안 Guard (Base, UserAgent, IpBlacklist, Headless)
+│   ├── filters/                # UnifiedExceptionFilter
+│   ├── services/               # IpBlacklistService, SecurityEventService
+│   ├── exceptions/             # 통합 예외 계층 (BaseApplicationException)
+│   ├── constants/              # 에러 코드, 보안 상수
+│   └── utils/                  # RequestUtils, ResponseBuilder
 │
-├── api/               # API 버전 관리
-│   └── v1/           # v1 API
+├── features/                   # 비즈니스 모듈
+│   ├── auth/                   # JWT 인증 + RBAC
+│   ├── admin/                  # 시스템 관리
+│   ├── security/               # IP 차단 관리
+│   ├── health/                 # 헬스체크 (DB/Redis 실제 체크)
+│   ├── public/                 # 공개 API
+│   ├── client-info/            # 클라이언트 핑거프린팅
+│   └── testing/                # 보안 테스트
 │
-└── legacy/            # 레거시 호환성
+└── api/v1/                     # API 버전 관리
 ```
 
-## ⚙️ 환경 설정
+## 환경변수
 
-`.env.example`을 `.env`로 복사 후 설정:
-
-### 기본 설정
+### 필수
 ```env
-# 서버 설정
-PORT=3000
-NODE_ENV=development
-
-# 보안 설정
-SECURITY_STRICT_MODE=false
-BLOCKED_USER_AGENTS=scrapy,python-requests,curl,bot
-
-# 요청 제한
-THROTTLE_TTL=60
-THROTTLE_LIMIT=20
+JWT_SECRET=your-jwt-secret          # JWT 서명 키 (없으면 부팅 실패)
+DB_HOST=localhost                    # PostgreSQL 호스트
+DB_PORT=5432
+DB_USERNAME=p_user
+DB_PASSWORD=p_pw
+DB_DATABASE=anti_scraping
 ```
 
-### Redis 설정 (선택사항)
+### 선택
 ```env
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_DB=0
-REDIS_PASSWORD=
+IP_HASH_SALT=your-salt              # IP 해시 솔트 (없으면 랜덤 생성)
+INITIAL_ADMIN_PASSWORD=Admin@1234   # 초기 admin 비밀번호
+REDIS_HOST=localhost                # Redis (없으면 in-memory)
+SECURITY_STRICT_MODE=false          # strict 모드
+DB_SYNCHRONIZE=true                 # 개발용 스키마 자동 동기화
 ```
 
-### 고급 보안 설정
-```env
-# reCAPTCHA (선택사항)
-RECAPTCHA_SECRET_KEY=your-secret-key
-RECAPTCHA_SCORE_THRESHOLD=0.5
+전체 목록은 `.env.example` 참조.
 
-# Honeypot
-HONEYPOT_FIELD_NAME=_hp
-HONEYPOT_ENABLED=true
-
-# IP 차단
-IP_BLACKLIST_TTL=3600
-IP_BLACKLIST_ENABLED=true
-```
-
-## 🔧 개발
-
-### 코드 품질
-```bash
-# 린트 실행
-npm run lint
-
-# 코드 포맷팅
-npm run format
-
-# TypeScript 체크
-npm run type-check
-```
-
-### 유용한 스크립트
-```bash
-# 빌드 테스트
-./build-test.sh
-
-# TypeScript 오류 수정
-./fix-typescript-errors.sh
-
-# 정리 검증
-./verify-cleanup.sh
-```
-
-## 🧪 테스트
+## 개발
 
 ```bash
-# 단위 테스트
-npm test
-
-# 테스트 커버리지
-npm run test:cov
-
-# E2E 테스트
-npm run test:e2e
-
-# 보안 기능 테스트
-curl http://localhost:3000/test/security-full
+npm run start:dev      # 개발 서버 (watch 모드)
+npm run build          # 프로덕션 빌드
+npm run lint           # ESLint
+npm run format         # Prettier
+npm test               # Jest 테스트 (5 suites, 41 tests)
+npm run test:cov       # 커버리지 리포트
 ```
 
-## 🐳 Docker
+## 아키텍처
 
-### Docker Compose로 실행
-```bash
-# 서비스 시작
-docker-compose up -d
-
-# 로그 확인
-docker-compose logs -f app
-
-# 서비스 중지
-docker-compose down
+### 모듈 의존성
+```
+CoreModule (Global)         → Config, Cache, Database
+    ↓
+CommonModule (Global)       → Guards, Services, Throttler, SecurityEvent
+    ↓
+ApiModule → V1Module        → Auth, Admin, Security, Health, Public, ...
 ```
 
-### Docker 이미지 빌드
-```bash
-docker build -t anti-scraping-server .
-docker run -p 3000:3000 anti-scraping-server
+### 보안 이벤트 흐름
+```
+Guard 위반 탐지 → SecurityEventService.log() → PostgreSQL 저장 (비동기)
+                → Logger 출력 (IP 해시화)
 ```
 
-## 📈 모니터링
+### 캐시 전략
+```
+CacheFactory → REDIS_HOST 설정됨? → RedisCacheService
+                                  → MemoryCacheService (fallback)
+```
 
-서버는 다음과 같은 내장 모니터링 기능을 제공합니다:
+## 라이선스
 
-- **시스템 상태**: CPU, 메모리, 디스크 사용량
-- **보안 이벤트**: 실시간 위협 탐지 및 로깅
-- **성능 메트릭**: 응답 시간, 처리량, 에러율
-- **캐시 통계**: 히트율, 메모리 사용량
-
-### 모니터링 엔드포인트
-- `/health/detailed` - 상세 시스템 메트릭
-- `/admin/system/info` - 시스템 정보
-- `/admin/security/statistics` - 보안 통계
-
-## 🤝 기여
-
-1. 저장소 포크
-2. 기능 브랜치 생성 (`git checkout -b feature/amazing-feature`)
-3. 변경사항 커밋 (`git commit -m 'Add amazing feature'`)
-4. 브랜치 푸시 (`git push origin feature/amazing-feature`)
-5. Pull Request 생성
-
-## 📄 라이선스
-
-MIT License - 자세한 내용은 LICENSE 파일 참조
-
-## 🛠️ 기술 스택
-
-- **Framework**: NestJS
-- **Language**: TypeScript
-- **Cache**: Redis / In-Memory
-- **Database**: PostgreSQL
-- **Container**: Docker
-- **Testing**: Jest
-
----
-
-**Built with ❤️ using NestJS, TypeScript, and Redis**
+MIT

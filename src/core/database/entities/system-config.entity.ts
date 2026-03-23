@@ -12,14 +12,12 @@ export class SystemConfig {
   id: string;
 
   @Column({ unique: true, length: 100 })
-  @Index()
   key: string;
 
   @Column({ type: 'text' })
   value: string;
 
   @Column({ length: 50, default: 'general' })
-  @Index()
   category: string;
 
   @Column({ type: 'enum', enum: ['string', 'number', 'boolean', 'json'], default: 'string' })

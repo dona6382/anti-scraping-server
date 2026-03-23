@@ -8,6 +8,8 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 
 @Index(['createdAt'])
 @Index(['eventType'])
 @Index(['ip'])
+@Index(['severity', 'createdAt'])
+@Index(['eventType', 'severity'])
 export class SecurityEvent {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -24,14 +26,12 @@ export class SecurityEvent {
     'ADMIN_ACTION',
     'SYSTEM_ALERT'
   ]})
-  @Index()
   eventType: string;
 
   @Column({ type: 'enum', enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], default: 'MEDIUM' })
   severity: string;
 
   @Column({ type: 'inet', nullable: true })
-  @Index()
   ip?: string;
 
   @Column({ type: 'text', nullable: true })
@@ -53,7 +53,6 @@ export class SecurityEvent {
   userId?: string;
 
   @CreateDateColumn()
-  @Index()
   createdAt: Date;
 
   // Additional event data

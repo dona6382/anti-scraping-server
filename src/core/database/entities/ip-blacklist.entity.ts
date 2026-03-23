@@ -13,7 +13,6 @@ export class IpBlacklist {
   id: string;
 
   @Column({ type: 'inet' })
-  @Index()
   ip: string;
 
   @Column({ type: 'enum', enum: [

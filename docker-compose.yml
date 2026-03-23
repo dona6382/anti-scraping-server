@@ -8,10 +8,44 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=anti_scraping
+      - DB_PASSWORD=anti_scraping_pw
+      - DB_DATABASE=anti_scraping
+      - DB_SYNCHRONIZE=false
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:-}
+      - SECURITY_STRICT_MODE=true
+      - IP_HASH_SALT=${IP_HASH_SALT:?IP_HASH_SALT is required}
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: anti-scraping-postgres
+    environment:
+      POSTGRES_USER: anti_scraping
+      POSTGRES_PASSWORD: anti_scraping_pw
+      POSTGRES_DB: anti_scraping
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anti_scraping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
     networks:
       - app-network
@@ -24,6 +58,11 @@ services:
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
     networks:
       - app-network
@@ -46,4 +85,5 @@ networks:
     driver: bridge
 
 volumes:
+  postgres-data:
   redis-data:

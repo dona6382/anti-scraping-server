@@ -21,6 +21,10 @@ export const createDatabaseConfig = (configService: AppConfigService): TypeOrmMo
     // Development settings
     synchronize: configService.isDevelopment && dbConfig.synchronize,
     logging: configService.isDevelopment ? 'all' : ['error'],
+
+    // Connection retry (dev에서는 빠르게 실패하고 계속 진행)
+    retryAttempts: configService.isProduction ? 10 : 2,
+    retryDelay: configService.isProduction ? 3000 : 1000,
     
     // Connection pool settings
     extra: {

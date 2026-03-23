@@ -4,6 +4,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as express from 'express';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 /**
@@ -46,6 +47,13 @@ async function bootstrap(): Promise<void> {
     // Get configuration
     const config = getApplicationConfiguration();
 
+    // Security headers
+    app.use(helmet({ contentSecurityPolicy: config.nodeEnv === 'production' }));
+
+    // Body size limit
+    app.use(express.json({ limit: '1mb' }));
+    app.use(express.urlencoded({ limit: '1mb', extended: true }));
+
     // Setup global pipes
     setupGlobalPipes(app);
 
@@ -62,8 +70,14 @@ async function bootstrap(): Promise<void> {
       setupSwagger(app);
     }
 
+    // Enable shutdown hooks (NestJS lifecycle)
+    app.enableShutdownHooks();
+
     // Start the application
     await app.listen(config.port);
+
+    // Setup graceful shutdown with app.close()
+    setupGracefulShutdown(app);
 
     // Log startup information
     const startupInfo = createStartupInfo(config);
@@ -173,14 +187,8 @@ function setupSwagger(app: NestExpressApplication): void {
     .setTitle('Anti-Scraping Server API')
     .setDescription(getSwaggerDescription())
     .setVersion('1.0.0')
-    .setContact(
-      'Anti-Scraping Server Support',
-      'https://github.com/your-repo',
-      'support@example.com'
-    )
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
-    .addServer('http://localhost:3000', 'Development server')
-    .addServer('https://your-domain.com', 'Production server')
+    .addServer(`http://localhost:${process.env.PORT || 3000}`, 'Development server')
     .addTag('Application', 'Core application endpoints')
     .addTag('Admin', 'Administrative functions')
     .addTag('Testing', 'Security testing endpoints')
@@ -378,34 +386,35 @@ ${info.docsEnabled ? `║  📚 API Docs:     http://localhost:${info.port}/api-
 }
 
 /**
- * Handle process termination gracefully
+ * Graceful shutdown - closes DB/Redis connections via NestJS lifecycle
  */
-function setupGracefulShutdown(): void {
+function setupGracefulShutdown(app: NestExpressApplication): void {
   const logger = new Logger('Shutdown');
-  
-  process.on('SIGTERM', () => {
-    logger.log('Received SIGTERM, shutting down gracefully...');
-    process.exit(0);
-  });
 
-  process.on('SIGINT', () => {
-    logger.log('Received SIGINT, shutting down gracefully...');
-    process.exit(0);
-  });
+  const shutdown = async (signal: string) => {
+    logger.log(`Received ${signal}, shutting down gracefully...`);
+    try {
+      await app.close();
+      logger.log('Application closed gracefully');
+      process.exit(0);
+    } catch (error) {
+      logger.error('Error during shutdown', error);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 
   process.on('uncaughtException', (error) => {
     logger.error('Uncaught Exception:', error);
     process.exit(1);
   });
 
-  process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.on('unhandledRejection', (reason) => {
+    logger.error('Unhandled Rejection:', reason);
     process.exit(1);
   });
 }
 
-// Setup graceful shutdown handlers
-setupGracefulShutdown();
-
-// Start the application
 void bootstrap();

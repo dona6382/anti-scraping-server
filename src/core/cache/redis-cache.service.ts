@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { AppConfigService } from '../config/config.service';
 import { ICacheService } from './interfaces/cache.interface';
 
@@ -7,13 +7,15 @@ import { ICacheService } from './interfaces/cache.interface';
  * Redis를 사용한 캐시 서비스 구현
  */
 @Injectable()
-export class RedisCacheService implements ICacheService, OnModuleDestroy {
+export class RedisCacheService implements ICacheService, OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisCacheService.name);
   private client: any = null;
   private isConnected = false;
 
-  constructor(private readonly configService: AppConfigService) {
-    this.initializeRedis();
+  constructor(private readonly configService: AppConfigService) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.initializeRedis();
   }
 
   /**

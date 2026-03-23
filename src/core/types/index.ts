@@ -17,10 +17,10 @@ export interface ExtendedRequest extends Omit<Request, 'connection' | 'socket'> 
   query: Record<string, string | string[] | undefined>;
   connection?: {
     remoteAddress?: string;
-  } | any;
+  };
   socket?: {
     remoteAddress?: string;
-  } | any;
+  };
   // New fields
   clientInfo?: ClientInfo;
   securityContext?: SecurityContext;

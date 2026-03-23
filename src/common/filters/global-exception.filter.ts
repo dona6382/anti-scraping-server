@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { SecurityException } from '../exceptions';
+import { RequestUtils } from '../utils/request.utils';
+import { ExtendedRequest } from '../../core/types';
 
 interface ExceptionInfo {
   statusCode: number;
@@ -204,99 +206,7 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
    * 클라이언트 IP 추출
    */
   private getClientIp(request: Request): string {
-    const forwardedFor = request.headers['x-forwarded-for'];
-    if (forwardedFor) {
-      const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-      if (ips) {
-        return ips.split(',')[0]?.trim() || 'unknown';
-      }
-    }
-
-    return (
-      (request.headers['x-real-ip'] as string) ||
-      (request as any).connection?.remoteAddress ||
-      (request as any).socket?.remoteAddress ||
-      request.ip ||
-      'unknown'
-    );
+    return RequestUtils.extractClientIp(request as ExtendedRequest);
   }
 }
 
-/**
- * HTTP Exception Filter
- * HTTP 예외만 처리하는 필터 (특정 컨트롤러용)
- */
-@Catch(HttpException)
-export class HttpExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger('HttpExceptionFilter');
-
-  catch(exception: HttpException, host: ArgumentsHost): void {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
-    const status = exception.getStatus();
-    const exceptionResponse = exception.getResponse();
-
-    const errorResponse = {
-      statusCode: status,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      method: request.method,
-      message: 
-        typeof exceptionResponse === 'object' && 'message' in exceptionResponse
-          ? (exceptionResponse as any).message
-          : exception.message,
-    };
-
-    this.logger.warn(
-      `HTTP Exception: ${errorResponse.message}`,
-      {
-        statusCode: status,
-        path: request.url,
-        method: request.method,
-      }
-    );
-
-    response.status(status).json(errorResponse);
-  }
-}
-
-/**
- * Validation Exception Filter
- * 검증 예외 전용 필터
- */
-@Catch(HttpException)
-export class ValidationExceptionFilter implements ExceptionFilter {
-  catch(exception: HttpException, host: ArgumentsHost): void {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
-    const status = exception.getStatus();
-
-    if (status === HttpStatus.BAD_REQUEST) {
-      const exceptionResponse = exception.getResponse();
-      
-      response.status(status).json({
-        statusCode: status,
-        timestamp: new Date().toISOString(),
-        path: request.url,
-        error: 'Validation Error',
-        message: 'The request contains invalid data',
-        // 개발 환경에서만 상세 검증 오류 표시
-        ...(process.env.NODE_ENV !== 'production' && 
-          typeof exceptionResponse === 'object' && 
-          'errors' in exceptionResponse && {
-            errors: (exceptionResponse as any).errors,
-          }),
-      });
-    } else {
-      // BAD_REQUEST가 아닌 경우 기본 처리
-      response.status(status).json({
-        statusCode: status,
-        timestamp: new Date().toISOString(),
-        path: request.url,
-        message: exception.message,
-      });
-    }
-  }
-}

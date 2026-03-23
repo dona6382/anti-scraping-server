@@ -11,44 +11,42 @@ import { CommonModule } from './common/common.module';
 // API modules
 import { ApiModule } from './api/api.module';
 
-// Global filter
+// Global filter & guards
 import { UnifiedExceptionFilter } from './common/filters/global-exception.filter';
+import { IpBlacklistGuard } from './common/guards/ip-blacklist.guard';
 
-// App controller and service
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 
 /**
  * Root Application Module
- * 
+ *
  * Clean modular architecture:
  * - Core: Infrastructure (Config, Cache, Types)
  * - Common: Shared components (Guards, Filters, Utils, Services)
  * - API: Versioned API endpoints
+ *
+ * 전역 보안 체인: ThrottlerGuard → IpBlacklistGuard → Route Guards
  */
 @Module({
   imports: [
-    // Core infrastructure (must be first)
     CoreModule,
-    
-    // Common services and components
     CommonModule,
-    
-    // API modules
     ApiModule,
   ],
   controllers: [
     AppController,
   ],
   providers: [
-    AppService,
-    
-    // Global guards
+    // Global guards (실행 순서: 등록 순서대로)
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    
+    {
+      provide: APP_GUARD,
+      useClass: IpBlacklistGuard,
+    },
+
     // Global exception filter
     {
       provide: APP_FILTER,

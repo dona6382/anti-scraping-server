@@ -32,52 +32,83 @@ export const BLOCKED_USER_AGENTS = [
 ];
 
 /**
- * 의심스러운 User-Agent 패턴들
+ * 봇 탐지 정규식 패턴들
+ * UserAgentGuard, ClientInfoService, TestingService 등에서 공통 사용
  */
-export const SUSPICIOUS_PATTERNS = [
-  // 버전이 없거나 이상한 패턴
-  /^Mozilla\/5\.0$/,
-  /^Mozilla$/,
-  /^Chrome$/,
-  /^Safari$/,
-  
-  // 너무 오래된 브라우저
-  /MSIE [1-8]\./,
-  /Chrome\/[1-9]\./,
-  /Firefox\/[1-9]\./,
-  
-  // 의심스러운 키워드
-  /hack/i,
-  /exploit/i,
-  /injection/i,
-  /vulnerability/i,
-  
-  // 자동화 도구 흔적
-  /automation/i,
-  /testing/i,
-  /robot/i,
-  /artificial/i,
+export const BOT_PATTERNS: RegExp[] = [
+  /bot/i,
+  /crawler/i,
+  /spider/i,
+  /scraper/i,
+  /curl/i,
+  /wget/i,
+  /python/i,
+  /java\//i,
+  /ruby/i,
 ];
 
 /**
- * 화이트리스트된 User-Agent (검증 제외)
+ * 크롤러 전용 탐지 패턴
  */
-export const WHITELISTED_USER_AGENTS = [
-  // 주요 검색엔진 (실제 봇은 IP로도 검증해야 함)
-  'Googlebot',
-  'Bingbot', 
-  'Slurp',
-  'DuckDuckBot',
-  
-  // 소셜 미디어 크롤러
+export const CRAWLER_PATTERNS: RegExp[] = [
+  /crawl/i,
+  /spider/i,
+  /scrape/i,
+  /harvest/i,
+  /extract/i,
+];
+
+/**
+ * 의심스러운 User-Agent 패턴들 (strict mode 전용)
+ */
+export const SUSPICIOUS_UA_PATTERNS: RegExp[] = [
+  /bot/i,
+  /spider/i,
+  /crawl/i,
+  /scrape/i,
+  /harvest/i,
+  /extract/i,
+  /grab/i,
+  /fetch/i,
+  /mine/i,
+  /scan/i,
+];
+
+/**
+ * 허용된 봇 목록 (strict mode에서도 통과)
+ */
+export const ALLOWED_BOTS: string[] = [
+  'googlebot',
+  'bingbot',
+  'slackbot',
+  'twitterbot',
   'facebookexternalhit',
-  'Twitterbot',
-  'LinkedInBot',
-  
-  // 합법적인 모니터링 도구
-  'Pingdom',
-  'UptimeRobot',
-  'StatusCake',
+  'linkedinbot',
+  'whatsapp',
+  'telegram',
+];
+
+/**
+ * 모바일 디바이스 패턴
+ */
+export const MOBILE_PATTERNS: RegExp[] = [
+  /mobile/i,
+  /android/i,
+  /iphone/i,
+  /ipad/i,
+  /ipod/i,
+  /blackberry/i,
+  /windows phone/i,
+  /opera mini/i,
+  /opera mobi/i,
+];
+
+/**
+ * 태블릿 디바이스 패턴
+ */
+export const TABLET_PATTERNS: RegExp[] = [
+  /tablet/i,
+  /ipad/i,
 ];
 
 /**

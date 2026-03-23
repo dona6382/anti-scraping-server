@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { ApiResponse } from '../../types';
+import { ApiResponse } from '../../core/types';
 
 /**
  * Response Builder Utility

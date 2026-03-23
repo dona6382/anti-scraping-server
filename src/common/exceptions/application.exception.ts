@@ -365,8 +365,39 @@ export class DatabaseException extends SystemException {
       originalError,
       {
         operation,
-        // 데이터베이스 에러 상세 정보는 절대 노출하지 않음
       }
+    );
+  }
+}
+
+/**
+ * Invalid User Agent Exception
+ * User-Agent 검증 실패 시 발생
+ */
+export class InvalidUserAgentException extends SecurityException {
+  constructor(userAgent: string) {
+    super(
+      ErrorCodes.INVALID_USER_AGENT,
+      process.env.NODE_ENV === 'production'
+        ? undefined
+        : `Invalid User-Agent detected: ${userAgent.substring(0, 100)}`,
+      { userAgent: userAgent.substring(0, 200) },
+    );
+  }
+}
+
+/**
+ * Headless Browser Exception
+ * 헤드리스 브라우저 감지 시 발생
+ */
+export class HeadlessBrowserException extends SecurityException {
+  constructor(detectionFactors: string[]) {
+    super(
+      ErrorCodes.HEADLESS_BROWSER_DETECTED,
+      process.env.NODE_ENV === 'production'
+        ? undefined
+        : `Headless browser detected with ${detectionFactors.length} factors`,
+      { factors: detectionFactors },
     );
   }
 }

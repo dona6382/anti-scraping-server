@@ -1,31 +1,28 @@
 import { Module } from '@nestjs/common';
 
 // Feature modules
+import { AuthModule } from '../../features/auth/auth.module';
 import { SecurityModule } from '../../features/security/security.module';
 import { HealthModule } from '../../features/health/health.module';
 import { ClientInfoModule } from '../../features/client-info/client-info.module';
 import { PublicModule } from '../../features/public/public.module';
 import { AdminModule } from '../../features/admin/admin.module';
 import { TestingModule } from '../../features/testing/testing.module';
-// import { AuthModule } from '../../features/auth/auth.module'; // 임시 비활성화
 
 /**
  * API v1 Module
- * 
- * v1 버전의 모든 API 엔드포인트를 관리:
- * - /api/v1/security/*
- * - /api/v1/health/*
- * - /api/v1/client/*
+ *
+ * v1 버전의 모든 API 엔드포인트를 관리
  */
 @Module({
   imports: [
+    AuthModule,
     SecurityModule,
     HealthModule,
     ClientInfoModule,
     PublicModule,
     AdminModule,
     TestingModule,
-    // AuthModule, // 임시 비활성화
   ],
 })
 export class ApiV1Module {}

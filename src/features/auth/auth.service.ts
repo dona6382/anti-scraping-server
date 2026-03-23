@@ -1,6 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
@@ -16,14 +21,19 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
   ) {}
 
-  async login(authDto: AuthDto) {
+  async login(authDto: AuthDto, clientIp?: string) {
     const user = await this.validateUser(authDto.username, authDto.password);
     if (!user) {
-      throw new Error('Invalid credentials');
+      throw new UnauthorizedException('Invalid credentials');
     }
+
+    // Update login tracking
+    await this.userRepository.update(user.id, {
+      lastLoginAt: new Date(),
+      ...(clientIp && { lastLoginIp: clientIp }),
+    });
 
     const payload = { username: user.username, sub: user.id, role: user.role };
     return {
@@ -46,7 +56,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new Error('User already exists');
+      throw new ConflictException('User already exists');
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 12);
@@ -64,9 +74,21 @@ export class AuthService {
     return result;
   }
 
-  async changePassword(changePasswordDto: ChangePasswordDto) {
-    // Implementation needed
-    return { success: true };
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isCurrentValid = await bcrypt.compare(dto.currentPassword, user.password);
+    if (!isCurrentValid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    user.password = await bcrypt.hash(dto.newPassword, 12);
+    await this.userRepository.save(user);
+
+    return { success: true, message: 'Password changed successfully' };
   }
 
   private async validateUser(username: string, password: string): Promise<User | null> {
@@ -74,32 +96,30 @@ export class AuthService {
       where: { username },
     });
 
-    if (user && await bcrypt.compare(password, user.password)) {
+    if (user && (await bcrypt.compare(password, user.password))) {
       return user;
     }
     return null;
   }
 
-  /**
-   * Validate JWT token and return user
-   */
-  async validateToken(token: string): Promise<any> {
+  async validateToken(token: string): Promise<User> {
     try {
       const decoded = this.jwtService.verify(token);
       const user = await this.userRepository.findOne({
         where: { id: decoded.sub },
       });
       if (!user) {
-        throw new Error('User not found');
+        throw new UnauthorizedException('User not found');
       }
       return user;
     } catch (error) {
-      throw new Error('Invalid token');
+      if (error instanceof UnauthorizedException) throw error;
+      throw new UnauthorizedException('Invalid or expired token');
     }
   }
 
   /**
-   * Create initial admin user
+   * Create initial admin user (환경변수에서 비밀번호 가져옴)
    */
   async createInitialAdmin(): Promise<void> {
     const adminExists = await this.userRepository.findOne({
@@ -107,7 +127,13 @@ export class AuthService {
     });
 
     if (!adminExists) {
-      const hashedPassword = await bcrypt.hash('admin123', 12);
+      const adminPassword = process.env.INITIAL_ADMIN_PASSWORD;
+      if (!adminPassword) {
+        this.logger.warn('INITIAL_ADMIN_PASSWORD not set - skipping admin creation');
+        return;
+      }
+
+      const hashedPassword = await bcrypt.hash(adminPassword, 12);
       const admin = this.userRepository.create({
         username: 'admin',
         email: 'admin@example.com',
@@ -121,35 +147,13 @@ export class AuthService {
     }
   }
 
-  /**
-   * Get users with pagination
-   */
-  async getUsers(page: number, limit: number): Promise<{ users: any[], total: number }> {
+  async getUsers(page: number, limit: number) {
     const [users, total] = await this.userRepository.findAndCount({
       skip: (page - 1) * limit,
       take: limit,
       select: ['id', 'username', 'email', 'role', 'isActive', 'createdAt'],
     });
 
-    return {
-      users,
-      total,
-    };
-  }
-
-  /**
-   * Create a new user
-   */
-  async createUser(userData: any): Promise<any> {
-    const hashedPassword = await bcrypt.hash(userData.password, 12);
-    const user = this.userRepository.create({
-      ...userData,
-      password: hashedPassword,
-      isActive: true,
-      isEmailVerified: false,
-    });
-    const savedUser = await this.userRepository.save(user);
-    const { password, ...result } = savedUser as any;
-    return result;
+    return { users, total };
   }
 }

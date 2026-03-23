@@ -9,6 +9,8 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,19 +19,27 @@ import {
   ApiParam,
   ApiBody,
   ApiQuery,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 
 import { IpBlacklistService } from '../../../common/services/ip-blacklist.service';
-import { IpStatistics, BlacklistEntry, SecurityReason } from '../../../core/types';
+import { IpStatistics } from '../../../core/types';
+import { JwtAuthGuard, RolesGuard } from '../../auth/guards/auth.guards';
+import { Roles } from '../../auth/auth.decorators';
+import { BlockIpDto } from '../dto/security-admin.dto';
 
 /**
  * Security Admin Controller
  * 보안 관련 관리 기능을 제공하는 컨트롤러
+ * JWT 인증 + admin 역할 필요
  */
 @ApiTags('Security Admin')
+@ApiBearerAuth('JWT-auth')
 @Controller('admin/security')
-@SkipThrottle() // 관리자는 rate limiting 제외
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
+@SkipThrottle()
 export class SecurityAdminController {
   private readonly logger = new Logger(SecurityAdminController.name);
 
@@ -41,23 +51,8 @@ export class SecurityAdminController {
   @Post('blacklist/ip')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Block an IP address' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        ip: { type: 'string', example: '192.168.1.100' },
-        reason: { type: 'string', example: 'MANUAL_ADMIN_ACTION' },
-        ttl: { type: 'number', example: 86400 }
-      }
-    }
-  })
-  async blockIp(@Body() body: { ip: string; reason: SecurityReason; ttl?: number }) {
-    const { ip, reason, ttl } = body;
-    
-    if (!this.ipBlacklistService.isValidIp(ip)) {
-      throw new Error('Invalid IP address format');
-    }
-
+  async blockIp(@Body() dto: BlockIpDto) {
+    const { ip, reason, ttl } = dto;
     await this.ipBlacklistService.blockIp(ip, reason, ttl);
     
     this.logger.log(`Admin blocked IP: ${ip} for reason: ${reason}`);
@@ -78,7 +73,7 @@ export class SecurityAdminController {
   @ApiParam({ name: 'ip', description: 'IP address to unblock' })
   async unblockIp(@Param('ip') ip: string) {
     if (!this.ipBlacklistService.isValidIp(ip)) {
-      throw new Error('Invalid IP address format');
+      throw new BadRequestException('Invalid IP address format');
     }
 
     const wasBlocked = await this.ipBlacklistService.isBlocked(ip);
@@ -141,7 +136,7 @@ export class SecurityAdminController {
   @ApiParam({ name: 'ip', description: 'IP address to check' })
   async getIpInfo(@Param('ip') ip: string) {
     if (!this.ipBlacklistService.isValidIp(ip)) {
-      throw new Error('Invalid IP address format');
+      throw new BadRequestException('Invalid IP address format');
     }
 
     const info = await this.ipBlacklistService.getBlockInfo(ip);

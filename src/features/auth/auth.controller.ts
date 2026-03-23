@@ -1,23 +1,28 @@
 import {
   Controller,
-  Get,
   Post,
   Body,
   Logger,
   HttpCode,
   HttpStatus,
   UseGuards,
+  Req,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
 import { AuthDto, RegisterDto, ChangePasswordDto } from './dto/auth.dto';
-import { RequestUtils } from '../../common/utils/request.utils'; // shared -> common
-import { ExtendedRequest } from '../../core/types';
+import { JwtAuthGuard, AuthenticatedRequest } from './guards/auth.guards';
+import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
 
+/**
+ * Authentication Controller
+ * 로그인/회원가입은 IP 차단 체크 제외 (인증 전이므로)
+ */
 @ApiTags('Authentication')
 @Controller('auth')
+@SkipIpBlacklist()
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
@@ -28,8 +33,8 @@ export class AuthController {
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'User login' })
   @ApiResponse({ status: 200, description: 'Login successful' })
-  async login(@Body() authDto: AuthDto) {
-    return this.authService.login(authDto);
+  async login(@Body() authDto: AuthDto, @Req() req: AuthenticatedRequest) {
+    return this.authService.login(authDto, req.ip);
   }
 
   @Post('register')
@@ -42,9 +47,13 @@ export class AuthController {
 
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
-  @UseGuards() // Add proper auth guard here
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Change password' })
-  async changePassword(@Body() changePasswordDto: ChangePasswordDto) {
-    return this.authService.changePassword(changePasswordDto);
+  async changePassword(
+    @Body() changePasswordDto: ChangePasswordDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.authService.changePassword(req.user.id, changePasswordDto);
   }
 }

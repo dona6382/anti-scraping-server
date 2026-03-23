@@ -1,29 +1,27 @@
 import { Module } from '@nestjs/common';
 import { CommonModule } from '../../common/common.module';
+import { AuthModule } from '../auth/auth.module';
 
 // Controllers
 import { SecurityAdminController } from './controllers/security-admin.controller';
 
-// Services는 CommonModule에서 제공됨
-
 /**
  * Security Feature Module
- * 
+ *
  * 보안 관련 모든 기능을 담당:
  * - IP 블랙리스트 관리
  * - 보안 통계
  * - 관리자 기능
+ *
+ * JWT 인증 + admin 역할 필요
  */
 @Module({
   imports: [
-    CommonModule, // IpBlacklistService를 여기서 가져옴
+    CommonModule,
+    AuthModule,
   ],
   controllers: [
     SecurityAdminController,
   ],
-  providers: [
-    // 중복 서비스 제거 - CommonModule에서 제공
-  ],
-  exports: [],
 })
 export class SecurityModule {}

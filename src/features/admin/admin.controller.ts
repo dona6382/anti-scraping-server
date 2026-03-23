@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,25 +18,26 @@ import {
   ApiParam,
   ApiBody,
   ApiQuery,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import { UseGuards } from '@nestjs/common';
 
 import { AdminService } from './admin.service';
-import { SecurityReason } from '../../core/types';
-// import { JwtAuthGuard, RolesGuard } from '../auth/guards/auth.guards'; // 임시 비활성화
-// import { Roles, CurrentUser } from '../auth/auth.decorators'; // 임시 비활성화
-// import { User } from '../../core/database/entities'; // 임시 비활성화
+import { JwtAuthGuard, RolesGuard } from '../auth/guards/auth.guards';
+import { Roles } from '../auth/auth.decorators';
+import { ChangeLogLevelDto } from './dto/admin.dto';
 
 /**
  * Admin Controller
  * 관리자 전용 기능을 제공하는 컨트롤러
+ * JWT 인증 + admin 역할 필요
  */
 @ApiTags('Admin')
+@ApiBearerAuth('JWT-auth')
 @Controller('admin')
-// @UseGuards(JwtAuthGuard, RolesGuard) // 임시 비활성화 - Auth 모듈 필요
-// @Roles('admin') // 임시 비활성화 - Auth 모듈 필요
-@SkipThrottle() // 관리자는 rate limiting 제외
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
+@SkipThrottle()
 export class AdminController {
   private readonly logger = new Logger(AdminController.name);
 
@@ -94,21 +96,6 @@ export class AdminController {
   }
 
   /**
-   * 활성 세션 조회
-   */
-  @Get('sessions')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'Get active sessions',
-    description: 'Retrieve information about active user sessions.'
-  })
-  @ApiResponse({ status: 200, description: 'Active sessions retrieved successfully' })
-  async getActiveSessions() {
-    this.logger.log('Admin: Active sessions requested');
-    return await this.adminService.getActiveSessions();
-  }
-
-  /**
    * 시스템 설정 조회
    */
   @Get('config')
@@ -121,30 +108,6 @@ export class AdminController {
   async getSystemConfig() {
     this.logger.log('Admin: System config requested');
     return await this.adminService.getSystemConfig();
-  }
-
-  /**
-   * 시스템 설정 업데이트
-   */
-  @Post('config')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'Update system configuration',
-    description: 'Update system configuration settings.'
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        key: { type: 'string', example: 'SECURITY_STRICT_MODE' },
-        value: { type: 'string', example: 'true' }
-      }
-    }
-  })
-  @ApiResponse({ status: 200, description: 'Configuration updated successfully' })
-  async updateSystemConfig(@Body() body: { key: string; value: string }) {
-    this.logger.log(`Admin: Config update requested for ${body.key}`);
-    return await this.adminService.updateSystemConfig(body.key, body.value);
   }
 
   /**
@@ -167,22 +130,11 @@ export class AdminController {
    */
   @Post('system/log-level')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'Change log level',
-    description: 'Change system log level dynamically.'
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        level: { type: 'string', enum: ['error', 'warn', 'info', 'debug'], example: 'debug' }
-      }
-    }
-  })
+  @ApiOperation({ summary: 'Change log level' })
   @ApiResponse({ status: 200, description: 'Log level changed successfully' })
-  async changeLogLevel(@Body() body: { level: string }) {
-    this.logger.log(`Admin: Log level change requested to ${body.level}`);
-    return await this.adminService.changeLogLevel(body.level);
+  async changeLogLevel(@Body() dto: ChangeLogLevelDto) {
+    this.logger.log(`Admin: Log level change requested to ${dto.level}`);
+    return await this.adminService.changeLogLevel(dto.level);
   }
 
   /**

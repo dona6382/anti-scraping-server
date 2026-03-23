@@ -1,31 +1,76 @@
-/**
- * Auth DTO (for login)
- */
-export class AuthDto {
-  username: string;
-  password: string;
-}
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsEnum,
+  MinLength,
+  MaxLength,
+  IsNotEmpty,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
- * Login DTO (alias for AuthDto)
+ * Login DTO
  */
-export class LoginDto extends AuthDto {}
+export class AuthDto {
+  @ApiProperty({ example: 'admin', minLength: 3, maxLength: 50 })
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(50)
+  username: string;
+
+  @ApiProperty({ example: 'password123', minLength: 8 })
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password: string;
+}
 
 /**
  * Register DTO
  */
 export class RegisterDto {
+  @ApiProperty({ example: 'johndoe', minLength: 3, maxLength: 50 })
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(50)
   username: string;
+
+  @ApiProperty({ example: 'john@example.com' })
+  @IsNotEmpty()
+  @IsEmail()
   email: string;
+
+  @ApiProperty({ example: 'secureP@ss1', minLength: 8 })
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
   password: string;
+
+  @ApiPropertyOptional({ example: 'John' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
   firstName?: string;
+
+  @ApiPropertyOptional({ example: 'Doe' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
   lastName?: string;
 }
 
 /**
- * Create User DTO (extends RegisterDto with role)
+ * Create User DTO (admin 용)
  */
 export class CreateUserDto extends RegisterDto {
+  @ApiPropertyOptional({ enum: ['admin', 'user', 'readonly'], default: 'user' })
+  @IsOptional()
+  @IsEnum(['admin', 'user', 'readonly'])
   role?: 'admin' | 'user' | 'readonly';
 }
 
@@ -33,19 +78,15 @@ export class CreateUserDto extends RegisterDto {
  * Change Password DTO
  */
 export class ChangePasswordDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
   currentPassword: string;
-  newPassword: string;
-}
 
-/**
- * Update Profile DTO
- */
-export class UpdateProfileDto {
-  firstName?: string;
-  lastName?: string;
-  preferences?: {
-    theme?: 'light' | 'dark';
-    language?: string;
-    notifications?: boolean;
-  };
+  @ApiProperty({ minLength: 8 })
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  newPassword: string;
 }

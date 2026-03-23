@@ -1,5 +1,6 @@
 import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
 import { BaseSecurityGuard } from './base-security.guard';
+import { SecurityEventService } from '../services/security-event.service';
 import { ExtendedRequest } from '../../core/types';
 import { HeadlessBrowserException } from '../exceptions';
 
@@ -11,26 +12,37 @@ import { HeadlessBrowserException } from '../exceptions';
 export class HeadlessBrowserGuard extends BaseSecurityGuard {
   protected override readonly logger = new Logger(HeadlessBrowserGuard.name);
 
-  constructor() {
+  constructor(private readonly securityEventService: SecurityEventService) {
     super();
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<ExtendedRequest>();
-    const ip = this.getClientIp(request);
 
     try {
       const detectionResult = await this.detectHeadlessBrowser(request);
       
       if (detectionResult.isHeadless) {
-        // 보안 위반 로깅 (내부용)
         this.logSecurityViolation(
-          request, 
-          `Headless browser detected. Factors: ${detectionResult.factors.join(', ')}`
+          request,
+          `Headless browser detected. Factors: ${detectionResult.factors.join(', ')}`,
         );
-        
-        // 통합된 예외 발생
-        throw new HeadlessBrowserException(ip, detectionResult.factors);
+
+        this.securityEventService.log({
+          eventType: 'HEADLESS_BROWSER_DETECTED',
+          severity: 'HIGH',
+          ip: this.getClientIp(request),
+          userAgent: request.headers['user-agent'] as string,
+          endpoint: request.url,
+          method: request.method,
+          description: `Headless browser detected (confidence: ${detectionResult.confidence})`,
+          eventData: {
+            factors: detectionResult.factors,
+            confidence: detectionResult.confidence,
+          },
+        });
+
+        throw new HeadlessBrowserException(detectionResult.factors);
       }
       
       return true;
@@ -46,20 +58,6 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
       // 에러 시 허용 (fail-open)
       return true;
     }
-  }
-
-  protected getGuardName(): string {
-    return 'HeadlessBrowserGuard';
-  }
-
-  protected async validateRequest(request: ExtendedRequest): Promise<boolean> {
-    const result = await this.detectHeadlessBrowser(request);
-    return !result.isHeadless;
-  }
-
-  protected getFailureMessage(request: ExtendedRequest): string {
-    // 이 메서드는 더 이상 직접 사용되지 않음 (예외 시스템 사용)
-    return 'Access denied';
   }
 
   /**

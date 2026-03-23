@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import * as os from 'os';
 
-/**
- * Health Status Interface
- */
+import { ICacheService } from '../../core/cache/interfaces';
+
 export interface HealthStatus {
   healthy: boolean;
   timestamp: Date;
@@ -10,9 +11,6 @@ export interface HealthStatus {
   checks: HealthCheck[];
 }
 
-/**
- * Individual Health Check
- */
 export interface HealthCheck {
   name: string;
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -30,13 +28,15 @@ export class HealthService {
   private readonly logger = new Logger(HealthService.name);
   private readonly startTime = Date.now();
 
-  /**
-   * Get overall health status
-   */
+  constructor(
+    private readonly dataSource: DataSource,
+    @Inject('ICacheService') private readonly cacheService: ICacheService,
+  ) {}
+
   async getOverallHealth(): Promise<HealthStatus> {
     const checks = await this.runHealthChecks();
     const healthy = checks.every(check => check.status !== 'unhealthy');
-    
+
     return {
       healthy,
       timestamp: new Date(),
@@ -45,188 +45,135 @@ export class HealthService {
     };
   }
 
-  /**
-   * Get detailed health information
-   */
-  async getDetailedHealth(): Promise<any> {
+  async getDetailedHealth() {
     const health = await this.getOverallHealth();
-    const metrics = this.getSystemMetrics();
-    
+
     return {
       ...health,
-      system: metrics,
-      dependencies: await this.checkDependencies(),
+      system: {
+        platform: os.platform(),
+        arch: os.arch(),
+        nodeVersion: process.version,
+        uptime: this.getUptime(),
+        memory: {
+          total: Math.round(os.totalmem() / 1024 / 1024),
+          free: Math.round(os.freemem() / 1024 / 1024),
+        },
+        cpu: {
+          model: os.cpus()[0]?.model,
+          cores: os.cpus().length,
+        },
+      },
     };
   }
 
-  /**
-   * Check if system is ready
-   */
   async isReady(): Promise<boolean> {
     const checks = await this.runHealthChecks();
     return checks.every(check => check.status !== 'unhealthy');
   }
 
-  /**
-   * Run all health checks
-   */
   private async runHealthChecks(): Promise<HealthCheck[]> {
-    const checks: HealthCheck[] = [];
-    
-    // Memory check
-    checks.push(this.checkMemory());
-    
-    // CPU check
-    checks.push(this.checkCpu());
-    
-    // Database check (if available)
-    checks.push(await this.checkDatabase());
-    
-    // Redis check (if applicable)
-    checks.push(await this.checkRedis());
-    
-    return checks;
+    return Promise.all([
+      this.checkMemory(),
+      this.checkCpu(),
+      this.checkDatabase(),
+      this.checkRedis(),
+    ]);
   }
 
-  /**
-   * Check memory usage
-   */
   private checkMemory(): HealthCheck {
     const used = process.memoryUsage();
     const heapUsedPercent = (used.heapUsed / used.heapTotal) * 100;
-    
-    let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
-    if (heapUsedPercent > 95) {
-      status = 'unhealthy';
-    } else if (heapUsedPercent > 85) {
-      status = 'degraded';
-    }
-    
+
+    let status: HealthCheck['status'] = 'healthy';
+    if (heapUsedPercent > 95) status = 'unhealthy';
+    else if (heapUsedPercent > 85) status = 'degraded';
+
     return {
       name: 'memory',
       status,
       metadata: {
-        heapUsed: Math.round(used.heapUsed / 1024 / 1024),
-        heapTotal: Math.round(used.heapTotal / 1024 / 1024),
-        percentage: heapUsedPercent.toFixed(2),
+        heapUsedMB: Math.round(used.heapUsed / 1024 / 1024),
+        heapTotalMB: Math.round(used.heapTotal / 1024 / 1024),
+        percentage: Math.round(heapUsedPercent),
       },
     };
   }
 
-  /**
-   * Check CPU usage
-   */
   private checkCpu(): HealthCheck {
-    const cpus = require('os').cpus();
-    const loadAvg = require('os').loadavg();
-    
-    let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
+    const cores = os.cpus().length;
+    const loadAvg = os.loadavg();
     const avgLoad = loadAvg[0];
-    
-    if (avgLoad > cpus.length * 0.9) {
-      status = 'unhealthy';
-    } else if (avgLoad > cpus.length * 0.7) {
-      status = 'degraded';
-    }
-    
+
+    let status: HealthCheck['status'] = 'healthy';
+    if (avgLoad > cores * 0.9) status = 'unhealthy';
+    else if (avgLoad > cores * 0.7) status = 'degraded';
+
     return {
       name: 'cpu',
       status,
-      metadata: {
-        cores: cpus.length,
-        loadAverage: loadAvg,
-      },
+      metadata: { cores, loadAverage: loadAvg.map(v => Math.round(v * 100) / 100) },
     };
   }
 
-  /**
-   * Check database connection
-   */
   private async checkDatabase(): Promise<HealthCheck> {
-    return {
-      name: 'database',
-      status: 'healthy',
-      message: 'Database module disabled - install TypeORM to enable',
-    };
-  }
+    const start = Date.now();
+    try {
+      if (!this.dataSource.isInitialized) {
+        return { name: 'database', status: 'unhealthy', message: 'Not initialized' };
+      }
+      await this.dataSource.query('SELECT 1');
+      const responseTime = Date.now() - start;
 
-  /**
-   * Check Redis connection
-   */
-  private async checkRedis(): Promise<HealthCheck> {
-    // Check if Redis is configured
-    const redisHost = process.env.REDIS_HOST;
-    
-    if (!redisHost) {
       return {
-        name: 'redis',
-        status: 'healthy',
-        message: 'Redis not configured (using memory cache)',
+        name: 'database',
+        status: responseTime > 1000 ? 'degraded' : 'healthy',
+        responseTime,
+      };
+    } catch (error) {
+      this.logger.error('Database health check failed', error);
+      return {
+        name: 'database',
+        status: 'unhealthy',
+        responseTime: Date.now() - start,
+        message: 'Connection failed',
       };
     }
-    
-    return {
-      name: 'redis',
-      status: 'healthy',
-      message: 'Redis health check not implemented yet',
-      metadata: {
-        host: redisHost,
-        port: process.env.REDIS_PORT || 6379,
-        db: process.env.REDIS_DB || 0,
-      },
-    };
   }
 
-  /**
-   * Check external dependencies
-   */
-  private async checkDependencies(): Promise<Record<string, any>> {
-    return {
-      database: {
-        configured: false,
-        type: 'PostgreSQL',
-        host: process.env.DB_HOST || 'not configured',
-        port: process.env.DB_PORT || 'not configured',
-        name: process.env.DB_NAME || 'not configured',
-        status: 'disabled - install @nestjs/typeorm typeorm pg',
-      },
-      redis: {
-        configured: !!process.env.REDIS_HOST,
-        host: process.env.REDIS_HOST || 'not configured',
-        port: process.env.REDIS_PORT || 'not configured',
-        db: process.env.REDIS_DB || 'not configured',
-      },
-      recaptcha: {
-        configured: !!process.env.RECAPTCHA_SECRET_KEY,
-      },
-    };
+  private async checkRedis(): Promise<HealthCheck> {
+    if (!process.env.REDIS_HOST) {
+      return { name: 'redis', status: 'healthy', message: 'Not configured (in-memory mode)' };
+    }
+
+    const start = Date.now();
+    try {
+      const testKey = '__health_check__';
+      await this.cacheService.set(testKey, 'ok', 5);
+      const value = await this.cacheService.get<string>(testKey);
+      await this.cacheService.delete(testKey);
+      const responseTime = Date.now() - start;
+
+      if (value !== 'ok') {
+        return { name: 'redis', status: 'unhealthy', responseTime, message: 'Read/write mismatch' };
+      }
+
+      return {
+        name: 'redis',
+        status: responseTime > 500 ? 'degraded' : 'healthy',
+        responseTime,
+      };
+    } catch (error) {
+      this.logger.error('Redis health check failed', error);
+      return {
+        name: 'redis',
+        status: 'unhealthy',
+        responseTime: Date.now() - start,
+        message: 'Connection failed',
+      };
+    }
   }
 
-  /**
-   * Get system metrics
-   */
-  private getSystemMetrics(): Record<string, any> {
-    const os = require('os');
-    
-    return {
-      platform: os.platform(),
-      arch: os.arch(),
-      nodeVersion: process.version,
-      uptime: this.getUptime(),
-      memory: {
-        total: Math.round(os.totalmem() / 1024 / 1024),
-        free: Math.round(os.freemem() / 1024 / 1024),
-      },
-      cpu: {
-        model: os.cpus()[0]?.model,
-        cores: os.cpus().length,
-      },
-    };
-  }
-
-  /**
-   * Get system uptime
-   */
   private getUptime(): number {
     return Math.floor((Date.now() - this.startTime) / 1000);
   }

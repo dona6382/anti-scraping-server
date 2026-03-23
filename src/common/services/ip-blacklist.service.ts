@@ -1,6 +1,7 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ICacheService, BlacklistEntry, SecurityReason, IpStatistics } from '../../core/types';
+import { RequestUtils } from '../utils/request.utils';
 
 /**
  * IP Blacklist Service
@@ -21,16 +22,9 @@ export class IpBlacklistService {
   }
 
   /**
-   * IP 차단 (별칭 추가)
-   */
-  async blockIp(ip: string, reason: SecurityReason, ttl?: number): Promise<void> {
-    return this.blacklistIp(ip, reason, ttl);
-  }
-
-  /**
    * IP 차단
    */
-  async blacklistIp(ip: string, reason: SecurityReason, ttl?: number): Promise<void> {
+  async blockIp(ip: string, reason: SecurityReason, ttl?: number): Promise<void> {
     const key = this.getKey(ip);
     const existingEntry = await this.cache.get<BlacklistEntry>(key);
     
@@ -58,13 +52,6 @@ export class IpBlacklistService {
   }
 
   /**
-   * IP 차단 해제 (별칭)
-   */
-  async removeFromBlacklist(ip: string): Promise<void> {
-    return this.unblockIp(ip);
-  }
-
-  /**
    * IP 차단 여부 확인
    */
   async isBlocked(ip: string): Promise<boolean> {
@@ -78,13 +65,6 @@ export class IpBlacklistService {
   async getBlockInfo(ip: string): Promise<BlacklistEntry | null> {
     const key = this.getKey(ip);
     return this.cache.get<BlacklistEntry>(key);
-  }
-
-  /**
-   * IP 정보 조회 (별칭)
-   */
-  async getIpInfo(ip: string): Promise<BlacklistEntry | null> {
-    return this.getBlockInfo(ip);
   }
 
   /**
@@ -106,27 +86,17 @@ export class IpBlacklistService {
   }
 
   /**
-   * 모든 차단된 IP 조회 (별칭)
-   */
-  async getAllBlacklistedIps(): Promise<string[]> {
-    return this.getAllBlockedIps();
-  }
-
-  /**
    * 차단 목록 조회 (상세 정보 포함)
    */
   async getBlocklist(): Promise<BlacklistEntry[]> {
-    const ips = await this.getAllBlockedIps();
-    const entries: BlacklistEntry[] = [];
-    
-    for (const ip of ips) {
-      const entry = await this.getBlockInfo(ip);
-      if (entry) {
-        entries.push(entry);
-      }
-    }
-    
-    return entries;
+    const pattern = `${this.keyPrefix}:*`;
+    const keys = await this.cache.keys(pattern);
+
+    if (keys.length === 0) return [];
+
+    // Batch fetch로 N+1 쿼리 제거
+    const entries = await this.cache.getMany<BlacklistEntry>(keys);
+    return entries.filter((entry): entry is BlacklistEntry => entry !== null);
   }
 
   /**
@@ -196,26 +166,13 @@ export class IpBlacklistService {
    * IP 유효성 검사
    */
   isValidIp(ip: string): boolean {
-    // IPv4 패턴
-    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-    
-    if (ipv4Regex.test(ip)) {
-      const parts = ip.split('.');
-      return parts.every(part => {
-        const num = parseInt(part, 10);
-        return num >= 0 && num <= 255;
-      });
-    }
-
-    // IPv6 패턴 (간단한 검증)
-    const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
-    return ipv6Regex.test(ip);
+    return RequestUtils.isValidIpAddress(ip);
   }
 
   /**
    * Redis 연결 상태 확인
    */
-  private async isRedisConnected(): Promise<boolean> {
+  async isRedisConnected(): Promise<boolean> {
     try {
       // cache service가 Redis를 사용하는지 확인
       const testKey = '__redis_connection_test__';

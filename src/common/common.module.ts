@@ -1,14 +1,14 @@
 import { Module, Global } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
-// Configuration은 CoreConfigModule에서 이미 글로벌로 제공됨
 import { CoreConfigModule } from '../core/config/config.module';
-
-// Cache는 core/cache 모듈에서 제공됨 (중복 제거)
+import { SecurityEvent } from '../core/database/entities';
 
 // Services
 import { IpBlacklistService } from './services/ip-blacklist.service';
+import { SecurityEventService } from './services/security-event.service';
 
 // Guards
 import { UserAgentGuard } from './guards/user-agent.guard';
@@ -16,18 +16,17 @@ import { IpBlacklistGuard } from './guards/ip-blacklist.guard';
 import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
 
 /**
- * Common Module - Recommended Configuration
- * 권장 보안 기능을 제공하는 글로벌 모듈
- * 
- * 포함된 기능:
- * - UserAgentGuard: User-Agent 기반 봇 차단
- * - IpBlacklistGuard: IP 차단 시스템
- * - HeadlessBrowserGuard: 헤드리스 브라우저 탐지
+ * Common Module
+ * 보안 기능을 제공하는 글로벌 모듈
+ *
+ * - Guards: UserAgent, IpBlacklist, HeadlessBrowser
+ * - Services: IpBlacklist, SecurityEvent
  */
 @Global()
 @Module({
   imports: [
     CoreConfigModule,
+    TypeOrmModule.forFeature([SecurityEvent]),
     ThrottlerModule.forRootAsync({
       imports: [CoreConfigModule],
       inject: [ConfigService],
@@ -43,24 +42,18 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
     }),
   ],
   providers: [
-    // Services
     IpBlacklistService,
-    
-    // Guards
+    SecurityEventService,
     UserAgentGuard,
     IpBlacklistGuard,
     HeadlessBrowserGuard,
   ],
   exports: [
-    // Export services
     IpBlacklistService,
-    
-    // Export guards
+    SecurityEventService,
     UserAgentGuard,
     IpBlacklistGuard,
     HeadlessBrowserGuard,
-    
-    // Export modules
     ThrottlerModule,
     CoreConfigModule,
   ],

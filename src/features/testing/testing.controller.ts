@@ -19,9 +19,11 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
-import { UserAgentGuard } from '../../common/guards/user-agent.guard'; // shared -> common
-import { TestingService, TestRequestData, SecurityTestResults } from './testing.service';
+import { UserAgentGuard } from '../../common/guards/user-agent.guard';
+import { TestingService, SecurityTestResults } from './testing.service';
+import { TestActionDto } from './dto/test-action.dto';
 import { ExtendedRequest } from '../../core/types';
+import { ResponseBuilder } from '../../common/utils/response.builder';
 
 @ApiTags('Testing')
 @Controller('test')
@@ -38,16 +40,11 @@ export class TestingController {
   })
   @ApiResponse({ status: 200, description: 'Test completed successfully' })
   getBasicTest() {
-    return {
-      status: 'success',
-      message: 'Basic test passed',
-      timestamp: new Date().toISOString(),
-      tests: {
-        server: 'running',
-        api: 'functional',
-        guards: 'active'
-      }
-    };
+    return ResponseBuilder.success({
+      server: 'running',
+      api: 'functional',
+      guards: 'active',
+    }, 'Basic test passed');
   }
 
   @Get('security-full')
@@ -81,7 +78,7 @@ export class TestingController {
       }
     }
   })
-  async postTestAction(@Body() data: TestRequestData) {
+  async postTestAction(@Body() data: TestActionDto) {
     return this.testingService.performTestAction(data);
   }
 
@@ -101,12 +98,11 @@ export class TestingController {
     const endTime = process.hrtime.bigint();
     const processingTime = Number(endTime - startTime) / 1000000; // Convert to milliseconds
 
-    return {
-      status: 'success',
+    return ResponseBuilder.success({
       processingTimeMs: processingTime,
       dataSize: testData.length,
       memoryUsage: process.memoryUsage(),
-      uptime: process.uptime()
-    };
+      uptime: process.uptime(),
+    });
   }
 }

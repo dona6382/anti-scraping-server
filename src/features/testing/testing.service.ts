@@ -3,19 +3,20 @@ import { ConfigService } from '@nestjs/config';
 
 import { ExtendedRequest } from '../../core/types';
 import { RequestUtils } from '../../common/utils/request.utils';
+import { ResponseBuilder } from '../../common/utils/response.builder';
 
 export interface TestRequestData {
   name?: string;
   email?: string;
   message?: string;
-  recaptchaToken?: string;
+
 }
 
 export interface TestResult {
   test: string;
   status: 'passed' | 'failed' | 'error';
   message: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 export interface SecurityTestResults {
@@ -125,11 +126,7 @@ export class TestingService {
     };
   }
 
-  async performTestAction(data: TestRequestData): Promise<any> {
-    return {
-      success: true,
-      message: 'Test action completed',
-      data: data
-    };
+  async performTestAction(data: TestRequestData) {
+    return ResponseBuilder.success(data, 'Test action completed');
   }
 }

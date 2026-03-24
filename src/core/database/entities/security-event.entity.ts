@@ -24,7 +24,8 @@ export class SecurityEvent {
     'HEADLESS_BROWSER_DETECTED',
     'SUSPICIOUS_ACTIVITY',
     'ADMIN_ACTION',
-    'SYSTEM_ALERT'
+    'SYSTEM_ALERT',
+    'AUTO_BLOCKED'
   ]})
   eventType: string;
 

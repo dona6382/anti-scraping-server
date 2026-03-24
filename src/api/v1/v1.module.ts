@@ -8,6 +8,7 @@ import { ClientInfoModule } from '../../features/client-info/client-info.module'
 import { PublicModule } from '../../features/public/public.module';
 import { AdminModule } from '../../features/admin/admin.module';
 import { TestingModule } from '../../features/testing/testing.module';
+import { AnalysisModule } from '../../features/analysis/analysis.module';
 
 /**
  * API v1 Module
@@ -23,6 +24,7 @@ import { TestingModule } from '../../features/testing/testing.module';
     PublicModule,
     AdminModule,
     TestingModule,
+    AnalysisModule,
   ],
 })
 export class ApiV1Module {}

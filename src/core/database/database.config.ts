@@ -1,5 +1,6 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { AppConfigService } from '../config/config.service';
+import { User, SecurityEvent } from './entities';
 
 /**
  * Database Configuration Factory
@@ -15,8 +16,8 @@ export const createDatabaseConfig = (configService: AppConfigService): TypeOrmMo
     password: dbConfig.password,
     database: dbConfig.database,
     
-    // Entity auto-discovery
-    entities: [__dirname + '/../../**/*.entity{.ts,.js}'],
+    // 사용 중인 엔티티만 명시적 등록
+    entities: [User, SecurityEvent],
     
     // Development settings
     synchronize: configService.isDevelopment && dbConfig.synchronize,
@@ -26,11 +27,11 @@ export const createDatabaseConfig = (configService: AppConfigService): TypeOrmMo
     retryAttempts: configService.isProduction ? 10 : 2,
     retryDelay: configService.isProduction ? 3000 : 1000,
     
-    // Connection pool settings
+    // PostgreSQL connection pool settings
     extra: {
-      connectionLimit: 10,
-      acquireTimeout: 60000,
-      timeout: 60000,
+      max: 10,
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
     },
     
     // Migration settings
@@ -45,7 +46,7 @@ export const createDatabaseConfig = (configService: AppConfigService): TypeOrmMo
     
     // SSL settings for production
     ssl: configService.isProduction ? {
-      rejectUnauthorized: false
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
     } : false,
   };
 };

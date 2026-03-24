@@ -3,12 +3,14 @@ import { Reflector } from '@nestjs/core';
 import { IpBlacklistGuard } from './ip-blacklist.guard';
 import { IpBlacklistService } from '../services/ip-blacklist.service';
 import { SecurityEventService } from '../services/security-event.service';
+import { ThreatScoreService } from '../services/threat-score.service';
 import { IpBlockedException } from '../exceptions/application.exception';
 
 describe('IpBlacklistGuard', () => {
   let guard: IpBlacklistGuard;
   let ipBlacklistService: jest.Mocked<Partial<IpBlacklistService>>;
   let securityEventService: jest.Mocked<Partial<SecurityEventService>>;
+  let threatScoreService: jest.Mocked<Partial<ThreatScoreService>>;
   let reflector: Reflector;
 
   function createMockContext(ip = '192.168.1.100', skipBlacklist = false): ExecutionContext {
@@ -41,12 +43,17 @@ describe('IpBlacklistGuard', () => {
       log: jest.fn(),
     };
 
+    threatScoreService = {
+      shouldPreemptiveBlock: jest.fn().mockResolvedValue(false),
+    };
+
     reflector = new Reflector();
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
 
     guard = new IpBlacklistGuard(
       ipBlacklistService as unknown as IpBlacklistService,
       securityEventService as unknown as SecurityEventService,
+      threatScoreService as unknown as ThreatScoreService,
       reflector,
     );
   });

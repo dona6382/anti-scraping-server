@@ -1,8 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
 
 import { SecurityEvent } from '../../core/database/entities';
+import { PaginationUtils } from '../utils/pagination.utils';
+import { RequestUtils } from '../utils/request.utils';
+import { ICacheService } from '../../core/cache/interfaces/cache.interface';
+import { IpBlacklistService } from './ip-blacklist.service';
+import { ThreatScoreService } from './threat-score.service';
 
 export type SecurityEventType =
   | 'IP_BLOCKED'
@@ -14,7 +19,8 @@ export type SecurityEventType =
   | 'HEADLESS_BROWSER_DETECTED'
   | 'SUSPICIOUS_ACTIVITY'
   | 'ADMIN_ACTION'
-  | 'SYSTEM_ALERT';
+  | 'SYSTEM_ALERT'
+  | 'AUTO_BLOCKED';
 
 export type SecuritySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
@@ -26,7 +32,7 @@ export interface LogSecurityEventDto {
   endpoint?: string;
   method?: string;
   description: string;
-  eventData?: Record<string, any>;
+  eventData?: Record<string, unknown>;
   actions?: {
     blocked: boolean;
     notified: boolean;
@@ -36,9 +42,18 @@ export interface LogSecurityEventDto {
 }
 
 /**
- * Security Event Service
- * 보안 이벤트를 DB에 기록하고 조회하는 서비스
+ * Auto-Block 정책
+ * 위반 횟수에 따른 단계별 차단
  */
+const AUTO_BLOCK_POLICY = {
+  WINDOW_MS: 5 * 60 * 1000,       // 5분 윈도우
+  THRESHOLDS: [
+    { violations: 3, blockTtl: 3600 },       // 3회 → 1시간
+    { violations: 5, blockTtl: 86400 },      // 5회 → 24시간
+    { violations: 10, blockTtl: 604800 },    // 10회 → 7일
+  ],
+} as const;
+
 @Injectable()
 export class SecurityEventService {
   private readonly logger = new Logger(SecurityEventService.name);
@@ -46,10 +61,14 @@ export class SecurityEventService {
   constructor(
     @InjectRepository(SecurityEvent)
     private readonly securityEventRepository: Repository<SecurityEvent>,
+    @Inject('ICacheService') private readonly cacheService: ICacheService,
+    @Inject(forwardRef(() => IpBlacklistService))
+    private readonly ipBlacklistService: IpBlacklistService,
+    private readonly threatScoreService: ThreatScoreService,
   ) {}
 
   /**
-   * 보안 이벤트 기록
+   * 보안 이벤트 기록 + 자동 차단 체크
    */
   async log(dto: LogSecurityEventDto): Promise<void> {
     try {
@@ -70,29 +89,80 @@ export class SecurityEventService {
         },
       });
 
-      // 비동기로 저장 (Guard 응답 속도에 영향 주지 않음)
       this.securityEventRepository.save(event).catch((err) => {
         this.logger.error(`Failed to save security event: ${err.message}`);
       });
+
+      // Update threat score
+      if (dto.ip && dto.severity) {
+        this.threatScoreService.recordViolation(dto.ip, dto.eventType, dto.severity).catch(() => {});
+      }
+
+      // 자동 차단 체크 (IP가 있고, 이미 차단 이벤트가 아닌 경우)
+      if (dto.ip && dto.eventType !== 'IP_BLOCKED' && dto.eventType !== 'AUTO_BLOCKED') {
+        this.checkAutoBlock(dto.ip, dto.eventType).catch((err) => {
+          this.logger.error(`Auto-block check failed: ${err.message}`);
+        });
+      }
     } catch (error) {
       this.logger.error(`Failed to create security event: ${error}`);
     }
   }
 
   /**
-   * 보안 이벤트 목록 조회 (페이지네이션)
+   * 자동 차단 체크
+   * 윈도우 내 위반 횟수를 카운트하여 threshold 초과 시 자동 차단
    */
+  private async checkAutoBlock(ip: string, eventType: string): Promise<void> {
+    const key = `auto_block:${RequestUtils.normalizeIp(ip)}`;
+
+    try {
+      const current = await this.cacheService.get<number>(key) ?? 0;
+      const newCount = current + 1;
+
+      const windowSeconds = AUTO_BLOCK_POLICY.WINDOW_MS / 1000;
+      await this.cacheService.set(key, newCount, windowSeconds);
+
+      // threshold 체크 (높은 것부터)
+      for (const threshold of [...AUTO_BLOCK_POLICY.THRESHOLDS].reverse()) {
+        if (newCount >= threshold.violations) {
+          const alreadyBlocked = await this.ipBlacklistService.isBlocked(ip);
+
+          if (!alreadyBlocked) {
+            // IpBlacklistService를 통해 정상 차단 (캐시 키 일관성 보장)
+            await this.ipBlacklistService.blockIp(ip, 'SUSPICIOUS_BEHAVIOR', threshold.blockTtl);
+
+            this.logger.warn(
+              `Auto-blocked IP ${RequestUtils.hashIp(ip, 'log')}: ${newCount} violations → ${threshold.blockTtl}s ban`,
+            );
+
+            // 자동 차단 이벤트 DB 기록 (AUTO_BLOCKED 타입으로 재귀 방지)
+            const autoBlockEvent = this.securityEventRepository.create({
+              eventType: 'AUTO_BLOCKED',
+              severity: 'HIGH',
+              ip,
+              description: `Auto-blocked after ${newCount} violations (${eventType}). TTL: ${threshold.blockTtl}s`,
+              actions: { blocked: true, notified: false, escalated: false, autoResolved: false },
+            });
+            this.securityEventRepository.save(autoBlockEvent).catch(() => {});
+          }
+          break;
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Auto-block check error: ${error}`);
+    }
+  }
+
   async findAll(options: {
     page?: number;
     limit?: number;
     severity?: string;
     eventType?: string;
   }) {
-    const page = options.page ?? 1;
-    const limit = Math.min(options.limit ?? 50, 100);
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = PaginationUtils.parse(options.page, options.limit);
 
-    const where: Record<string, any> = {};
+    const where: Record<string, unknown> = {};
     if (options.severity) where.severity = options.severity;
     if (options.eventType) where.eventType = options.eventType;
 
@@ -105,18 +175,10 @@ export class SecurityEventService {
 
     return {
       data: events,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      pagination: PaginationUtils.meta(page, limit, total),
     };
   }
 
-  /**
-   * 보안 통계
-   */
   async getStatistics() {
     const now = new Date();
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -132,7 +194,6 @@ export class SecurityEventService {
       }),
     ]);
 
-    // 이벤트 타입별 카운트
     const byType = await this.securityEventRepository
       .createQueryBuilder('event')
       .select('event.eventType', 'eventType')
@@ -140,7 +201,6 @@ export class SecurityEventService {
       .groupBy('event.eventType')
       .getRawMany();
 
-    // severity별 카운트
     const bySeverity = await this.securityEventRepository
       .createQueryBuilder('event')
       .select('event.severity', 'severity')

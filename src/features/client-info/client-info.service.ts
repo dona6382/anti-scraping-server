@@ -99,17 +99,59 @@ export class ClientInfoService {
   private analyzeIp(ip: string): ClientInfo['ip'] {
     const isIPv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(ip);
     const isIPv6 = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(ip);
-
     const isPrivate = RequestUtils.isPrivateIp(ip);
-    
+
     return {
       address: ip,
       type: isIPv4 ? 'IPv4' : isIPv6 ? 'IPv6' : 'Unknown',
       isPrivate,
-      isProxy: false, // 실제 구현에서는 IP 데이터베이스 사용
-      isVpn: false,   // 실제 구현에서는 VPN 탐지 API 사용
-      isTor: false,   // 실제 구현에서는 Tor 노드 리스트 확인
+      isProxy: this.isDatacenterIp(ip),
+      isVpn: this.isKnownVpnRange(ip),
+      isTor: false, // Tor exit node 목록은 별도 업데이트 필요
     };
+  }
+
+  /**
+   * 알려진 데이터센터/클라우드 IP 대역 탐지
+   */
+  private isDatacenterIp(ip: string): boolean {
+    const datacenterRanges = [
+      /^13\.(52|56|57|250|251)\./,    // AWS
+      /^18\.(144|188|216|236)\./,     // AWS
+      /^34\.(8[0-9]|9[0-9]|1[0-6][0-9])\./,  // GCP
+      /^35\.(1[5-9][0-9]|2[0-4][0-9])\./,    // GCP
+      /^104\.(1[6-9]|2[0-9]|3[0-1])\./,      // DigitalOcean
+      /^159\.(65|89|203)\./,          // DigitalOcean
+      /^167\.(71|172|99)\./,          // DigitalOcean
+      /^64\.225\./,                   // DigitalOcean
+      /^5\.161\./,                    // Hetzner
+      /^49\.12\./,                    // Hetzner
+      /^135\.181\./,                  // Hetzner
+      /^23\.(88|92|94|95|96)\./,      // Hetzner
+      /^45\.(33|56|79)\./,           // Linode
+      /^172\.(104|105)\./,           // Linode
+      /^139\.(162)\./,               // Linode
+      /^51\.(38|77|79|83|89|91)\./,  // OVH
+      /^198\.211\./,                  // Vultr
+      /^45\.(32|63|76|77)\./,        // Vultr
+    ];
+
+    return datacenterRanges.some(range => range.test(ip));
+  }
+
+  /**
+   * 알려진 VPN 서비스 IP 대역
+   */
+  private isKnownVpnRange(ip: string): boolean {
+    const vpnRanges = [
+      /^185\.156\.(4[0-7])\./,       // NordVPN
+      /^146\.70\./,                   // Mullvad
+      /^193\.138\.(218|219)\./,       // ProtonVPN
+      /^103\.(86|231)\./,             // ExpressVPN
+      /^91\.108\./,                   // Surfshark
+    ];
+
+    return vpnRanges.some(range => range.test(ip));
   }
 
   /**
@@ -154,14 +196,32 @@ export class ClientInfoService {
    * 위치 정보 (실제 구현에서는 IP 지리 정보 API 사용)
    */
   private async getLocationInfo(ip: string): Promise<ClientInfo['location']> {
-    // 임시로 기본값 반환
-    return {
-      country: null,
-      countryCode: null,
-      region: null,
-      city: null,
-      isp: null,
-    };
+    // private IP는 GeoIP 조회 불가
+    if (RequestUtils.isPrivateIp(ip) || ip === 'unknown') {
+      return { country: null, countryCode: null, region: null, city: null, isp: null };
+    }
+
+    try {
+      // ip-api.com (무료, 분당 45회 제한)
+      const response = await fetch(`http://ip-api.com/json/${ip}?fields=country,countryCode,regionName,city,isp,status`);
+      if (!response.ok) {
+        return { country: null, countryCode: null, region: null, city: null, isp: null };
+      }
+      const data = await response.json();
+      if (data.status !== 'success') {
+        return { country: null, countryCode: null, region: null, city: null, isp: null };
+      }
+
+      return {
+        country: data.country ?? null,
+        countryCode: data.countryCode ?? null,
+        region: data.regionName ?? null,
+        city: data.city ?? null,
+        isp: data.isp ?? null,
+      };
+    } catch {
+      return { country: null, countryCode: null, region: null, city: null, isp: null };
+    }
   }
 
   /**

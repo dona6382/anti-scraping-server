@@ -2,11 +2,8 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { SkipIpBlacklist } from './common/guards/ip-blacklist.guard';
+import { ResponseBuilder } from './common/utils/response.builder';
 
-/**
- * App Controller
- * 루트 엔드포인트
- */
 @ApiTags('Application')
 @Controller()
 export class AppController {
@@ -15,13 +12,12 @@ export class AppController {
   @SkipIpBlacklist()
   @ApiOperation({ summary: 'Root endpoint' })
   getRoot() {
-    return {
+    return ResponseBuilder.success({
       name: 'Anti-Scraping Server',
       version: '2.0.0',
       status: 'running',
       docs: '/api-docs',
       health: '/health',
-      timestamp: new Date().toISOString(),
-    };
+    });
   }
 }

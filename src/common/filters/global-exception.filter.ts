@@ -9,6 +9,7 @@ import {
 import { Request, Response } from 'express';
 import { SecurityException } from '../exceptions';
 import { RequestUtils } from '../utils/request.utils';
+import { SystemUtils } from '../utils/system.utils';
 import { ExtendedRequest } from '../../core/types';
 
 interface ExceptionInfo {
@@ -73,11 +74,12 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
       const status = exception.getStatus();
 
       if (typeof response === 'object' && response !== null) {
+        const res = response as Record<string, unknown>;
         return {
           statusCode: status,
-          message: (response as any).message || exception.message,
-          error: (response as any).error || exception.name,
-          details: response as Record<string, unknown>,
+          message: (res.message as string) || exception.message,
+          error: (res.error as string) || exception.name,
+          details: res,
           stack: exception.stack,
         };
       }
@@ -122,7 +124,7 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
       url: request.url,
       ip: this.getClientIp(request),
       userAgent: request.headers['user-agent'],
-      timestamp: new Date().toISOString(),
+      timestamp: SystemUtils.timestamp(),
     };
 
     // 4xx 에러는 경고, 5xx 에러는 에러로 로깅
@@ -155,7 +157,7 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
   ): Record<string, unknown> {
     const baseResponse = {
       statusCode: exceptionInfo.statusCode,
-      timestamp: new Date().toISOString(),
+      timestamp: SystemUtils.timestamp(),
       path: request.url,
       method: request.method,
     };

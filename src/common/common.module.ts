@@ -3,14 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { CoreConfigModule } from '../core/config/config.module';
 import { SecurityEvent } from '../core/database/entities';
 
-// Services
 import { IpBlacklistService } from './services/ip-blacklist.service';
 import { SecurityEventService } from './services/security-event.service';
+import { ThreatScoreService } from './services/threat-score.service';
 
-// Guards
 import { UserAgentGuard } from './guards/user-agent.guard';
 import { IpBlacklistGuard } from './guards/ip-blacklist.guard';
 import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
@@ -18,17 +16,12 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
 /**
  * Common Module
  * 보안 기능을 제공하는 글로벌 모듈
- *
- * - Guards: UserAgent, IpBlacklist, HeadlessBrowser
- * - Services: IpBlacklist, SecurityEvent
  */
 @Global()
 @Module({
   imports: [
-    CoreConfigModule,
     TypeOrmModule.forFeature([SecurityEvent]),
     ThrottlerModule.forRootAsync({
-      imports: [CoreConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         throttlers: [
@@ -44,6 +37,7 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
   providers: [
     IpBlacklistService,
     SecurityEventService,
+    ThreatScoreService,
     UserAgentGuard,
     IpBlacklistGuard,
     HeadlessBrowserGuard,
@@ -51,11 +45,11 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
   exports: [
     IpBlacklistService,
     SecurityEventService,
+    ThreatScoreService,
     UserAgentGuard,
     IpBlacklistGuard,
     HeadlessBrowserGuard,
     ThrottlerModule,
-    CoreConfigModule,
   ],
 })
 export class CommonModule {}

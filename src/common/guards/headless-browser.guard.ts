@@ -3,6 +3,7 @@ import { BaseSecurityGuard } from './base-security.guard';
 import { SecurityEventService } from '../services/security-event.service';
 import { ExtendedRequest } from '../../core/types';
 import { HeadlessBrowserException } from '../exceptions';
+import { HEADLESS_SCORES } from '../constants/threshold.constants';
 
 /**
  * Headless Browser Detection Guard
@@ -20,7 +21,7 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
     const request = context.switchToHttp().getRequest<ExtendedRequest>();
 
     try {
-      const detectionResult = await this.detectHeadlessBrowser(request);
+      const detectionResult = this.detectHeadlessBrowser(request);
       
       if (detectionResult.isHeadless) {
         this.logSecurityViolation(
@@ -63,11 +64,11 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
   /**
    * 헤드리스 브라우저 감지
    */
-  private async detectHeadlessBrowser(request: ExtendedRequest): Promise<{
+  private detectHeadlessBrowser(request: ExtendedRequest): {
     isHeadless: boolean;
     factors: string[];
     confidence: number;
-  }> {
+  } {
     const factors: string[] = [];
     let confidenceScore = 0;
 
@@ -83,21 +84,17 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
 
     if (headlessIndicators.some(indicator => userAgent.includes(indicator))) {
       factors.push('User-Agent contains headless indicator');
-      confidenceScore += 100;
+      confidenceScore += HEADLESS_SCORES.UA_HEADLESS_INDICATOR;
     }
 
-    // 2. Chrome DevTools Protocol 감지
-    const chromeDevToolsPatterns = [
-      'HeadlessChrome',
-      'Chrome-Lighthouse',
-    ];
-
-    if (chromeDevToolsPatterns.some(pattern => userAgent.includes(pattern.toLowerCase()))) {
+    // 2. Chrome DevTools Protocol
+    const chromeDevToolsPatterns = ['headlesschrome', 'chrome-lighthouse'];
+    if (chromeDevToolsPatterns.some(p => userAgent.includes(p))) {
       factors.push('Chrome DevTools Protocol detected');
-      confidenceScore += 90;
+      confidenceScore += HEADLESS_SCORES.DEVTOOLS_PROTOCOL;
     }
 
-    // 3. 자동화 도구 감지
+    // 3. Automation tools
     const automationTools = [
       { pattern: 'puppeteer', name: 'Puppeteer' },
       { pattern: 'playwright', name: 'Playwright' },
@@ -105,75 +102,62 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
       { pattern: 'webdriver', name: 'WebDriver' },
       { pattern: 'cypress', name: 'Cypress' },
     ];
-
     for (const tool of automationTools) {
       if (userAgent.includes(tool.pattern)) {
         factors.push(`${tool.name} detected`);
-        confidenceScore += 80;
+        confidenceScore += HEADLESS_SCORES.AUTOMATION_TOOL;
       }
     }
 
-    // 4. 누락된 헤더 검사
-    const requiredHeaders = [
-      'accept-language',
-      'accept-encoding',
-      'accept',
-    ];
-
-    const missingHeaders = requiredHeaders.filter(
-      header => !request.headers[header]
-    );
-
+    // 4. Missing required headers
+    const missingHeaders = ['accept-language', 'accept-encoding', 'accept']
+      .filter(h => !request.headers[h]);
     if (missingHeaders.length > 0) {
       factors.push(`Missing headers: ${missingHeaders.join(', ')}`);
-      confidenceScore += missingHeaders.length * 20;
+      confidenceScore += missingHeaders.length * HEADLESS_SCORES.MISSING_HEADER;
     }
 
-    // 5. 의심스러운 헤더 값 검사
+    // 5. Suspicious Accept-Language
     const acceptLanguage = this.getHeader(request, 'accept-language');
     if (acceptLanguage === '*' || acceptLanguage === 'en-US') {
       factors.push('Suspicious Accept-Language header');
-      confidenceScore += 15;
+      confidenceScore += HEADLESS_SCORES.SUSPICIOUS_ACCEPT_LANG;
     }
 
-    // 6. WebDriver 프로퍼티 체크 (클라이언트 측 체크가 필요하지만 여기서는 헤더로 추정)
+    // 6. Missing Sec-CH-UA for Chrome
     const secChUa = this.getHeader(request, 'sec-ch-ua');
     if (!secChUa && userAgent.includes('chrome')) {
       factors.push('Missing Sec-CH-UA header for Chrome');
-      confidenceScore += 25;
+      confidenceScore += HEADLESS_SCORES.MISSING_SEC_CH_UA;
     }
 
-    // 7. Connection 헤더 검사
+    // 7. Connection: close
     const connection = this.getHeader(request, 'connection');
-    if (connection && connection.toLowerCase() === 'close') {
+    if (connection?.toLowerCase() === 'close') {
       factors.push('Connection: close header detected');
-      confidenceScore += 10;
+      confidenceScore += HEADLESS_SCORES.CONNECTION_CLOSE;
     }
 
-    // 8. 비정상적인 Accept 헤더
+    // 8. Missing/generic Accept
     const accept = this.getHeader(request, 'accept');
     if (!accept || accept === '*/*') {
       factors.push('Missing or generic Accept header');
-      confidenceScore += 15;
+      confidenceScore += HEADLESS_SCORES.GENERIC_ACCEPT;
     }
 
-    // 9. 플러그인/벤더 정보 부재 (User-Agent 분석)
+    // 9. Missing Sec-Fetch headers for modern Chrome
     if (userAgent.includes('chrome') && !userAgent.includes('edg') && !userAgent.includes('opr')) {
       const chromeVersion = userAgent.match(/chrome\/(\d+)/);
-      if (chromeVersion && chromeVersion[1]) {
+      if (chromeVersion?.[1]) {
         const version = parseInt(chromeVersion[1], 10);
-        if (!isNaN(version) && version >= 90) {
-          // Chrome 90+ should have certain features
-          if (!this.getHeader(request, 'sec-fetch-site')) {
-            factors.push('Missing Sec-Fetch headers for modern Chrome');
-            confidenceScore += 20;
-          }
+        if (!isNaN(version) && version >= 90 && !this.getHeader(request, 'sec-fetch-site')) {
+          factors.push('Missing Sec-Fetch headers for modern Chrome');
+          confidenceScore += HEADLESS_SCORES.MISSING_SEC_FETCH;
         }
       }
     }
 
-    // 임계값 기반 판단 (50점 이상이면 헤드리스로 간주)
-    const isHeadless = confidenceScore >= 50;
+    const isHeadless = confidenceScore >= HEADLESS_SCORES.THRESHOLD;
 
     if (factors.length > 0) {
       this.logger.debug(`Headless detection - Score: ${confidenceScore}, Factors: ${factors.join(', ')}`);

@@ -41,10 +41,6 @@ export class AppConfigService {
     return this.securityConfig.strictMode;
   }
 
-  get recaptchaConfig() {
-    return this.securityConfig.recaptcha;
-  }
-
   get rateLimitConfig() {
     return this.securityConfig.rateLimit;
   }
@@ -77,11 +73,11 @@ export class AppConfigService {
   }
 
   // Utility Methods
-  get<T = any>(key: keyof AppConfig): T {
+  get<T = unknown>(key: keyof AppConfig): T {
     return this.configService.get(key) as T;
   }
 
-  getOrThrow<T = any>(key: keyof AppConfig): T {
+  getOrThrow<T = unknown>(key: keyof AppConfig): T {
     return this.configService.getOrThrow(key) as T;
   }
 }

@@ -12,6 +12,7 @@ import * as bcrypt from 'bcrypt';
 
 import { User } from '../../core/database/entities';
 import { AuthDto, RegisterDto, ChangePasswordDto } from './dto/auth.dto';
+import { ResponseBuilder } from '../../common/utils/response.builder';
 
 @Injectable()
 export class AuthService {
@@ -56,7 +57,8 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException('User already exists');
+      // 어떤 필드가 중복인지 노출하지 않음 (사용자 열거 방지)
+      throw new ConflictException('Registration failed. Please try different credentials.');
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 12);
@@ -70,8 +72,12 @@ export class AuthService {
     });
 
     const savedUser = await this.userRepository.save(user);
-    const { password, ...result } = savedUser as any;
-    return result;
+    return {
+      id: savedUser.id,
+      username: savedUser.username,
+      email: savedUser.email,
+      role: savedUser.role,
+    };
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto) {
@@ -88,7 +94,7 @@ export class AuthService {
     user.password = await bcrypt.hash(dto.newPassword, 12);
     await this.userRepository.save(user);
 
-    return { success: true, message: 'Password changed successfully' };
+    return ResponseBuilder.success(null, 'Password changed successfully');
   }
 
   private async validateUser(username: string, password: string): Promise<User | null> {
@@ -96,7 +102,11 @@ export class AuthService {
       where: { username },
     });
 
-    if (user && (await bcrypt.compare(password, user.password))) {
+    if (!user || !user.isActive) {
+      return null;
+    }
+
+    if (await bcrypt.compare(password, user.password)) {
       return user;
     }
     return null;
@@ -104,13 +114,19 @@ export class AuthService {
 
   async validateToken(token: string): Promise<User> {
     try {
-      const decoded = this.jwtService.verify(token);
+      const decoded = this.jwtService.verify(token) as { sub: string };
+      if (!decoded?.sub) {
+        throw new UnauthorizedException('Invalid token payload');
+      }
+
       const user = await this.userRepository.findOne({
         where: { id: decoded.sub },
       });
-      if (!user) {
-        throw new UnauthorizedException('User not found');
+
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('User not found or deactivated');
       }
+
       return user;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;

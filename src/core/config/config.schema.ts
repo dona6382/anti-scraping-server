@@ -8,10 +8,6 @@ export interface AppConfig {
   };
   security: {
     strictMode: boolean;
-    recaptcha: {
-      secretKey?: string;
-      scoreThreshold: number;
-    };
     rateLimit: {
       ttl: number;
       limit: number;
@@ -44,7 +40,7 @@ export interface AppConfig {
     synchronize: boolean;
   };
   logging: {
-    level: 'error' | 'warn' | 'info' | 'debug';
+    level: 'error' | 'warn' | 'log' | 'debug' | 'verbose';
     enableFileLogging: boolean;
   };
 }
@@ -64,15 +60,11 @@ export function validateConfig(): AppConfig {
 export const configFactory = (): AppConfig => ({
   server: {
     port: parseInt(process.env.PORT || '3000', 10),
-    nodeEnv: process.env.NODE_ENV as any || 'development',
+    nodeEnv: (process.env.NODE_ENV as 'development' | 'production' | 'test') || 'development',
     corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
   },
   security: {
     strictMode: process.env.SECURITY_STRICT_MODE === 'true',
-    recaptcha: {
-      secretKey: process.env.RECAPTCHA_SECRET_KEY,
-      scoreThreshold: parseFloat(process.env.RECAPTCHA_SCORE_THRESHOLD || '0.5'),
-    },
     rateLimit: {
       ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
       limit: parseInt(process.env.THROTTLE_LIMIT || '20', 10),
@@ -92,7 +84,7 @@ export const configFactory = (): AppConfig => ({
     },
   },
   redis: {
-    host: process.env.REDIS_HOST || 'localhost',
+    host: process.env.REDIS_HOST || '',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
     password: process.env.REDIS_PASSWORD,
     db: parseInt(process.env.REDIS_DB || '0', 10),
@@ -101,12 +93,12 @@ export const configFactory = (): AppConfig => ({
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432', 10),
     username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'password',
+    password: process.env.DB_PASSWORD || '',
     database: process.env.DB_DATABASE || 'anti_scraping',
     synchronize: process.env.DB_SYNCHRONIZE === 'true',
   },
   logging: {
-    level: process.env.LOG_LEVEL as any || 'info',
+    level: (process.env.LOG_LEVEL as 'error' | 'warn' | 'log' | 'debug' | 'verbose') || 'log',
     enableFileLogging: process.env.ENABLE_FILE_LOGGING !== 'false',
   },
 });

@@ -24,10 +24,12 @@ import {
 import { SkipThrottle } from '@nestjs/throttler';
 
 import { IpBlacklistService } from '../../../common/services/ip-blacklist.service';
-import { IpStatistics } from '../../../core/types';
 import { JwtAuthGuard, RolesGuard } from '../../auth/guards/auth.guards';
 import { Roles } from '../../auth/auth.decorators';
 import { BlockIpDto } from '../dto/security-admin.dto';
+import { ResponseBuilder } from '../../../common/utils/response.builder';
+import { PaginationUtils } from '../../../common/utils/pagination.utils';
+import { RequestUtils } from '../../../common/utils/request.utils';
 
 /**
  * Security Admin Controller
@@ -52,21 +54,11 @@ export class SecurityAdminController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Block an IP address' })
   async blockIp(@Body() dto: BlockIpDto) {
-    const { ip, reason, ttl } = dto;
-    await this.ipBlacklistService.blockIp(ip, reason, ttl);
-    
-    this.logger.log(`Admin blocked IP: ${ip} for reason: ${reason}`);
-    
-    return {
-      success: true,
-      message: `IP ${ip} has been blocked`,
-      timestamp: new Date().toISOString(),
-    };
+    await this.ipBlacklistService.blockIp(dto.ip, dto.reason, dto.ttl);
+    this.logger.log(`Admin blocked IP: ${RequestUtils.hashIp(dto.ip, 'log')} for reason: ${dto.reason}`);
+    return ResponseBuilder.success(null, 'IP has been blocked');
   }
 
-  /**
-   * IP 차단 해제
-   */
   @Delete('blacklist/ip/:ip')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Unblock an IP address' })
@@ -77,29 +69,15 @@ export class SecurityAdminController {
     }
 
     const wasBlocked = await this.ipBlacklistService.isBlocked(ip);
-    
     if (!wasBlocked) {
-      return {
-        success: false,
-        message: `IP ${ip} was not blocked`,
-        timestamp: new Date().toISOString(),
-      };
+      return ResponseBuilder.error(`IP ${ip} was not blocked`);
     }
 
     await this.ipBlacklistService.unblockIp(ip);
-    
-    this.logger.log(`Admin unblocked IP: ${ip}`);
-    
-    return {
-      success: true,
-      message: `IP ${ip} has been unblocked`,
-      timestamp: new Date().toISOString(),
-    };
+    this.logger.log(`Admin unblocked IP: ${RequestUtils.hashIp(ip, 'log')}`);
+    return ResponseBuilder.success(null, 'IP has been unblocked');
   }
 
-  /**
-   * 차단된 IP 목록 조회
-   */
   @Get('blacklist')
   @ApiOperation({ summary: 'Get all blocked IPs' })
   @ApiQuery({ name: 'page', required: false, type: Number })
@@ -109,28 +87,12 @@ export class SecurityAdminController {
     @Query('limit') limit: number = 50,
   ) {
     const allEntries = await this.ipBlacklistService.getBlocklist();
-    
-    // 간단한 페이지네이션
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const entries = allEntries.slice(startIndex, endIndex);
-    
-    return {
-      success: true,
-      data: entries,
-      pagination: {
-        page,
-        limit,
-        total: allEntries.length,
-        totalPages: Math.ceil(allEntries.length / limit),
-      },
-      timestamp: new Date().toISOString(),
-    };
+    const { page: p, limit: l, skip } = PaginationUtils.parse(page, limit);
+    const entries = allEntries.slice(skip, skip + l);
+
+    return ResponseBuilder.paginated(entries, p, l, allEntries.length);
   }
 
-  /**
-   * IP 정보 조회
-   */
   @Get('blacklist/ip/:ip')
   @ApiOperation({ summary: 'Get IP block information' })
   @ApiParam({ name: 'ip', description: 'IP address to check' })
@@ -138,33 +100,15 @@ export class SecurityAdminController {
     if (!this.ipBlacklistService.isValidIp(ip)) {
       throw new BadRequestException('Invalid IP address format');
     }
-
     const info = await this.ipBlacklistService.getBlockInfo(ip);
-    
-    return {
-      success: true,
-      data: info,
-      isBlocked: !!info,
-      timestamp: new Date().toISOString(),
-    };
+    return ResponseBuilder.success({ ...info, isBlocked: !!info });
   }
 
-  /**
-   * IP 차단 통계
-   */
   @Get('statistics')
   @ApiOperation({ summary: 'Get IP blocking statistics' })
-  async getStatistics(): Promise<{
-    success: boolean;
-    data: IpStatistics;
-    timestamp: string;
-  }> {
-    const stats = await this.ipBlacklistService.getStatistics();
-    
-    return {
-      success: true,
-      data: stats,
-      timestamp: new Date().toISOString(),
-    };
+  async getStatistics() {
+    return ResponseBuilder.success(
+      await this.ipBlacklistService.getStatistics(),
+    );
   }
 }

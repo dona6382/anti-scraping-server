@@ -15,7 +15,7 @@ export class ClientInfoController {
 
   @Get('info')
   @ApiOperation({ summary: 'Get client information' })
-  async getClientInfo(@Req() request: Request, @Query('detailed') detailed?: boolean): Promise<ClientInfo> {
+  async getClientInfo(@Req() request: Request, @Query('detailed') detailed?: boolean) {
     this.logger.log(`Client info requested from ${RequestUtils.extractClientIp(request as ExtendedRequest)}`);
     
     try {
@@ -36,7 +36,7 @@ export class ClientInfoController {
 
   @Get('ip')
   @ApiOperation({ summary: 'Get client IP information' })
-  async getClientIpInfo(@Req() request: Request): Promise<any> {
+  async getClientIpInfo(@Req() request: Request) {
     const clientInfo = await this.clientInfoService.getClientInfo(request);
     return {
       ip: clientInfo.ip.address,
@@ -50,7 +50,7 @@ export class ClientInfoController {
 
   @Get('security')
   @ApiOperation({ summary: 'Get security analysis' })
-  async getSecurityAnalysis(@Req() request: Request): Promise<any> {
+  async getSecurityAnalysis(@Req() request: Request) {
     const clientInfo = await this.clientInfoService.getClientInfo(request);
     return {
       ip: clientInfo.ip.address,
@@ -66,7 +66,7 @@ export class ClientInfoController {
 
   @Get('headers')
   @ApiOperation({ summary: 'Get header analysis' })
-  async getHeaders(@Req() request: Request): Promise<any> {
+  async getHeaders(@Req() request: Request) {
     const clientInfo = await this.clientInfoService.getClientInfo(request);
     return {
       headers: clientInfo.headers,
@@ -76,7 +76,7 @@ export class ClientInfoController {
     };
   }
 
-  private getSimplifiedInfo(clientInfo: ClientInfo): any {
+  private getSimplifiedInfo(clientInfo: ClientInfo) {
     return {
       ip: clientInfo.ip.address,
       location: {

@@ -99,9 +99,7 @@ export class DatabaseService {
    * 초기 데이터 생성
    */
   private async createInitialData(): Promise<void> {
-    // TODO: Create initial admin user, roles, etc.
-    // This will be implemented when we add User entities
-    this.logger.log('Initial data creation - ready for entities');
+    this.logger.log('Database initialized');
   }
 
   /**
@@ -110,7 +108,7 @@ export class DatabaseService {
   async healthCheck(): Promise<{
     status: 'healthy' | 'unhealthy';
     responseTime: number;
-    details?: any;
+    details?: Record<string, unknown>;
   }> {
     const startTime = Date.now();
     

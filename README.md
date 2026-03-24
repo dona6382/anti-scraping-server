@@ -1,6 +1,6 @@
 # Anti-Scraping Server
 
-6단계 보안 레이어를 갖춘 웹 스크래핑/봇 탐지 및 차단 서버.
+5단계 보안 레이어를 갖춘 웹 스크래핑/봇 탐지 및 차단 서버.
 NestJS + TypeScript + PostgreSQL + Redis 기반.
 
 ## 기술 스택
@@ -16,22 +16,28 @@ NestJS + TypeScript + PostgreSQL + Redis 기반.
 | Validation | class-validator + class-transformer |
 | API Docs | Swagger (OpenAPI 3.0) |
 | Container | Docker Compose |
-| Test | Jest (41 tests) |
+| Test | Jest (57 unit + 16 e2e) |
 
-## 보안 레이어 (6단계)
+## 보안 레이어 (5단계)
 
 ```
-Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → Honeypot → reCAPTCHA
+Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → Honeypot
 ```
 
 | 레이어 | 설명 | 적용 범위 |
 |--------|------|----------|
 | Rate Limiting | IP별 요청 속도 제한 | 전역 (APP_GUARD) |
-| IP Blacklist | Redis/Memory 기반 동적 IP 차단 | 전역 (APP_GUARD) |
+| IP Blacklist | Redis/Memory 기반 동적 IP 차단 + **자동 차단** | 전역 (APP_GUARD) |
 | User-Agent Filter | 봇/스크래퍼 UA 패턴 매칭 | 라우트별 |
 | Headless Detection | Puppeteer, Selenium 등 자동화 탐지 (점수 기반) | 라우트별 |
 | Honeypot | 숨겨진 필드로 자동화 도구 탐지 | 라우트별 |
-| reCAPTCHA v3 | Google reCAPTCHA 통합 | 선택적 |
+
+### 추가 보안 기능
+- **자동 IP 차단**: 5분 내 위반 3회→1시간, 5회→24시간, 10회→7일 단계별 차단
+- **GeoIP / VPN / Tor 탐지**: 데이터센터 IP 대역 (AWS, GCP, DO 등), VPN 서비스 대역 자동 탐지
+- **IP Reputation**: 위반 횟수 누적 기반 점진적 차단 에스컬레이션
+- **위협 점수 시스템**: IP별 위협 점수 관리 (가중치: LOW=5, MEDIUM=15, HIGH=30, CRITICAL=50), 1시간 TTL 감쇠, 70점 이상 사전 차단
+- **요청 패턴 분석 (봇 탐지)**: 시간대별 차단 분포, 상위 차단 IP/UA 순위, 엔드포인트별 통계, 요청 간격 변동계수 기반 봇 탐지, 공격 패턴 클러스터링
 
 ## 빠른 시작
 
@@ -106,6 +112,18 @@ docker-compose up -d
 | DELETE | `/admin/security/blacklist/ip/:ip` | IP 차단 해제 |
 | GET | `/admin/security/statistics` | IP 차단 통계 |
 
+### Analysis (JWT + admin 역할 필요)
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/admin/analysis/time-distribution` | 시간대별 차단 분포 |
+| GET | `/admin/analysis/top-blocked-ips` | 상위 차단 IP 순위 |
+| GET | `/admin/analysis/top-blocked-uas` | 상위 차단 User-Agent 순위 |
+| GET | `/admin/analysis/endpoint-stats` | 엔드포인트별 차단 통계 |
+| GET | `/admin/analysis/request-intervals/:ip` | IP별 요청 간격 분석 (봇 탐지) |
+| GET | `/admin/analysis/attack-clusters` | 공격 패턴 클러스터링 |
+| GET | `/admin/analysis/similar-patterns/:ip` | 유사 패턴 IP 매칭 |
+| GET | `/admin/analysis/threat-score/:ip` | IP 위협 점수 조회 |
+
 ### Testing
 | Method | Path | 설명 |
 |--------|------|------|
@@ -177,7 +195,7 @@ npm run start:dev      # 개발 서버 (watch 모드)
 npm run build          # 프로덕션 빌드
 npm run lint           # ESLint
 npm run format         # Prettier
-npm test               # Jest 테스트 (5 suites, 41 tests)
+npm test               # Jest 테스트 (7 suites, 57 tests)
 npm run test:cov       # 커버리지 리포트
 ```
 

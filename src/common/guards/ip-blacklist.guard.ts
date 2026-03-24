@@ -1,11 +1,13 @@
 import { Injectable, Logger, ExecutionContext, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { createHash, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { BaseSecurityGuard } from './base-security.guard';
+import { RequestUtils } from '../utils/request.utils';
 import { IpBlacklistService } from '../services/ip-blacklist.service';
 import { SecurityEventService } from '../services/security-event.service';
 import { ExtendedRequest } from '../../core/types';
 import { IpBlockedException } from '../exceptions/application.exception';
+import { ThreatScoreService } from '../services/threat-score.service';
 
 /**
  * IP Blacklist 체크를 건너뛰는 데코레이터
@@ -26,6 +28,7 @@ export class IpBlacklistGuard extends BaseSecurityGuard {
   constructor(
     private readonly ipBlacklistService: IpBlacklistService,
     private readonly securityEventService: SecurityEventService,
+    private readonly threatScoreService: ThreatScoreService,
     private readonly reflector: Reflector,
   ) {
     super();
@@ -72,7 +75,25 @@ export class IpBlacklistGuard extends BaseSecurityGuard {
 
         throw new IpBlockedException(this.hashIp(ip), 'Security policy');
       }
-      
+
+      // Threat score based preemptive blocking
+      const shouldPreemptiveBlock = await this.threatScoreService.shouldPreemptiveBlock(ip);
+      if (shouldPreemptiveBlock) {
+        await this.ipBlacklistService.blockIp(ip, 'SUSPICIOUS_BEHAVIOR', 3600);
+
+        this.securityEventService.log({
+          eventType: 'AUTO_BLOCKED',
+          severity: 'HIGH',
+          ip,
+          userAgent: request.headers['user-agent'] as string,
+          endpoint: request.url,
+          method: request.method,
+          description: 'Preemptive block: threat score exceeded threshold',
+        });
+
+        throw new IpBlockedException(this.hashIp(ip), 'Threat score exceeded');
+      }
+
       return true;
     } catch (error) {
       if (error instanceof IpBlockedException) {
@@ -89,15 +110,8 @@ export class IpBlacklistGuard extends BaseSecurityGuard {
     }
   }
 
-  /**
-   * IP 해시화 (로깅용)
-   */
   private hashIp(ip: string): string {
-    const salt = this.ipHashSalt;
-    return createHash('sha256')
-      .update(ip + salt)
-      .digest('hex')
-      .substring(0, 16);
+    return RequestUtils.hashIp(ip, this.ipHashSalt);
   }
 
   /**

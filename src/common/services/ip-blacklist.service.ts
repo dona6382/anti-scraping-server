@@ -39,7 +39,7 @@ export class IpBlacklistService {
     
     await this.cache.set(key, entry, ttl || this.ttl);
     
-    this.logger.warn(`Blocked IP: ${ip}, Reason: ${reason}, Count: ${entry.count}`);
+    this.logger.warn(`Blocked IP: ${RequestUtils.hashIp(ip, 'log')}, Reason: ${reason}, Count: ${entry.count}`);
   }
 
   /**
@@ -48,7 +48,7 @@ export class IpBlacklistService {
   async unblockIp(ip: string): Promise<void> {
     const key = this.getKey(ip);
     await this.cache.delete(key);
-    this.logger.log(`Unblocked IP: ${ip}`);
+    this.logger.log(`Unblocked IP: ${RequestUtils.hashIp(ip, 'log')}`);
   }
 
   /**
@@ -82,7 +82,8 @@ export class IpBlacklistService {
     const pattern = `${this.keyPrefix}:*`;
     const keys = await this.cache.keys(pattern);
     
-    return keys.map(key => key.replace(`${this.keyPrefix}:`, ''));
+    const prefixLen = this.keyPrefix.length + 1; // "prefix:" length
+    return keys.map(key => key.slice(prefixLen));
   }
 
   /**
@@ -103,13 +104,14 @@ export class IpBlacklistService {
    * 차단 목록 초기화
    */
   async clearBlocklist(): Promise<void> {
-    const ips = await this.getAllBlockedIps();
-    
-    for (const ip of ips) {
-      await this.unblockIp(ip);
+    const pattern = `${this.keyPrefix}:*`;
+    const keys = await this.cache.keys(pattern);
+
+    if (keys.length > 0) {
+      await this.cache.deleteMany(keys);
     }
-    
-    this.logger.warn(`Cleared blacklist: ${ips.length} IPs removed`);
+
+    this.logger.warn(`Cleared blacklist: ${keys.length} IPs removed`);
   }
 
   /**
@@ -121,7 +123,7 @@ export class IpBlacklistService {
     const dayAgo = now - 86400000; // 24시간 전
     
     const recentBlocks = entries.filter(
-      entry => entry.blockedAt.getTime() > dayAgo
+      entry => new Date(entry.blockedAt).getTime() > dayAgo
     ).length;
     
     const topReasons: Record<string, number> = {};
@@ -149,7 +151,7 @@ export class IpBlacklistService {
     let cleaned = 0;
     
     for (const entry of entries) {
-      if (entry.expiresAt && entry.expiresAt < now) {
+      if (entry.expiresAt && new Date(entry.expiresAt) < now) {
         await this.unblockIp(entry.ip);
         cleaned++;
       }
@@ -188,6 +190,6 @@ export class IpBlacklistService {
    * 키 생성
    */
   private getKey(ip: string): string {
-    return `${this.keyPrefix}:${ip}`;
+    return `${this.keyPrefix}:${RequestUtils.normalizeIp(ip)}`;
   }
 }

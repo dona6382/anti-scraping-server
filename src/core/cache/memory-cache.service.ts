@@ -1,14 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ICacheService } from './interfaces/cache.interface';
 
 /**
  * Memory Cache Service
- * 임시 메모리 기반 캐시 서비스 (나중에 Redis로 교체 예정)
+ * In-Memory 캐시 (Redis 미설정 시 fallback)
  */
 @Injectable()
-export class MemoryCacheService implements ICacheService {
+export class MemoryCacheService implements ICacheService, OnModuleDestroy {
   private readonly logger = new Logger(MemoryCacheService.name);
-  private readonly cache = new Map<string, { value: any; expiresAt?: number }>();
+  private readonly cache = new Map<string, { value: unknown; expiresAt?: number }>();
   private readonly cleanupInterval: NodeJS.Timeout;
 
   constructor() {
@@ -33,7 +33,7 @@ export class MemoryCacheService implements ICacheService {
       return null;
     }
 
-    return entry.value;
+    return entry.value as T;
   }
 
   async set<T>(key: string, value: T, ttl?: number): Promise<void> {
@@ -105,9 +105,10 @@ export class MemoryCacheService implements ICacheService {
   async keys(pattern: string): Promise<string[]> {
     const allKeys = Array.from(this.cache.keys());
     
-    // 간단한 패턴 매칭 (*, ? 지원)
+    // 패턴 매칭 (*, ? 지원) — 메타문자 이스케이프 후 glob 변환
+    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(
-      '^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$'
+      '^' + escaped.replace(/\*/g, '.*').replace(/\?/g, '.') + '$',
     );
     
     return allKeys.filter(key => regex.test(key));
@@ -147,7 +148,7 @@ export class MemoryCacheService implements ICacheService {
    */
   onModuleDestroy() {
     if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval as any);
+      clearInterval(this.cleanupInterval);
     }
   }
 }

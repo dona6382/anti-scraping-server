@@ -25,7 +25,6 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards/auth.guards';
 import { Roles } from '../auth/auth.decorators';
-import { ChangeLogLevelDto } from './dto/admin.dto';
 
 /**
  * Admin Controller
@@ -123,18 +122,6 @@ export class AdminController {
   async clearCache() {
     this.logger.log('Admin: Cache clear requested');
     return await this.adminService.clearSystemCache();
-  }
-
-  /**
-   * 로그 레벨 변경
-   */
-  @Post('system/log-level')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Change log level' })
-  @ApiResponse({ status: 200, description: 'Log level changed successfully' })
-  async changeLogLevel(@Body() dto: ChangeLogLevelDto) {
-    this.logger.log(`Admin: Log level change requested to ${dto.level}`);
-    return await this.adminService.changeLogLevel(dto.level);
   }
 
   /**

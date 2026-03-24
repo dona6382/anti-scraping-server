@@ -23,7 +23,6 @@ export class IpBlacklist {
     'HONEYPOT_TRIGGERED',
     'INVALID_USER_AGENT',
     'HEADLESS_BROWSER_DETECTED',
-    'RECAPTCHA_VERIFICATION_FAILED'
   ]})
   reason: string;
 

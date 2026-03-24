@@ -50,7 +50,7 @@ export abstract class BaseApplicationException extends HttpException {
   /**
    * 환경에 따른 응답 생성
    */
-  public override getResponse(mode: ErrorResponseMode = ErrorResponseMode.PRODUCTION): Record<string, any> {
+  public override getResponse(mode: ErrorResponseMode = ErrorResponseMode.PRODUCTION): Record<string, unknown> {
     const baseResponse = {
       success: false,
       error: {
@@ -106,8 +106,6 @@ export abstract class BaseApplicationException extends HttpException {
     switch (this.severity) {
       case ErrorSeverity.CRITICAL:
         this.logger.error('CRITICAL ERROR', logData);
-        // 알림 시스템 트리거 (예: Slack, Email)
-        this.sendAlert(logData);
         break;
       case ErrorSeverity.HIGH:
         this.logger.error('HIGH SEVERITY ERROR', logData);
@@ -121,13 +119,6 @@ export abstract class BaseApplicationException extends HttpException {
     }
   }
 
-  /**
-   * 심각한 에러 알림
-   */
-  private sendAlert(data: any): void {
-    // TODO: 알림 시스템 구현 (Slack, Email, SMS 등)
-    this.logger.error('🚨 ALERT: Critical error occurred', data);
-  }
 }
 
 /**
@@ -161,7 +152,7 @@ export class SecurityException extends BaseApplicationException {
   public guardName?: string;
   public reason?: string;
   public ip?: string;
-  public metadata?: Record<string, any>;
+  public metadata?: Record<string, unknown>;
 
   constructor(
     errorCode: string = ErrorCodes.SECURITY_VIOLATION,
@@ -170,7 +161,7 @@ export class SecurityException extends BaseApplicationException {
     guardName?: string,
     reason?: string,
     ip?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ) {
     super(
       errorCode,

@@ -44,11 +44,11 @@ export abstract class BaseSecurityGuard implements CanActivate {
    * 보안 위반 로깅
    */
   protected logSecurityViolation(request: ExtendedRequest, reason: string): void {
-    const ip = this.getClientIp(request);
+    const hashedIp = RequestUtils.hashIp(this.getClientIp(request), 'log');
     const userAgent = this.getUserAgent(request).substring(0, 100);
 
     this.logger.warn(
-      `Security violation: ${reason} - ${request.method} ${request.url} - IP: ${ip}, UA: ${userAgent}`,
+      `Security violation: ${reason} - ${request.method} ${request.url} - IP: ${hashedIp}, UA: ${userAgent}`,
     );
   }
 }

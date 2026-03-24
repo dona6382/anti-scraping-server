@@ -38,11 +38,8 @@ export class CacheFactory {
   /**
    * Redis 연결 상태 확인
    */
-  async checkRedisConnection(): Promise<boolean> {
-    if (this.redisCacheService.isRedisConnected()) {
-      return true;
-    }
-    return false;
+  checkRedisConnection(): boolean {
+    return this.redisCacheService.isRedisConnected();
   }
 
   /**
@@ -51,7 +48,7 @@ export class CacheFactory {
   async getCacheStats(): Promise<{
     type: 'redis' | 'memory';
     connected: boolean;
-    info?: Record<string, any>;
+    info?: Record<string, unknown>;
   }> {
     const redisConfig = this.configService.redisConfig;
     

@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import type { Redis as RedisClient } from 'ioredis';
 import { AppConfigService } from '../config/config.service';
 import { ICacheService } from './interfaces/cache.interface';
 
@@ -9,7 +10,7 @@ import { ICacheService } from './interfaces/cache.interface';
 @Injectable()
 export class RedisCacheService implements ICacheService, OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisCacheService.name);
-  private client: any = null;
+  private client: RedisClient | null = null;
   private isConnected = false;
 
   constructor(private readonly configService: AppConfigService) {}
@@ -31,7 +32,7 @@ export class RedisCacheService implements ICacheService, OnModuleInit, OnModuleD
       }
 
       // Redis 클라이언트 동적 import (optional dependency)
-      let Redis: any;
+      let Redis: typeof import('ioredis').default;
       try {
         Redis = (await import('ioredis')).default;
       } catch (error) {
@@ -42,9 +43,8 @@ export class RedisCacheService implements ICacheService, OnModuleInit, OnModuleD
       this.client = new Redis({
         host: redisConfig.host,
         port: redisConfig.port,
-        password: redisConfig.password,
+        password: redisConfig.password || undefined,
         db: redisConfig.db,
-        retryDelayOnFailover: 100,
         maxRetriesPerRequest: 3,
         lazyConnect: true,
       });
@@ -253,9 +253,17 @@ export class RedisCacheService implements ICacheService, OnModuleInit, OnModuleD
     }
 
     try {
-      return await this.client.keys(pattern);
+      // SCAN 기반 — KEYS O(N) 블로킹 방지
+      const results: string[] = [];
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = nextCursor;
+        results.push(...keys);
+      } while (cursor !== '0');
+      return results;
     } catch (error) {
-      this.logger.error(`Redis KEYS error for pattern ${pattern}: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Redis SCAN error for pattern ${pattern}: ${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
   }
@@ -270,7 +278,7 @@ export class RedisCacheService implements ICacheService, OnModuleInit, OnModuleD
   /**
    * Redis 정보 조회
    */
-  async getRedisInfo(): Promise<Record<string, any> | null> {
+  async getRedisInfo(): Promise<Record<string, unknown> | null> {
     if (!this.client || !this.isConnected) {
       return null;
     }

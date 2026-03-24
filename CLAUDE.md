@@ -15,7 +15,7 @@
 - **Validation**: class-validator + class-transformer (DTO 기반)
 - **API Docs**: Swagger (`/api-docs`)
 - **Container**: Docker Compose (app + postgres + redis)
-- **Test**: Jest (41 tests, 5 suites)
+- **Test**: Jest (57 tests, 7 suites)
 
 ## 프로젝트 구조
 ```
@@ -32,7 +32,7 @@ src/
 ├── common/                  # 공유 계층 (@Global)
 │   ├── guards/              # BaseSecurityGuard, UserAgent, IpBlacklist, HeadlessBrowser
 │   ├── filters/             # UnifiedExceptionFilter
-│   ├── services/            # IpBlacklistService, SecurityEventService
+│   ├── services/            # IpBlacklistService, SecurityEventService, ThreatScoreService
 │   ├── exceptions/          # BaseApplicationException 계층 (통합)
 │   ├── constants/           # error.constants, security.constants
 │   └── utils/               # RequestUtils, ResponseBuilder
@@ -43,6 +43,7 @@ src/
 │   ├── health/              # 헬스체크 (DB/Redis 실제 체크)
 │   ├── public/              # 공개 API
 │   ├── client-info/         # 클라이언트 핑거프린팅
+│   ├── analysis/            # 위협 분석 (패턴 분석, Admin API)
 │   └── testing/             # 보안 테스트 엔드포인트
 └── api/                     # API 버전 관리 (v1)
 ```
@@ -53,7 +54,7 @@ src/
 3. **ApiModule** → V1Module → Auth, Security, Health, Public, Admin, ClientInfo, Testing
 
 ## 전역 보안 체인
-`ThrottlerGuard` → `IpBlacklistGuard` → Route-level Guards (UserAgent, Headless, JWT)
+`ThrottlerGuard` → `IpBlacklistGuard` (+ 위협 점수 기반 사전 차단) → Route-level Guards (UserAgent, Headless, JWT)
 
 ## 개발 규칙
 
@@ -90,7 +91,7 @@ src/
 ```bash
 npm run start:dev      # 개발 서버 (watch)
 npm run build          # 빌드
-npm test               # Jest 테스트 (41 tests)
+npm test               # Jest 테스트 (57 tests)
 npm run lint           # ESLint
 npm run format         # Prettier
 docker-compose up -d   # Docker 실행 (app + postgres + redis)

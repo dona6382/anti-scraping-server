@@ -28,7 +28,7 @@ interface StartupInfo {
   docsEnabled: boolean;
   redisConfigured: boolean;
   strictMode: boolean;
-  recaptchaConfigured: boolean;
+
 }
 
 /**
@@ -46,6 +46,9 @@ async function bootstrap(): Promise<void> {
 
     // Get configuration
     const config = getApplicationConfiguration();
+
+    // Trust proxy (loopback only — Docker/Nginx 환경에서는 프록시 IP 추가)
+    app.set('trust proxy', 'loopback');
 
     // Security headers
     app.use(helmet({ contentSecurityPolicy: config.nodeEnv === 'production' }));
@@ -76,8 +79,8 @@ async function bootstrap(): Promise<void> {
     // Start the application
     await app.listen(config.port);
 
-    // Setup graceful shutdown with app.close()
-    setupGracefulShutdown(app);
+    // Setup error handlers (shutdown handled by enableShutdownHooks)
+    setupProcessErrorHandlers();
 
     // Log startup information
     const startupInfo = createStartupInfo(config);
@@ -149,7 +152,7 @@ function setupCors(app: NestExpressApplication, config: AppConfiguration): void 
       'Content-Type', 
       'Authorization', 
       'X-Requested-With', 
-      'X-Recaptcha-Token',
+
       'Accept',
       'Origin',
       'User-Agent',
@@ -248,13 +251,13 @@ Production-ready anti-scraping solution with multiple protection layers.
 - Rate limiting per IP and endpoint
 - Headless browser detection
 - Honeypot fields for bot trapping
-- reCAPTCHA v3 integration
+
 - Request fingerprinting
 
 🔐 **Protection Levels:**
 - **Public APIs**: Basic rate limiting
 - **Protected APIs**: User-Agent + Headless detection
-- **Secure APIs**: Full protection stack including reCAPTCHA
+- **Secure APIs**: Full protection stack
 
 📊 **Rate Limits:**
 - Public Data: Default throttling
@@ -326,7 +329,7 @@ function createStartupInfo(config: AppConfiguration): StartupInfo {
     docsEnabled: config.swaggerEnabled,
     redisConfigured: !!process.env.REDIS_HOST,
     strictMode: process.env.SECURITY_STRICT_MODE === 'true',
-    recaptchaConfigured: !!process.env.RECAPTCHA_SECRET_KEY,
+
   };
 }
 
@@ -351,7 +354,7 @@ ${info.docsEnabled ? `║  📚 API Docs:     http://localhost:${info.port}/api-
 ╠═══════════════════════════════════════════════════════════════╣
 ║  📦 Redis:        ${(info.redisConfigured ? 'Configured' : 'Not configured').padEnd(43)} ║
 ║  🛡️  Security:     Strict mode ${(info.strictMode ? 'ENABLED' : 'DISABLED').padEnd(32)} ║
-║  🤖 reCAPTCHA:    ${(info.recaptchaConfigured ? 'Configured' : 'Not configured').padEnd(43)} ║
+
 ║  📖 Docs:         ${(info.docsEnabled ? 'Enabled' : 'Disabled').padEnd(43)} ║
 ║                                                               ║
 ╠═══════════════════════════════════════════════════════════════╣
@@ -369,10 +372,6 @@ ${info.docsEnabled ? `║  📚 API Docs:     http://localhost:${info.port}/api-
   }
 
   // 보안 설정 확인
-  if (!info.recaptchaConfigured && isProduction) {
-    logger.warn('⚠️  reCAPTCHA not configured - consider enabling for production');
-  }
-
   if (!info.redisConfigured) {
     logger.warn('⚠️  Redis not configured - using in-memory cache (not recommended for production)');
   }
@@ -386,25 +385,11 @@ ${info.docsEnabled ? `║  📚 API Docs:     http://localhost:${info.port}/api-
 }
 
 /**
- * Graceful shutdown - closes DB/Redis connections via NestJS lifecycle
+ * Process error handlers (uncaught exceptions only)
+ * SIGTERM/SIGINT는 app.enableShutdownHooks()가 처리
  */
-function setupGracefulShutdown(app: NestExpressApplication): void {
-  const logger = new Logger('Shutdown');
-
-  const shutdown = async (signal: string) => {
-    logger.log(`Received ${signal}, shutting down gracefully...`);
-    try {
-      await app.close();
-      logger.log('Application closed gracefully');
-      process.exit(0);
-    } catch (error) {
-      logger.error('Error during shutdown', error);
-      process.exit(1);
-    }
-  };
-
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+function setupProcessErrorHandlers(): void {
+  const logger = new Logger('Process');
 
   process.on('uncaughtException', (error) => {
     logger.error('Uncaught Exception:', error);

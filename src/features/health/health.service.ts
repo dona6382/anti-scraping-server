@@ -3,6 +3,8 @@ import { DataSource } from 'typeorm';
 import * as os from 'os';
 
 import { ICacheService } from '../../core/cache/interfaces';
+import { SystemUtils } from '../../common/utils/system.utils';
+import { HEALTH_THRESHOLDS } from '../../common/constants/threshold.constants';
 
 export interface HealthStatus {
   healthy: boolean;
@@ -16,7 +18,7 @@ export interface HealthCheck {
   status: 'healthy' | 'degraded' | 'unhealthy';
   responseTime?: number;
   message?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -56,8 +58,8 @@ export class HealthService {
         nodeVersion: process.version,
         uptime: this.getUptime(),
         memory: {
-          total: Math.round(os.totalmem() / 1024 / 1024),
-          free: Math.round(os.freemem() / 1024 / 1024),
+          totalMB: SystemUtils.bytesToMB(os.totalmem()),
+          freeMB: SystemUtils.bytesToMB(os.freemem()),
         },
         cpu: {
           model: os.cpus()[0]?.model,
@@ -86,15 +88,15 @@ export class HealthService {
     const heapUsedPercent = (used.heapUsed / used.heapTotal) * 100;
 
     let status: HealthCheck['status'] = 'healthy';
-    if (heapUsedPercent > 95) status = 'unhealthy';
-    else if (heapUsedPercent > 85) status = 'degraded';
+    if (heapUsedPercent > HEALTH_THRESHOLDS.MEMORY_UNHEALTHY_PCT) status = 'unhealthy';
+    else if (heapUsedPercent > HEALTH_THRESHOLDS.MEMORY_DEGRADED_PCT) status = 'degraded';
 
     return {
       name: 'memory',
       status,
       metadata: {
-        heapUsedMB: Math.round(used.heapUsed / 1024 / 1024),
-        heapTotalMB: Math.round(used.heapTotal / 1024 / 1024),
+        heapUsedMB: SystemUtils.bytesToMB(used.heapUsed),
+        heapTotalMB: SystemUtils.bytesToMB(used.heapTotal),
         percentage: Math.round(heapUsedPercent),
       },
     };
@@ -106,8 +108,8 @@ export class HealthService {
     const avgLoad = loadAvg[0];
 
     let status: HealthCheck['status'] = 'healthy';
-    if (avgLoad > cores * 0.9) status = 'unhealthy';
-    else if (avgLoad > cores * 0.7) status = 'degraded';
+    if (avgLoad > cores * HEALTH_THRESHOLDS.CPU_UNHEALTHY_FACTOR) status = 'unhealthy';
+    else if (avgLoad > cores * HEALTH_THRESHOLDS.CPU_DEGRADED_FACTOR) status = 'degraded';
 
     return {
       name: 'cpu',
@@ -127,7 +129,7 @@ export class HealthService {
 
       return {
         name: 'database',
-        status: responseTime > 1000 ? 'degraded' : 'healthy',
+        status: responseTime > HEALTH_THRESHOLDS.DB_DEGRADED_MS ? 'degraded' : 'healthy',
         responseTime,
       };
     } catch (error) {
@@ -160,7 +162,7 @@ export class HealthService {
 
       return {
         name: 'redis',
-        status: responseTime > 500 ? 'degraded' : 'healthy',
+        status: responseTime > HEALTH_THRESHOLDS.REDIS_DEGRADED_MS ? 'degraded' : 'healthy',
         responseTime,
       };
     } catch (error) {

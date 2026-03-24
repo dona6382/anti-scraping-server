@@ -124,7 +124,7 @@ describe('AuthService', () => {
         newPassword: 'newpassword456',
       });
 
-      expect(result.success).toBe(true);
+      expect(result.status).toBe('success');
       expect(userRepository.save).toHaveBeenCalled();
     });
 

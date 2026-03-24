@@ -6,7 +6,6 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard, RolesGuard } from './guards/auth.guards';
 import { User } from '../../core/database/entities';
-import { AppConfigService } from '../../core/config/config.service';
 
 /**
  * Auth Feature Module
@@ -29,8 +28,12 @@ import { AppConfigService } from '../../core/config/config.service';
         return {
           secret,
           signOptions: {
+            algorithm: 'HS256' as const,
             expiresIn: process.env.JWT_EXPIRES_IN || '1h',
             issuer: 'anti-scraping-server',
+          },
+          verifyOptions: {
+            algorithms: ['HS256' as const],
           },
         };
       },

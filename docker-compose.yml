@@ -11,12 +11,13 @@ services:
       - PORT=3000
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_USERNAME=anti_scraping
-      - DB_PASSWORD=anti_scraping_pw
-      - DB_DATABASE=anti_scraping
+      - DB_USERNAME=${DB_USERNAME:?DB_USERNAME is required}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+      - DB_DATABASE=${DB_DATABASE:-anti_scraping}
       - DB_SYNCHRONIZE=false
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:-}
       - SECURITY_STRICT_MODE=true
@@ -34,15 +35,14 @@ services:
     image: postgres:16-alpine
     container_name: anti-scraping-postgres
     environment:
-      POSTGRES_USER: anti_scraping
-      POSTGRES_PASSWORD: anti_scraping_pw
-      POSTGRES_DB: anti_scraping
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: ${DB_DATABASE:-anti_scraping}
+    # ports not exposed — internal network only
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U anti_scraping"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-anti_scraping}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -53,29 +53,15 @@ services:
   redis:
     image: redis:7-alpine
     container_name: anti-scraping-redis
-    ports:
-      - "6379:6379"
+    # ports not exposed — internal network only
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-    networks:
-      - app-network
-
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: redis-commander
-    environment:
-      - REDIS_HOSTS=local:redis:6379
-    ports:
-      - "8081:8081"
-    depends_on:
-      - redis
     restart: unless-stopped
     networks:
       - app-network

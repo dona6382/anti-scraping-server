@@ -1,9 +1,11 @@
-import { Controller, Get, HttpCode, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, HttpCode, HttpStatus, ServiceUnavailableException, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 
 import { HealthService } from './health.service';
 import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
+import { JwtAuthGuard, RolesGuard } from '../auth/guards/auth.guards';
+import { Roles } from '../auth/auth.decorators';
 
 /**
  * Health Check Controller
@@ -28,10 +30,10 @@ export class HealthController {
     
     return {
       status: health.healthy ? 'ok' : 'error',
-      timestamp: health.timestamp,
+      timestamp: health.timestamp.toISOString(),
       uptime: health.uptime,
       healthy: health.healthy,
-      checks: health.checks
+      checks: health.checks,
     };
   }
 
@@ -40,7 +42,10 @@ export class HealthController {
    */
   @Get('detailed')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Detailed health check' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Detailed health check (admin only)' })
   async getDetailedHealth() {
     return this.healthService.getDetailedHealth();
   }

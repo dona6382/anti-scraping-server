@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { ExtendedRequest } from '../../core/types';
 import { BOT_PATTERNS, CRAWLER_PATTERNS, MOBILE_PATTERNS, TABLET_PATTERNS } from '../constants/security.constants';
 
@@ -9,44 +10,19 @@ export class RequestUtils {
   /**
    * 클라이언트 IP 주소 추출
    */
+  /**
+   * Express의 trust proxy 설정을 통해 안전하게 처리된 request.ip를 우선 사용.
+   * 프록시 헤더를 직접 파싱하지 않음 — Express가 trust proxy 기반으로 처리.
+   * main.ts에서 app.set('trust proxy', ...) 설정 필요.
+   */
   static extractClientIp(request: ExtendedRequest): string {
-    // X-Forwarded-For 헤더 확인 (프록시/로드밸런서 뒤)
-    const forwardedFor = request.headers['x-forwarded-for'];
-    if (forwardedFor) {
-      const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-      if (ips) {
-        return ips.split(',')[0]?.trim() || 'unknown';
-      }
-    }
-
-    // 다른 프록시 헤더들 확인
-    const proxyHeaders = [
-      'x-real-ip',
-      'x-client-ip',
-      'cf-connecting-ip', // Cloudflare
-      'true-client-ip',   // Akamai, Cloudflare Enterprise
-      'x-forwarded',
-      'forwarded-for',
-      'forwarded',
-    ];
-
-    for (const header of proxyHeaders) {
-      const value = request.headers[header];
-      if (value) {
-        const headerValue = Array.isArray(value) ? value[0] : value;
-        if (headerValue) {
-          return headerValue.split(',')[0]?.trim() || 'unknown';
-        }
-      }
-    }
-
-    // Express의 request.ip 사용
+    // Express가 trust proxy 설정에 따라 안전하게 결정한 IP
     if (request.ip) {
       return request.ip;
     }
 
-    // Socket에서 직접 가져오기
-    const socket = (request as any).socket;
+    // Socket에서 직접 가져오기 (fallback)
+    const socket = request.socket;
     if (socket?.remoteAddress) {
       return socket.remoteAddress;
     }
@@ -102,6 +78,16 @@ export class RequestUtils {
     }
 
     return ip;
+  }
+
+  /**
+   * IP 해시화 (로깅/개인정보 보호용)
+   */
+  static hashIp(ip: string, salt: string): string {
+    return createHash('sha256')
+      .update(ip + salt)
+      .digest('hex')
+      .substring(0, 16);
   }
 
   /**

@@ -16,13 +16,8 @@ import { AuthDto, RegisterDto, ChangePasswordDto } from './dto/auth.dto';
 import { JwtAuthGuard, AuthenticatedRequest } from './guards/auth.guards';
 import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
 
-/**
- * Authentication Controller
- * 로그인/회원가입은 IP 차단 체크 제외 (인증 전이므로)
- */
 @ApiTags('Authentication')
 @Controller('auth')
-@SkipIpBlacklist()
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
@@ -30,6 +25,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @SkipIpBlacklist()
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'User login' })
   @ApiResponse({ status: 200, description: 'Login successful' })
@@ -39,6 +35,7 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @SkipIpBlacklist()
   @Throttle({ default: { ttl: 300000, limit: 3 } })
   @ApiOperation({ summary: 'User registration' })
   async register(@Body() registerDto: RegisterDto) {

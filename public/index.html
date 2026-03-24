@@ -3,461 +3,915 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anti-Scraping Server - Test Forms</title>
+    <title>SHIELD — Anti-Scraping Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-deep: #0a0e17;
+            --bg-panel: #111827;
+            --bg-card: #1a2332;
+            --bg-card-hover: #1f2b3d;
+            --border: #2a3a4e;
+            --border-glow: #00ff8830;
+            --green: #00ff88;
+            --green-dim: #00cc6a;
+            --green-bg: #00ff8810;
+            --amber: #ffb700;
+            --amber-bg: #ffb70010;
+            --red: #ff3b5c;
+            --red-bg: #ff3b5c10;
+            --cyan: #00d4ff;
+            --text: #e4e8f1;
+            --text-dim: #8892a4;
+            --text-muted: #4a5568;
+            --mono: 'JetBrains Mono', monospace;
+            --sans: 'Outfit', sans-serif;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: var(--sans);
+            background: var(--bg-deep);
+            color: var(--text);
             min-height: 100vh;
+            overflow-x: hidden;
         }
-        .container {
-            background: white;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+
+        /* Scan-line overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 136, 0.015) 2px,
+                rgba(0, 255, 136, 0.015) 4px
+            );
+            pointer-events: none;
+            z-index: 9999;
         }
-        h1 {
-            color: #333;
-            border-bottom: 3px solid #667eea;
-            padding-bottom: 10px;
+
+        /* ═══ HEADER ═══ */
+        .header {
+            background: linear-gradient(180deg, #0d1321 0%, var(--bg-deep) 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
         }
-        h2 {
-            color: #555;
-            margin-top: 30px;
+
+        .header-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.5rem;
         }
-        .form-group {
-            margin-bottom: 20px;
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #555;
-        }
-        input, textarea, select {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        input:focus, textarea:focus, select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 12px 30px;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        .response {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 5px;
-            background: #f8f9fa;
-            border-left: 4px solid #667eea;
-        }
-        .error {
-            background: #fee;
-            border-left-color: #f66;
-        }
-        .success {
-            background: #efe;
-            border-left-color: #6c6;
-        }
-        pre {
-            background: #f4f4f4;
-            padding: 10px;
-            border-radius: 3px;
-            overflow-x: auto;
-        }
-        .test-section {
-            margin: 30px 0;
-            padding: 20px;
-            border: 1px solid #e0e0e0;
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--green);
             border-radius: 8px;
+            display: grid;
+            place-items: center;
+            font-size: 1.2rem;
+            background: var(--green-bg);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.15);
+            animation: pulse-glow 3s ease-in-out infinite;
         }
-        .info-box {
-            background: #e8f4fd;
-            border: 1px solid #bee5eb;
-            border-radius: 5px;
-            padding: 15px;
-            margin: 20px 0;
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.15); }
+            50% { box-shadow: 0 0 30px rgba(0, 255, 136, 0.3); }
         }
-        .warning-box {
-            background: #fff3cd;
-            border: 1px solid #ffeeba;
-            border-radius: 5px;
-            padding: 15px;
-            margin: 20px 0;
+
+        .logo-text {
+            font-family: var(--mono);
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: 0.15em;
+            color: var(--green);
         }
-        /* Honeypot 필드를 숨기는 여러 가지 방법 */
-        .hidden-field {
-            position: absolute;
-            left: -9999px;
+
+        .logo-sub {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
         }
-        .invisible-field {
-            display: none !important;
+
+        .status-cluster {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
         }
-        .opacity-field {
-            opacity: 0;
-            height: 0;
-            width: 0;
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--green);
+            background: var(--green-bg);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--green);
+            border-radius: 50%;
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .clock {
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        /* ═══ MAIN LAYOUT ═══ */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem 3rem;
+        }
+
+        /* ═══ STATS BAR ═══ */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+            animation: fadeUp 0.6s ease-out;
+        }
+
+        .stat-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.2rem;
+            position: relative;
             overflow: hidden;
         }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+        }
+
+        .stat-card.green::before { background: var(--green); }
+        .stat-card.amber::before { background: var(--amber); }
+        .stat-card.cyan::before { background: var(--cyan); }
+        .stat-card.red::before { background: var(--red); }
+
+        .stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-family: var(--mono);
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+
+        .stat-card.green .stat-value { color: var(--green); }
+        .stat-card.amber .stat-value { color: var(--amber); }
+        .stat-card.cyan .stat-value { color: var(--cyan); }
+        .stat-card.red .stat-value { color: var(--red); }
+
+        /* ═══ SECTION LABEL ═══ */
+        .section-label {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--text-muted);
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ═══ TEST CARDS GRID ═══ */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+            gap: 1rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: border-color 0.3s, transform 0.2s;
+            animation: fadeUp 0.6s ease-out both;
+        }
+
+        .card:hover {
+            border-color: rgba(0, 255, 136, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .card:nth-child(1) { animation-delay: 0.05s; }
+        .card:nth-child(2) { animation-delay: 0.1s; }
+        .card:nth-child(3) { animation-delay: 0.15s; }
+        .card:nth-child(4) { animation-delay: 0.2s; }
+        .card:nth-child(5) { animation-delay: 0.25s; }
+        .card:nth-child(6) { animation-delay: 0.3s; }
+        .card:nth-child(7) { animation-delay: 0.35s; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-header {
+            padding: 1.2rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .card-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            font-size: 0.9rem;
+        }
+
+        .card-icon.green { background: var(--green-bg); border: 1px solid rgba(0, 255, 136, 0.2); }
+        .card-icon.amber { background: var(--amber-bg); border: 1px solid rgba(255, 183, 0, 0.2); }
+        .card-icon.red { background: var(--red-bg); border: 1px solid rgba(255, 59, 92, 0.2); }
+        .card-icon.cyan { background: rgba(0, 212, 255, 0.08); border: 1px solid rgba(0, 212, 255, 0.2); }
+
+        .card-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .card-tag {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            border: 1px solid;
+        }
+
+        .tag-public { color: var(--green); border-color: rgba(0, 255, 136, 0.3); background: var(--green-bg); }
+        .tag-protected { color: var(--amber); border-color: rgba(255, 183, 0, 0.3); background: var(--amber-bg); }
+        .tag-admin { color: var(--red); border-color: rgba(255, 59, 92, 0.3); background: var(--red-bg); }
+
+        .card-body {
+            padding: 1.2rem 1.5rem;
+        }
+
+        .card-desc {
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        /* ═══ FORM ELEMENTS ═══ */
+        .field {
+            margin-bottom: 0.8rem;
+        }
+
+        .field label {
+            display: block;
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            margin-bottom: 0.35rem;
+        }
+
+        .field input, .field textarea {
+            width: 100%;
+            padding: 0.65rem 0.9rem;
+            background: var(--bg-deep);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .field input:focus, .field textarea:focus {
+            outline: none;
+            border-color: var(--green);
+            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1);
+        }
+
+        .field textarea { resize: vertical; min-height: 80px; }
+
+        .field-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.8rem;
+        }
+
+        /* Honeypot */
+        .hidden-field { position: absolute; left: -9999px; }
+        .invisible-field { display: none !important; }
+        .opacity-field { opacity: 0; height: 0; width: 0; overflow: hidden; }
+
+        /* ═══ BUTTONS ═══ */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.03em;
+        }
+
+        .btn-primary {
+            background: var(--green);
+            color: var(--bg-deep);
+        }
+
+        .btn-primary:hover {
+            background: #00e07a;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.25);
+        }
+
+        .btn-amber {
+            background: var(--amber);
+            color: var(--bg-deep);
+        }
+
+        .btn-amber:hover {
+            box-shadow: 0 0 20px rgba(255, 183, 0, 0.25);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        /* ═══ RESPONSE PANELS ═══ */
+        .response-panel {
+            margin-top: 1rem;
+            border-radius: 8px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .response-panel.visible { display: block; animation: fadeUp 0.3s ease-out; }
+
+        .response-bar {
+            padding: 0.5rem 0.9rem;
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .response-bar.ok { background: rgba(0, 255, 136, 0.1); color: var(--green); }
+        .response-bar.err { background: rgba(255, 59, 92, 0.1); color: var(--red); }
+
+        .response-body {
+            background: var(--bg-deep);
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            padding: 0.8rem;
+            max-height: 300px;
+            overflow: auto;
+        }
+
+        .response-body pre {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* Rate counter */
+        .rate-display {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .rate-count {
+            font-family: var(--mono);
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--cyan);
+        }
+
+        .rate-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* ═══ FOOTER ═══ */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: var(--mono);
+            border-top: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+
+        /* ═══ SCROLLBAR ═══ */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-deep); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ═══ RESPONSIVE ═══ */
+        @media (max-width: 900px) {
+            .cards-grid { grid-template-columns: 1fr; }
+            .header-inner { flex-wrap: wrap; }
+            .stats-bar { grid-template-columns: repeat(2, 1fr); }
+            .main { padding: 1rem; }
+            .field-row { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 500px) {
+            .stats-bar { grid-template-columns: 1fr; }
+            .status-cluster { display: none; }
+        }
     </style>
-    <!-- Google reCAPTCHA v3 -->
-    <script src="https://www.google.com/recaptcha/api.js?render=YOUR_SITE_KEY_HERE"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>🛡️ Anti-Scraping Server Test Interface</h1>
-        
-        <div class="info-box">
-            <h3>ℹ️ Information</h3>
-            <p>This page demonstrates various anti-scraping techniques implemented in the NestJS server:</p>
-            <ul>
-                <li><strong>Rate Limiting:</strong> Limits the number of requests from an IP</li>
-                <li><strong>User-Agent Filtering:</strong> Blocks suspicious or known bot user agents</li>
-                <li><strong>IP Blacklisting:</strong> Blocks requests from blacklisted IPs</li>
-                <li><strong>Honeypot Fields:</strong> Hidden fields that only bots would fill</li>
-                <li><strong>reCAPTCHA v3:</strong> Google's invisible bot detection</li>
-                <li><strong>Headless Browser Detection:</strong> Detects automated browsers</li>
-            </ul>
-        </div>
 
-        <!-- Test 1: Public Data -->
-        <div class="test-section">
-            <h2>📊 Test 1: Public Data (Basic Protection)</h2>
-            <p>This endpoint has only basic rate limiting.</p>
-            <button onclick="fetchPublicData()">Fetch Public Data</button>
-            <div id="public-response" class="response" style="display:none;"></div>
-        </div>
-
-        <!-- Test 2: Protected Data -->
-        <div class="test-section">
-            <h2>🔒 Test 2: Protected Data (Full Protection)</h2>
-            <p>This endpoint uses IP blacklist, User-Agent, and Headless browser detection.</p>
-            <button onclick="fetchProtectedData()">Fetch Protected Data</button>
-            <div id="protected-response" class="response" style="display:none;"></div>
-        </div>
-
-        <!-- Test 3: Contact Form with Honeypot -->
-        <div class="test-section">
-            <h2>📧 Test 3: Contact Form (Honeypot + reCAPTCHA)</h2>
-            <p>This form includes hidden honeypot fields and reCAPTCHA protection.</p>
-            
-            <form id="contact-form" data-recaptcha data-recaptcha-action="contact">
-                <div class="form-group">
-                    <label for="name">Name *</label>
-                    <input type="text" id="name" name="name" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="email">Email *</label>
-                    <input type="email" id="email" name="email" required>
-                </div>
-                
-                <!-- Honeypot Field 1: Hidden with CSS -->
-                <div class="hidden-field" aria-hidden="true">
-                    <label for="email_confirm">Please leave this field empty</label>
-                    <input type="text" name="email_confirm" id="email_confirm" tabindex="-1" autocomplete="off">
-                </div>
-                
-                <!-- Honeypot Field 2: Display none -->
-                <div class="invisible-field">
-                    <input type="text" name="website" placeholder="Your website">
-                </div>
-                
-                <!-- Honeypot Field 3: Zero opacity -->
-                <div class="opacity-field">
-                    <input type="text" name="phone_verify" placeholder="Phone verification">
-                </div>
-                
-                <div class="form-group">
-                    <label for="message">Message *</label>
-                    <textarea id="message" name="message" rows="4" required></textarea>
-                </div>
-                
-                <button type="submit">Send Message</button>
-            </form>
-            
-            <div id="contact-response" class="response" style="display:none;"></div>
-        </div>
-
-        <!-- Test 4: Rate Limit Test -->
-        <div class="test-section">
-            <h2>⏱️ Test 4: Rate Limit Test</h2>
-            <p>Click rapidly to test rate limiting (3 requests per 10 seconds).</p>
-            <button onclick="testRateLimit()">Test Rate Limit</button>
-            <div>Requests made: <span id="rate-counter">0</span></div>
-            <div id="rate-response" class="response" style="display:none;"></div>
-        </div>
-
-        <!-- Test 5: Search (Headless Detection) -->
-        <div class="test-section">
-            <h2>🔍 Test 5: Search API (Headless Detection)</h2>
-            <p>This endpoint detects headless browsers and automation tools.</p>
-            <div class="form-group">
-                <input type="text" id="search-query" placeholder="Enter search query...">
+<!-- ═══ HEADER ═══ -->
+<header class="header">
+    <div class="header-inner">
+        <div class="logo">
+            <div class="logo-icon">🛡</div>
+            <div>
+                <div class="logo-text">SHIELD</div>
+                <div class="logo-sub">Anti-Scraping Command Center</div>
             </div>
-            <button onclick="performSearch()">Search</button>
-            <div id="search-response" class="response" style="display:none;"></div>
         </div>
-
-        <!-- Admin Section -->
-        <div class="test-section">
-            <h2>⚙️ Admin: Blacklist Management</h2>
-            
-            <div class="form-group">
-                <button onclick="getBlacklistStats()">Get Blacklist Stats</button>
+        <div class="status-cluster">
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                <span>ALL SYSTEMS NOMINAL</span>
             </div>
-            
-            <div class="form-group">
-                <label>Add IP to Blacklist:</label>
-                <input type="text" id="blacklist-ip" placeholder="192.168.1.100">
-                <input type="text" id="blacklist-reason" placeholder="Reason (optional)">
-                <input type="number" id="blacklist-ttl" placeholder="TTL in seconds (optional)">
-                <button onclick="addToBlacklist()">Add to Blacklist</button>
-            </div>
-            
-            <div id="admin-response" class="response" style="display:none;"></div>
+            <div class="clock" id="clock"></div>
         </div>
+    </div>
+</header>
 
-        <div class="warning-box">
-            <h3>⚠️ Testing Tips</h3>
-            <ul>
-                <li>Open Developer Tools to see network requests and console logs</li>
-                <li>Try using curl or Postman to see how the server blocks non-browser clients</li>
-                <li>Use a VPN to test IP-based restrictions</li>
-                <li>Try automated testing tools like Puppeteer to trigger headless detection</li>
-                <li>Fill in the honeypot fields (if you can find them) to trigger bot detection</li>
-            </ul>
+<!-- ═══ MAIN ═══ -->
+<main class="main">
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+        <div class="stat-card green">
+            <div class="stat-label">Security Layers</div>
+            <div class="stat-value">5</div>
+        </div>
+        <div class="stat-card cyan">
+            <div class="stat-label">Uptime</div>
+            <div class="stat-value" id="uptime">--:--:--</div>
+        </div>
+        <div class="stat-card amber">
+            <div class="stat-label">Requests Tested</div>
+            <div class="stat-value" id="req-count">0</div>
+        </div>
+        <div class="stat-card red">
+            <div class="stat-label">Threats Blocked</div>
+            <div class="stat-value" id="block-count">0</div>
         </div>
     </div>
 
-    <script>
-        const API_BASE = 'http://localhost:3000';
-        const RECAPTCHA_SITE_KEY = 'YOUR_SITE_KEY_HERE'; // Replace with your actual site key
-        
-        // Browser fingerprinting and headless detection
-        (function() {
-            // Detect headless browser characteristics
-            function detectHeadlessBrowser() {
-                const results = {
-                    webdriver: navigator.webdriver || false,
-                    headless: /HeadlessChrome/.test(navigator.userAgent),
-                    plugins: navigator.plugins.length,
-                    languages: navigator.languages || [],
-                    screen: {
-                        width: window.screen.width,
-                        height: window.screen.height,
-                        colorDepth: window.screen.colorDepth
-                    }
-                };
-                
-                // Add fingerprint to all requests
-                window._browserFingerprint = results;
-                return results;
-            }
-            
-            // Run detection on page load
-            const fingerprint = detectHeadlessBrowser();
-            console.log('Browser fingerprint:', fingerprint);
-            
-            // Add timestamp to forms for timing-based honeypot
-            document.addEventListener('DOMContentLoaded', function() {
-                const forms = document.querySelectorAll('form');
-                forms.forEach(form => {
-                    const timestampField = document.createElement('input');
-                    timestampField.type = 'hidden';
-                    timestampField.name = '_timestamp';
-                    timestampField.value = Date.now();
-                    form.appendChild(timestampField);
-                });
-            });
-        })();
-        
-        // Helper function to display responses
-        function displayResponse(elementId, data, isError = false) {
-            const element = document.getElementById(elementId);
-            element.style.display = 'block';
-            element.className = `response ${isError ? 'error' : 'success'}`;
-            
-            if (typeof data === 'object') {
-                element.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-            } else {
-                element.innerHTML = data;
-            }
-        }
-        
-        // Helper function for fetch with browser fingerprint
-        async function fetchWithFingerprint(url, options = {}) {
-            const headers = options.headers || {};
-            headers['X-Browser-Fingerprint'] = JSON.stringify(window._browserFingerprint);
-            
-            return fetch(url, {
-                ...options,
-                headers
-            });
-        }
-        
-        // Test functions
-        async function fetchPublicData() {
-            try {
-                const response = await fetchWithFingerprint(`${API_BASE}/api/public/data`);
-                const data = await response.json();
-                displayResponse('public-response', data, !response.ok);
-            } catch (error) {
-                displayResponse('public-response', error.message, true);
-            }
-        }
-        
-        async function fetchProtectedData() {
-            try {
-                const response = await fetchWithFingerprint(`${API_BASE}/api/public/stats`);
-                const data = await response.json();
-                displayResponse('protected-response', data, !response.ok);
-            } catch (error) {
-                displayResponse('protected-response', error.message, true);
-            }
-        }
-        
-        // Contact form submission
-        document.getElementById('contact-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData);
-            
-            // Add browser properties for headless detection
-            data._browserProps = window._browserFingerprint;
-            
-            // Get reCAPTCHA token if configured
-            if (RECAPTCHA_SITE_KEY !== 'YOUR_SITE_KEY_HERE') {
-                try {
-                    const token = await grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'contact'});
-                    data.recaptchaToken = token;
-                } catch (error) {
-                    console.error('reCAPTCHA error:', error);
+    <!-- ═══ ENDPOINT TESTS ═══ -->
+    <div class="section-label">Endpoint Security Tests</div>
+
+    <div class="cards-grid">
+
+        <!-- Card 1: Public Data -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon green">📊</div>
+                    <span class="card-name">Public Data</span>
+                </div>
+                <span class="card-tag tag-public">Public</span>
+            </div>
+            <div class="card-body">
+                <p class="card-desc">Basic rate limiting only. Open endpoint for public data access.</p>
+                <button class="btn btn-primary" onclick="fetchPublicData()">▶ Execute</button>
+                <div id="public-response" class="response-panel"></div>
+            </div>
+        </div>
+
+        <!-- Card 2: Protected Data -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon amber">🔒</div>
+                    <span class="card-name">Protected Stats</span>
+                </div>
+                <span class="card-tag tag-protected">Protected</span>
+            </div>
+            <div class="card-body">
+                <p class="card-desc">IP blacklist + User-Agent filter + headless browser detection.</p>
+                <button class="btn btn-primary" onclick="fetchProtectedData()">▶ Execute</button>
+                <div id="protected-response" class="response-panel"></div>
+            </div>
+        </div>
+
+        <!-- Card 3: Contact Form -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon amber">📧</div>
+                    <span class="card-name">Form Submission</span>
+                </div>
+                <span class="card-tag tag-protected">Honeypot</span>
+            </div>
+            <div class="card-body">
+                <p class="card-desc">Hidden honeypot fields trap automated submissions.</p>
+                <form id="contact-form">
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Name</label>
+                            <input type="text" id="name" name="name" required placeholder="John Doe">
+                        </div>
+                        <div class="field">
+                            <label>Email</label>
+                            <input type="email" id="email" name="email" required placeholder="john@example.com">
+                        </div>
+                    </div>
+                    <!-- Honeypot Fields -->
+                    <div class="hidden-field" aria-hidden="true">
+                        <label for="email_confirm">Leave empty</label>
+                        <input type="text" name="email_confirm" id="email_confirm" tabindex="-1" autocomplete="off">
+                    </div>
+                    <div class="invisible-field">
+                        <input type="text" name="website" placeholder="website">
+                    </div>
+                    <div class="opacity-field">
+                        <input type="text" name="phone_verify" placeholder="phone">
+                    </div>
+                    <div class="field">
+                        <label>Message</label>
+                        <textarea id="message" name="message" required placeholder="Type your message..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">▶ Submit</button>
+                </form>
+                <div id="contact-response" class="response-panel"></div>
+            </div>
+        </div>
+
+        <!-- Card 4: Rate Limit -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon cyan">⏱</div>
+                    <span class="card-name">Rate Limiter</span>
+                </div>
+                <span class="card-tag tag-public">Throttle</span>
+            </div>
+            <div class="card-body">
+                <p class="card-desc">Click rapidly to trigger rate limiting protection.</p>
+                <div class="rate-display">
+                    <span class="rate-count" id="rate-counter">0</span>
+                    <span class="rate-label">requests<br>sent</span>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="testRateLimit()">▶ Fire Request</button>
+                </div>
+                <div id="rate-response" class="response-panel"></div>
+            </div>
+        </div>
+
+        <!-- Card 5: Search -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon green">🔍</div>
+                    <span class="card-name">Search API</span>
+                </div>
+                <span class="card-tag tag-public">Public</span>
+            </div>
+            <div class="card-body">
+                <p class="card-desc">Search endpoint with headless browser detection layer.</p>
+                <div class="field">
+                    <label>Query</label>
+                    <input type="text" id="search-query" placeholder="Enter search term...">
+                </div>
+                <button class="btn btn-primary" onclick="performSearch()">▶ Search</button>
+                <div id="search-response" class="response-panel"></div>
+            </div>
+        </div>
+
+        <!-- Card 6: Admin Stats -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon red">⚙</div>
+                    <span class="card-name">Blacklist Stats</span>
+                </div>
+                <span class="card-tag tag-admin">Admin</span>
+            </div>
+            <div class="card-body">
+                <p class="card-desc">View IP blocking statistics. Requires admin JWT token.</p>
+                <button class="btn btn-amber" onclick="getBlacklistStats()">▶ Fetch Stats</button>
+                <div id="admin-response" class="response-panel"></div>
+            </div>
+        </div>
+
+        <!-- Card 7: IP Blocking -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon red">🚫</div>
+                    <span class="card-name">IP Block Manager</span>
+                </div>
+                <span class="card-tag tag-admin">Admin</span>
+            </div>
+            <div class="card-body">
+                <p class="card-desc">Add IPs to the blacklist with reason and expiry.</p>
+                <div class="field">
+                    <label>IP Address</label>
+                    <input type="text" id="blacklist-ip" placeholder="192.168.1.100">
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label>Reason</label>
+                        <input type="text" id="blacklist-reason" placeholder="MANUAL_ADMIN_ACTION">
+                    </div>
+                    <div class="field">
+                        <label>TTL (seconds)</label>
+                        <input type="number" id="blacklist-ttl" placeholder="86400">
+                    </div>
+                </div>
+                <button class="btn btn-amber" onclick="addToBlacklist()">▶ Block IP</button>
+                <div id="blacklist-response" class="response-panel"></div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<footer class="footer">
+    SHIELD v2.2.0 — Anti-Scraping Server &middot; Built with NestJS + TypeScript
+</footer>
+
+<script>
+    const API_BASE = 'http://localhost:3000';
+
+    // ═══ CLOCK & UPTIME ═══
+    const startTime = Date.now();
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clock').textContent =
+            now.toLocaleTimeString('en-US', { hour12: false }) + ' UTC' + (now.getTimezoneOffset() > 0 ? '-' : '+') + Math.abs(now.getTimezoneOffset() / 60);
+
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+        const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+        const s = String(elapsed % 60).padStart(2, '0');
+        document.getElementById('uptime').textContent = `${h}:${m}:${s}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ═══ COUNTERS ═══
+    let reqTotal = 0;
+    let blockTotal = 0;
+
+    function bumpReq() {
+        reqTotal++;
+        document.getElementById('req-count').textContent = reqTotal;
+    }
+    function bumpBlock() {
+        blockTotal++;
+        document.getElementById('block-count').textContent = blockTotal;
+    }
+
+    // ═══ FINGERPRINT ═══
+    (function() {
+        function detectHeadlessBrowser() {
+            return {
+                webdriver: navigator.webdriver || false,
+                headless: /HeadlessChrome/.test(navigator.userAgent),
+                plugins: navigator.plugins.length,
+                languages: navigator.languages || [],
+                screen: {
+                    width: window.screen.width,
+                    height: window.screen.height,
+                    colorDepth: window.screen.colorDepth
                 }
-            }
-            
-            try {
-                const response = await fetchWithFingerprint(`${API_BASE}/test/action`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                displayResponse('contact-response', result, !response.ok);
-                
-                if (response.ok) {
-                    e.target.reset();
-                }
-            } catch (error) {
-                displayResponse('contact-response', error.message, true);
-            }
-        });
-        
-        // Rate limit test
-        let rateCounter = 0;
-        async function testRateLimit() {
-            rateCounter++;
-            document.getElementById('rate-counter').textContent = rateCounter;
-            
-            try {
-                const response = await fetchWithFingerprint(`${API_BASE}/test`);
-                const data = await response.json();
-                displayResponse('rate-response', data, !response.ok);
-            } catch (error) {
-                displayResponse('rate-response', error.message, true);
-            }
-        }
-        
-        // Search function
-        async function performSearch() {
-            const query = document.getElementById('search-query').value;
-            if (!query) {
-                alert('Please enter a search query');
-                return;
-            }
-            
-            try {
-                const response = await fetchWithFingerprint(`${API_BASE}/api/public/search/${encodeURIComponent(query)}`);
-                const data = await response.json();
-                displayResponse('search-response', data, !response.ok);
-            } catch (error) {
-                displayResponse('search-response', error.message, true);
-            }
-        }
-        
-        // Admin functions
-        async function getBlacklistStats() {
-            try {
-                const response = await fetchWithFingerprint(`${API_BASE}/admin/security/statistics`);
-                const data = await response.json();
-                displayResponse('admin-response', data, !response.ok);
-            } catch (error) {
-                displayResponse('admin-response', error.message, true);
-            }
-        }
-        
-        async function addToBlacklist() {
-            const ip = document.getElementById('blacklist-ip').value;
-            if (!ip) {
-                alert('Please enter an IP address');
-                return;
-            }
-            
-            const data = {
-                ip,
-                reason: document.getElementById('blacklist-reason').value || 'manual',
-                ttl: parseInt(document.getElementById('blacklist-ttl').value) || undefined
             };
-            
-            try {
-                const response = await fetchWithFingerprint(`${API_BASE}/admin/security/blacklist/ip`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                displayResponse('admin-response', result, !response.ok);
-                
-                if (response.ok) {
-                    document.getElementById('blacklist-ip').value = '';
-                    document.getElementById('blacklist-reason').value = '';
-                    document.getElementById('blacklist-ttl').value = '';
-                }
-            } catch (error) {
-                displayResponse('admin-response', error.message, true);
-            }
         }
-    </script>
+        window._browserFingerprint = detectHeadlessBrowser();
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('form').forEach(form => {
+                const ts = document.createElement('input');
+                ts.type = 'hidden'; ts.name = '_timestamp'; ts.value = Date.now();
+                form.appendChild(ts);
+            });
+        });
+    })();
+
+    // ═══ RESPONSE DISPLAY ═══
+    function displayResponse(elementId, data, isError = false) {
+        const el = document.getElementById(elementId);
+        const json = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+        const barClass = isError ? 'err' : 'ok';
+        const barText = isError ? '✕ Error Response' : '✓ Success Response';
+
+        el.className = 'response-panel visible';
+        el.innerHTML = `
+            <div class="response-bar ${barClass}">${barText}</div>
+            <div class="response-body"><pre>${json}</pre></div>
+        `;
+
+        if (isError) bumpBlock();
+    }
+
+    // ═══ FETCH HELPER ═══
+    async function fetchWithFingerprint(url, options = {}) {
+        const headers = options.headers || {};
+        headers['X-Browser-Fingerprint'] = JSON.stringify(window._browserFingerprint);
+        return fetch(url, { ...options, headers });
+    }
+
+    // ═══ TEST FUNCTIONS ═══
+    async function fetchPublicData() {
+        bumpReq();
+        try {
+            const r = await fetchWithFingerprint(`${API_BASE}/api/public/data`);
+            const d = await r.json();
+            displayResponse('public-response', d, !r.ok);
+        } catch (e) { displayResponse('public-response', e.message, true); }
+    }
+
+    async function fetchProtectedData() {
+        bumpReq();
+        try {
+            const r = await fetchWithFingerprint(`${API_BASE}/api/public/stats`);
+            const d = await r.json();
+            displayResponse('protected-response', d, !r.ok);
+        } catch (e) { displayResponse('protected-response', e.message, true); }
+    }
+
+    document.getElementById('contact-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        bumpReq();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData);
+        data._browserProps = window._browserFingerprint;
+
+        try {
+            const r = await fetchWithFingerprint(`${API_BASE}/test/action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await r.json();
+            displayResponse('contact-response', result, !r.ok);
+            if (r.ok) e.target.reset();
+        } catch (e2) { displayResponse('contact-response', e2.message, true); }
+    });
+
+    let rateCounter = 0;
+    async function testRateLimit() {
+        rateCounter++;
+        bumpReq();
+        document.getElementById('rate-counter').textContent = rateCounter;
+        try {
+            const r = await fetchWithFingerprint(`${API_BASE}/test`);
+            const d = await r.json();
+            displayResponse('rate-response', d, !r.ok);
+        } catch (e) { displayResponse('rate-response', e.message, true); }
+    }
+
+    async function performSearch() {
+        const q = document.getElementById('search-query').value;
+        if (!q) return alert('Enter a search query');
+        bumpReq();
+        try {
+            const r = await fetchWithFingerprint(`${API_BASE}/api/public/search/${encodeURIComponent(q)}`);
+            const d = await r.json();
+            displayResponse('search-response', d, !r.ok);
+        } catch (e) { displayResponse('search-response', e.message, true); }
+    }
+
+    async function getBlacklistStats() {
+        bumpReq();
+        try {
+            const r = await fetchWithFingerprint(`${API_BASE}/admin/security/statistics`);
+            const d = await r.json();
+            displayResponse('admin-response', d, !r.ok);
+        } catch (e) { displayResponse('admin-response', e.message, true); }
+    }
+
+    async function addToBlacklist() {
+        const ip = document.getElementById('blacklist-ip').value;
+        if (!ip) return alert('Enter an IP address');
+        bumpReq();
+        const data = {
+            ip,
+            reason: document.getElementById('blacklist-reason').value || 'MANUAL_ADMIN_ACTION',
+            ttl: parseInt(document.getElementById('blacklist-ttl').value) || undefined
+        };
+        try {
+            const r = await fetchWithFingerprint(`${API_BASE}/admin/security/blacklist/ip`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await r.json();
+            displayResponse('blacklist-response', result, !r.ok);
+            if (r.ok) {
+                document.getElementById('blacklist-ip').value = '';
+                document.getElementById('blacklist-reason').value = '';
+                document.getElementById('blacklist-ttl').value = '';
+            }
+        } catch (e) { displayResponse('blacklist-response', e.message, true); }
+    }
+</script>
 </body>
 </html>

@@ -545,8 +545,8 @@
     <!-- Stats Bar -->
     <div class="stats-bar">
         <div class="stat-card green">
-            <div class="stat-label">Security Layers</div>
-            <div class="stat-value">5</div>
+            <div class="stat-label">Security Chain</div>
+            <div class="stat-value" style="font-size:1rem;">5 ACTIVE</div>
         </div>
         <div class="stat-card cyan">
             <div class="stat-label">Uptime</div>
@@ -574,7 +574,7 @@
                     <div class="card-icon green">📊</div>
                     <span class="card-name">Public Data</span>
                 </div>
-                <span class="card-tag tag-public">Public</span>
+                <span class="card-tag tag-public">🛡 5 Guards</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">Basic rate limiting only. Open endpoint for public data access.</p>
@@ -590,7 +590,7 @@
                     <div class="card-icon amber">🔒</div>
                     <span class="card-name">Protected Stats</span>
                 </div>
-                <span class="card-tag tag-protected">Protected</span>
+                <span class="card-tag tag-public">🛡 5 Guards</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">IP blacklist + User-Agent filter + headless browser detection.</p>
@@ -606,7 +606,7 @@
                     <div class="card-icon amber">📧</div>
                     <span class="card-name">Form Submission</span>
                 </div>
-                <span class="card-tag tag-protected">Honeypot</span>
+                <span class="card-tag tag-public">🛡 5 Guards</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">Hidden honeypot fields trap automated submissions.</p>
@@ -649,7 +649,7 @@
                     <div class="card-icon cyan">⏱</div>
                     <span class="card-name">Rate Limiter</span>
                 </div>
-                <span class="card-tag tag-public">Throttle</span>
+                <span class="card-tag tag-public">🛡 5 Guards</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">Click rapidly to trigger rate limiting protection.</p>
@@ -671,7 +671,7 @@
                     <div class="card-icon green">🔍</div>
                     <span class="card-name">Search API</span>
                 </div>
-                <span class="card-tag tag-public">Public</span>
+                <span class="card-tag tag-public">🛡 5 Guards</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">Search endpoint with headless browser detection layer.</p>
@@ -691,7 +691,7 @@
                     <div class="card-icon red">⚙</div>
                     <span class="card-name">Blacklist Stats</span>
                 </div>
-                <span class="card-tag tag-admin">Admin</span>
+                <span class="card-tag tag-admin">🛡 5 Guards + JWT</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">View IP blocking statistics. Requires admin JWT token.</p>
@@ -707,7 +707,7 @@
                     <div class="card-icon red">🚫</div>
                     <span class="card-name">IP Block Manager</span>
                 </div>
-                <span class="card-tag tag-admin">Admin</span>
+                <span class="card-tag tag-admin">🛡 5 Guards + JWT</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">Add IPs to the blacklist with reason and expiry.</p>
@@ -727,6 +727,27 @@
                 </div>
                 <button class="btn btn-amber" onclick="addToBlacklist()">▶ Block IP</button>
                 <div id="blacklist-response" class="response-panel"></div>
+            </div>
+        </div>
+
+        <!-- Card 8: Security Chain Tester -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon red">⚔</div>
+                    <span class="card-name">Security Chain Tester</span>
+                </div>
+                <span class="card-tag tag-protected">Attack Simulation</span>
+            </div>
+            <div class="card-body">
+                <p class="card-desc">Intentionally trigger each security layer to verify the chain is working.</p>
+                <div class="btn-group" style="flex-wrap: wrap; gap: 0.5rem;">
+                    <button class="btn btn-primary" onclick="testNormalRequest()">✓ Normal Request</button>
+                    <button class="btn btn-outline" onclick="testBotUA()">🤖 Bot UA (Scrapy)</button>
+                    <button class="btn btn-outline" onclick="testHeadlessUA()">👻 Headless Chrome</button>
+                    <button class="btn btn-outline" onclick="testRapidFire()">⏱ Rapid Fire (x25)</button>
+                </div>
+                <div id="chain-response" class="response-panel"></div>
             </div>
         </div>
 
@@ -911,6 +932,72 @@
                 document.getElementById('blacklist-ttl').value = '';
             }
         } catch (e) { displayResponse('blacklist-response', e.message, true); }
+    }
+
+    // ═══ SECURITY CHAIN TEST FUNCTIONS ═══
+    async function testNormalRequest() {
+        bumpReq();
+        try {
+            const r = await fetch(`${API_BASE}/api/public/data`);
+            const d = await r.json();
+            displayResponse('chain-response', { test: 'Normal Browser Request', status: r.status, guards: '5/5 passed', data: d }, !r.ok);
+        } catch (e) { displayResponse('chain-response', e.message, true); }
+    }
+
+    async function testBotUA() {
+        bumpReq();
+        try {
+            const r = await fetch(`${API_BASE}/api/public/data`, {
+                headers: { 'User-Agent': 'Scrapy/2.11' }
+            });
+            const d = await r.json();
+            if (r.status === 403) bumpBlock();
+            displayResponse('chain-response', {
+                test: 'Bot User-Agent (Scrapy)',
+                status: r.status,
+                blocked: r.status === 403,
+                guard: 'UserAgentGuard',
+                data: d
+            }, r.status === 403);
+        } catch (e) { displayResponse('chain-response', e.message, true); }
+    }
+
+    async function testHeadlessUA() {
+        bumpReq();
+        try {
+            const r = await fetch(`${API_BASE}/api/public/data`, {
+                headers: { 'User-Agent': 'Mozilla/5.0 HeadlessChrome/120.0.0.0' }
+            });
+            const d = await r.json();
+            if (r.status === 403) bumpBlock();
+            displayResponse('chain-response', {
+                test: 'Headless Browser (HeadlessChrome)',
+                status: r.status,
+                blocked: r.status === 403,
+                guard: 'HeadlessBrowserGuard',
+                data: d
+            }, r.status === 403);
+        } catch (e) { displayResponse('chain-response', e.message, true); }
+    }
+
+    async function testRapidFire() {
+        const results = [];
+        for (let i = 0; i < 25; i++) {
+            bumpReq();
+            try {
+                const r = await fetch(`${API_BASE}/api/public/data`);
+                results.push({ request: i + 1, status: r.status });
+                if (r.status === 429) { bumpBlock(); break; }
+            } catch (e) { results.push({ request: i + 1, error: e.message }); break; }
+        }
+        const blocked = results.find(r => r.status === 429);
+        displayResponse('chain-response', {
+            test: 'Rapid Fire (Rate Limit)',
+            totalSent: results.length,
+            blockedAt: blocked ? `Request #${blocked.request}` : 'Not triggered',
+            guard: 'ThrottlerGuard',
+            results: results.slice(-5)
+        }, !!blocked);
     }
 </script>
 </body>

@@ -2,6 +2,8 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { SkipIpBlacklist } from './common/guards/ip-blacklist.guard';
+import { SkipUserAgent } from './common/guards/user-agent.guard';
+import { SkipHeadlessBrowser } from './common/guards/headless-browser.guard';
 import { ResponseBuilder } from './common/utils/response.builder';
 
 @ApiTags('Application')
@@ -10,6 +12,8 @@ export class AppController {
   @Get()
   @SkipThrottle()
   @SkipIpBlacklist()
+  @SkipUserAgent()
+  @SkipHeadlessBrowser()
   @ApiOperation({ summary: 'Root endpoint' })
   getRoot() {
     return ResponseBuilder.success({

@@ -1,10 +1,17 @@
-import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger, ExecutionContext, SetMetadata } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { AppConfigService } from '../../core/config/config.service';
 import { BaseSecurityGuard } from './base-security.guard';
 import { SecurityEventService } from '../services/security-event.service';
 import { ExtendedRequest } from '../../core/types';
 import { InvalidUserAgentException } from '../exceptions';
 import { SUSPICIOUS_UA_PATTERNS, ALLOWED_BOTS } from '../constants/security.constants';
+
+/**
+ * User-Agent 체크를 건너뛰는 데코레이터
+ */
+export const SKIP_USER_AGENT_KEY = 'skipUserAgent';
+export const SkipUserAgent = () => SetMetadata(SKIP_USER_AGENT_KEY, true);
 
 /**
  * User-Agent Guard
@@ -17,23 +24,30 @@ export class UserAgentGuard extends BaseSecurityGuard {
   private readonly strictMode: boolean;
 
   constructor(
-    private readonly configService: ConfigService,
+    private readonly configService: AppConfigService,
     private readonly securityEventService: SecurityEventService,
+    private readonly reflector: Reflector,
   ) {
     super();
 
-    const blockedAgents = this.configService.get<string>('BLOCKED_USER_AGENTS', '');
-    this.blockedUserAgents = blockedAgents
-      .split(',')
+    const userAgentConfig = this.configService.userAgentConfig;
+    this.blockedUserAgents = userAgentConfig.blockedAgents
       .map(agent => agent.trim().toLowerCase())
       .filter(agent => agent.length > 0);
 
-    this.strictMode = this.configService.get<boolean>('SECURITY_STRICT_MODE', false);
+    this.strictMode = userAgentConfig.strictMode;
 
     this.logger.log(`Initialized with ${this.blockedUserAgents.length} blocked agents, strict mode: ${this.strictMode}`);
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // @SkipUserAgent() 데코레이터가 있으면 건너뜀
+    const skip = this.reflector.getAllAndOverride<boolean>(SKIP_USER_AGENT_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (skip) return true;
+
     const request = context.switchToHttp().getRequest<ExtendedRequest>();
     const userAgent = this.getUserAgent(request);
 

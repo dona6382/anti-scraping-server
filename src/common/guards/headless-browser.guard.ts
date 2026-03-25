@@ -1,9 +1,16 @@
-import { Injectable, Logger, ExecutionContext } from '@nestjs/common';
+import { Injectable, Logger, ExecutionContext, SetMetadata } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { BaseSecurityGuard } from './base-security.guard';
 import { SecurityEventService } from '../services/security-event.service';
 import { ExtendedRequest } from '../../core/types';
 import { HeadlessBrowserException } from '../exceptions';
 import { HEADLESS_SCORES } from '../constants/threshold.constants';
+
+/**
+ * Headless Browser 체크를 건너뛰는 데코레이터
+ */
+export const SKIP_HEADLESS_BROWSER_KEY = 'skipHeadlessBrowser';
+export const SkipHeadlessBrowser = () => SetMetadata(SKIP_HEADLESS_BROWSER_KEY, true);
 
 /**
  * Headless Browser Detection Guard
@@ -13,11 +20,21 @@ import { HEADLESS_SCORES } from '../constants/threshold.constants';
 export class HeadlessBrowserGuard extends BaseSecurityGuard {
   protected override readonly logger = new Logger(HeadlessBrowserGuard.name);
 
-  constructor(private readonly securityEventService: SecurityEventService) {
+  constructor(
+    private readonly securityEventService: SecurityEventService,
+    private readonly reflector: Reflector,
+  ) {
     super();
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // @SkipHeadlessBrowser() 데코레이터가 있으면 건너뜀
+    const skip = this.reflector.getAllAndOverride<boolean>(SKIP_HEADLESS_BROWSER_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (skip) return true;
+
     const request = context.switchToHttp().getRequest<ExtendedRequest>();
 
     try {

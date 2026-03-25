@@ -1,5 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable } from '@nestjs/common';
 
 import { ExtendedRequest } from '../../core/types';
 import { RequestUtils } from '../../common/utils/request.utils';
@@ -31,9 +30,7 @@ export interface SecurityTestResults {
 
 @Injectable()
 export class TestingService {
-  private readonly logger = new Logger(TestingService.name);
-
-  constructor(private readonly configService: ConfigService) {}
+  constructor() {}
 
   async runSecurityTests(request: ExtendedRequest): Promise<SecurityTestResults> {
     const tests: TestResult[] = [];

@@ -1,9 +1,6 @@
 import {
   Controller,
   Get,
-  Post,
-  Body,
-  UseGuards,
   Logger,
   Param,
   HttpCode,
@@ -21,15 +18,12 @@ import {
 import { Throttle } from '@nestjs/throttler';
 
 import { PublicService } from './public.service';
-import { UserAgentGuard } from '../../common/guards/user-agent.guard';
-
 /**
  * Public API Controller
- * 공개 API 엔드포인트 관리 (기본적인 보안만 적용)
+ * 공개 API 엔드포인트 관리 (전역 Guard 체인 적용)
  */
 @ApiTags('Public APIs')
 @Controller('api/public')
-@UseGuards(UserAgentGuard) // 기본 User-Agent 검증
 export class PublicController {
   private readonly logger = new Logger(PublicController.name);
 

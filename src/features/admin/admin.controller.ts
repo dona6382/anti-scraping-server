@@ -3,8 +3,6 @@ import {
   Get,
   Post,
   Delete,
-  Body,
-  Param,
   Logger,
   HttpCode,
   HttpStatus,
@@ -15,8 +13,6 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiParam,
-  ApiBody,
   ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';

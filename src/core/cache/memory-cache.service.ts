@@ -134,16 +134,6 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
   }
 
   /**
-   * 메모리 사용량 정보
-   */
-  getStats() {
-    return {
-      totalKeys: this.cache.size,
-      memoryUsage: process.memoryUsage().heapUsed,
-    };
-  }
-
-  /**
    * 종료 시 정리
    */
   onModuleDestroy() {

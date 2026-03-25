@@ -1,6 +1,6 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ICacheService, BlacklistEntry, SecurityReason, IpStatistics } from '../../core/types';
+import { AppConfigService } from '../../core/config/config.service';
 import { RequestUtils } from '../utils/request.utils';
 
 /**
@@ -15,9 +15,9 @@ export class IpBlacklistService {
 
   constructor(
     @Inject('ICacheService') private readonly cache: ICacheService,
-    private readonly configService: ConfigService,
+    private readonly configService: AppConfigService,
   ) {
-    this.ttl = this.configService.get<number>('IP_BLACKLIST_TTL', 86400);
+    this.ttl = this.configService.ipBlacklistConfig.ttl;
     this.logger.log(`Initialized with TTL: ${this.ttl} seconds`);
   }
 
@@ -73,17 +73,6 @@ export class IpBlacklistService {
   async getBlockReason(ip: string): Promise<string | null> {
     const info = await this.getBlockInfo(ip);
     return info ? info.reason : null;
-  }
-
-  /**
-   * 모든 차단된 IP 조회
-   */
-  async getAllBlockedIps(): Promise<string[]> {
-    const pattern = `${this.keyPrefix}:*`;
-    const keys = await this.cache.keys(pattern);
-    
-    const prefixLen = this.keyPrefix.length + 1; // "prefix:" length
-    return keys.map(key => key.slice(prefixLen));
   }
 
   /**

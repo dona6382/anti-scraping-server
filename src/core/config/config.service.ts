@@ -67,17 +67,8 @@ export class AppConfigService {
     return this.configService.get('database', { infer: true });
   }
 
-  // Logging Configuration
-  get loggingConfig() {
-    return this.configService.get('logging', { infer: true });
-  }
-
   // Utility Methods
   get<T = unknown>(key: keyof AppConfig): T {
     return this.configService.get(key) as T;
-  }
-
-  getOrThrow<T = unknown>(key: keyof AppConfig): T {
-    return this.configService.getOrThrow(key) as T;
   }
 }

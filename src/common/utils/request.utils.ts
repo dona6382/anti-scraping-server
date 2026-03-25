@@ -110,50 +110,6 @@ export class RequestUtils {
   }
 
   /**
-   * Referer 헤더 추출
-   */
-  static extractReferer(request: ExtendedRequest): string | undefined {
-    return this.extractHeader(request, 'referer') || this.extractHeader(request, 'referrer');
-  }
-
-  /**
-   * Origin 헤더 추출
-   */
-  static extractOrigin(request: ExtendedRequest): string | undefined {
-    return this.extractHeader(request, 'origin');
-  }
-
-  /**
-   * Accept-Language 헤더 추출
-   */
-  static extractAcceptLanguage(request: ExtendedRequest): string | undefined {
-    return this.extractHeader(request, 'accept-language');
-  }
-
-  /**
-   * Content-Type 헤더 추출
-   */
-  static extractContentType(request: ExtendedRequest): string | undefined {
-    return this.extractHeader(request, 'content-type');
-  }
-
-  /**
-   * 요청 메서드가 안전한지 확인 (GET, HEAD, OPTIONS)
-   */
-  static isSafeMethod(request: ExtendedRequest): boolean {
-    const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
-    return safeMethods.includes(request.method.toUpperCase());
-  }
-
-  /**
-   * 요청 메서드가 멱등성인지 확인
-   */
-  static isIdempotentMethod(request: ExtendedRequest): boolean {
-    const idempotentMethods = ['GET', 'HEAD', 'PUT', 'DELETE', 'OPTIONS', 'TRACE'];
-    return idempotentMethods.includes(request.method.toUpperCase());
-  }
-
-  /**
    * 봇 User-Agent 확인
    */
   static isBotUserAgent(userAgent: string): boolean {

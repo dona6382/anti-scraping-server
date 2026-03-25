@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { ICacheService } from '../../core/cache/interfaces/cache.interface';
 import { RequestUtils } from '../utils/request.utils';
 
@@ -22,8 +22,6 @@ const SCORE_TTL = 3600;
 
 @Injectable()
 export class ThreatScoreService {
-  private readonly logger = new Logger(ThreatScoreService.name);
-
   constructor(
     @Inject('ICacheService') private readonly cache: ICacheService,
   ) {}

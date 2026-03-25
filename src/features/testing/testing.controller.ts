@@ -7,19 +7,15 @@ import {
   Logger,
   HttpCode,
   HttpStatus,
-  UseGuards,
-  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiQuery,
   ApiBody,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
-import { UserAgentGuard } from '../../common/guards/user-agent.guard';
 import { TestingService, SecurityTestResults } from './testing.service';
 import { TestActionDto } from './dto/test-action.dto';
 import { ExtendedRequest } from '../../core/types';
@@ -49,7 +45,6 @@ export class TestingController {
 
   @Get('security-full')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(UserAgentGuard)
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiOperation({ 
     summary: 'Comprehensive security test',
@@ -62,7 +57,6 @@ export class TestingController {
 
   @Post('action')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(UserAgentGuard)
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ 
     summary: 'Test form submission',

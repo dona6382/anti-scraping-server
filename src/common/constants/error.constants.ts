@@ -35,25 +35,6 @@ export enum ErrorSeverity {
 }
 
 /**
- * Standardized Error Response
- * 표준화된 에러 응답 형식
- */
-export interface StandardErrorResponse {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-    timestamp: string;
-    path?: string;
-    method?: string;
-    requestId?: string;
-    // 개발 환경에서만 노출
-    details?: unknown;
-    stack?: string[];
-  };
-}
-
-/**
  * Internal Error Details
  * 내부 로깅용 상세 정보
  */

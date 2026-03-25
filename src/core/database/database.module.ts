@@ -1,7 +1,6 @@
 import { Module, Global, Logger } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { DatabaseService } from './database.service';
 import { createDatabaseConfig } from './database.config';
 import { AppConfigService } from '../config/config.service';
 
@@ -30,7 +29,6 @@ const logger = new Logger('CoreDatabaseModule');
       inject: [AppConfigService],
     }),
   ],
-  providers: [DatabaseService],
-  exports: [DatabaseService, TypeOrmModule],
+  exports: [TypeOrmModule],
 })
 export class CoreDatabaseModule {}

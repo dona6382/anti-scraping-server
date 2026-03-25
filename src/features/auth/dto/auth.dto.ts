@@ -1,14 +1,12 @@
 import {
   IsString,
   IsEmail,
-  IsOptional,
-  IsEnum,
   MinLength,
   MaxLength,
   IsNotEmpty,
   Matches,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * Login DTO
@@ -54,28 +52,16 @@ export class RegisterDto {
     message: 'Password must contain at least 1 uppercase, 1 number, and 1 special character',
   })
   password: string;
-
-  @ApiPropertyOptional({ example: 'John' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  firstName?: string;
-
-  @ApiPropertyOptional({ example: 'Doe' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  lastName?: string;
 }
 
 /**
- * Create User DTO (admin 용)
+ * Refresh Token DTO
  */
-export class CreateUserDto extends RegisterDto {
-  @ApiPropertyOptional({ enum: ['admin', 'user', 'readonly'], default: 'user' })
-  @IsOptional()
-  @IsEnum(['admin', 'user', 'readonly'])
-  role?: 'admin' | 'user' | 'readonly';
+export class RefreshTokenDto {
+  @ApiProperty({ description: 'Refresh token' })
+  @IsNotEmpty()
+  @IsString()
+  refreshToken: string;
 }
 
 /**

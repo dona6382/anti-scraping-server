@@ -10,21 +10,26 @@ import { AdminModule } from '../../features/admin/admin.module';
 import { TestingModule } from '../../features/testing/testing.module';
 import { AnalysisModule } from '../../features/analysis/analysis.module';
 
+const coreModules = [
+  AuthModule,
+  SecurityModule,
+  HealthModule,
+  ClientInfoModule,
+  PublicModule,
+  AdminModule,
+  AnalysisModule,
+];
+
+// TestingModule은 프로덕션에서 비활성화 (내부 정보 노출 방지)
+const devModules =
+  process.env.NODE_ENV !== 'production' ? [TestingModule] : [];
+
 /**
  * API v1 Module
  *
  * v1 버전의 모든 API 엔드포인트를 관리
  */
 @Module({
-  imports: [
-    AuthModule,
-    SecurityModule,
-    HealthModule,
-    ClientInfoModule,
-    PublicModule,
-    AdminModule,
-    TestingModule,
-    AnalysisModule,
-  ],
+  imports: [...coreModules, ...devModules],
 })
 export class ApiV1Module {}

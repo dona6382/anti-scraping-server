@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import * as os from 'os';
 
 import { ICacheService } from '../../core/cache/interfaces';
+import { AppConfigService } from '../../core/config/config.service';
 import { SystemUtils } from '../../common/utils/system.utils';
 import { HEALTH_THRESHOLDS } from '../../common/constants/threshold.constants';
 
@@ -33,6 +34,7 @@ export class HealthService {
   constructor(
     private readonly dataSource: DataSource,
     @Inject('ICacheService') private readonly cacheService: ICacheService,
+    private readonly configService: AppConfigService,
   ) {}
 
   async getOverallHealth(): Promise<HealthStatus> {
@@ -144,7 +146,7 @@ export class HealthService {
   }
 
   private async checkRedis(): Promise<HealthCheck> {
-    if (!process.env.REDIS_HOST) {
+    if (!this.configService.redisConfig.host) {
       return { name: 'redis', status: 'healthy', message: 'Not configured (in-memory mode)' };
     }
 

@@ -1,19 +1,22 @@
-import { Controller, Get, Req, Logger, Query } from '@nestjs/common';
+import { Controller, Get, Req, Logger, Query, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
 import { ClientInfoService, ClientInfo } from './client-info.service';
 import { RequestUtils } from '../../common/utils/request.utils';
 import { ExtendedRequest } from '../../core/types';
+import { JwtAuthGuard } from '../auth/guards/auth.guards';
 
 @ApiTags('Client Info')
 @Controller('api/client')
 export class ClientInfoController {
   private readonly logger = new Logger(ClientInfoController.name);
-  
+
   constructor(private readonly clientInfoService: ClientInfoService) {}
 
   @Get('info')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get client information' })
   async getClientInfo(@Req() request: Request, @Query('detailed') detailed?: boolean) {
     this.logger.log(`Client info requested from ${RequestUtils.extractClientIp(request as ExtendedRequest)}`);
@@ -49,6 +52,8 @@ export class ClientInfoController {
   }
 
   @Get('security')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get security analysis' })
   async getSecurityAnalysis(@Req() request: Request) {
     const clientInfo = await this.clientInfoService.getClientInfo(request);
@@ -65,6 +70,8 @@ export class ClientInfoController {
   }
 
   @Get('headers')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get header analysis' })
   async getHeaders(@Req() request: Request) {
     const clientInfo = await this.clientInfoService.getClientInfo(request);

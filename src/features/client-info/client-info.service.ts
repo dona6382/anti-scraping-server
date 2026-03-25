@@ -1,6 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Request } from 'express';
-import { AppConfigService } from '../../core/config/config.service';
 import { RequestUtils } from '../../common/utils/request.utils';
 import { ExtendedRequest } from '../../core/types';
 
@@ -71,9 +70,7 @@ export interface ClientInfo {
  */
 @Injectable()
 export class ClientInfoService {
-  private readonly logger = new Logger(ClientInfoService.name);
-
-  constructor(private readonly configService: AppConfigService) {}
+  constructor() {}
 
   /**
    * 전체 클라이언트 정보 수집
@@ -261,10 +258,11 @@ export class ClientInfoService {
    * 헤더 분석
    */
   private analyzeHeaders(request: Request): ClientInfo['headers'] {
+    const SENSITIVE_HEADERS = ['authorization', 'cookie', 'x-api-key', 'x-real-ip', 'x-forwarded-for'];
     const suspiciousHeaders: string[] = [];
     const requiredHeaders = ['accept', 'accept-language', 'user-agent'];
     const missing = requiredHeaders.filter(header => !request.headers[header]);
-    
+
     // 의심스러운 헤더 패턴 확인
     Object.keys(request.headers).forEach(header => {
       const value = request.headers[header];
@@ -272,9 +270,13 @@ export class ClientInfoService {
         suspiciousHeaders.push(header);
       }
     });
-    
+
+    const filteredHeaders = Object.fromEntries(
+      Object.entries(request.headers).filter(([key]) => !SENSITIVE_HEADERS.includes(key.toLowerCase()))
+    );
+
     return {
-      all: request.headers as Record<string, string | string[]>,
+      all: filteredHeaders as Record<string, string | string[]>,
       suspicious: suspiciousHeaders,
       missing,
     };

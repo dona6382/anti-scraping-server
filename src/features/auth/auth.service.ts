@@ -11,8 +11,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 
 import { User } from '../../core/database/entities';
-import { AuthDto, RegisterDto, ChangePasswordDto } from './dto/auth.dto';
+import { AuthDto, RegisterDto, ChangePasswordDto, RefreshTokenDto } from './dto/auth.dto';
 import { ResponseBuilder } from '../../common/utils/response.builder';
+
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_DURATION_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -36,9 +39,16 @@ export class AuthService {
       ...(clientIp && { lastLoginIp: clientIp }),
     });
 
-    const payload = { username: user.username, sub: user.id, role: user.role };
+    const basePayload = { sub: user.id, username: user.username, role: user.role, tokenVersion: user.tokenVersion };
+    const accessToken = this.jwtService.sign(basePayload, { expiresIn: '15m' });
+    const refreshToken = this.jwtService.sign(
+      { sub: user.id, type: 'refresh', tokenVersion: user.tokenVersion },
+      { expiresIn: '7d' },
+    );
+
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: accessToken,
+      refresh_token: refreshToken,
       user: {
         id: user.id,
         username: user.username,
@@ -80,6 +90,37 @@ export class AuthService {
     };
   }
 
+  async refreshToken(dto: RefreshTokenDto) {
+    try {
+      const decoded = this.jwtService.verify(dto.refreshToken) as {
+        sub: string;
+        type?: string;
+        tokenVersion?: number;
+      };
+
+      if (decoded.type !== 'refresh') {
+        throw new UnauthorizedException('Invalid token type');
+      }
+
+      const user = await this.userRepository.findOne({ where: { id: decoded.sub } });
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('User not found or deactivated');
+      }
+
+      if (decoded.tokenVersion !== user.tokenVersion) {
+        throw new UnauthorizedException('Token has been revoked');
+      }
+
+      const payload = { sub: user.id, username: user.username, role: user.role, tokenVersion: user.tokenVersion };
+      return {
+        access_token: this.jwtService.sign(payload, { expiresIn: '15m' }),
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
+
   async changePassword(userId: string, dto: ChangePasswordDto) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
@@ -92,6 +133,7 @@ export class AuthService {
     }
 
     user.password = await bcrypt.hash(dto.newPassword, 12);
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     await this.userRepository.save(user);
 
     return ResponseBuilder.success(null, 'Password changed successfully');
@@ -106,15 +148,39 @@ export class AuthService {
       return null;
     }
 
+    // Check if account is locked
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      throw new UnauthorizedException('Account temporarily locked. Please try again later.');
+    }
+
     if (await bcrypt.compare(password, user.password)) {
+      // Reset failed attempts on successful login
+      if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+        await this.userRepository.update(user.id, {
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        });
+      }
       return user;
     }
+
+    // Increment failed attempts
+    const failedAttempts = (user.failedLoginAttempts || 0) + 1;
+    const updateData: Partial<User> = { failedLoginAttempts: failedAttempts };
+
+    if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+      updateData.lockedUntil = new Date(Date.now() + LOCK_DURATION_MS);
+      this.logger.warn(`Account locked for user: ${username} after ${failedAttempts} failed attempts`);
+    }
+
+    await this.userRepository.update(user.id, updateData);
+
     return null;
   }
 
   async validateToken(token: string): Promise<User> {
     try {
-      const decoded = this.jwtService.verify(token) as { sub: string };
+      const decoded = this.jwtService.verify(token) as { sub: string; tokenVersion?: number };
       if (!decoded?.sub) {
         throw new UnauthorizedException('Invalid token payload');
       }
@@ -127,6 +193,10 @@ export class AuthService {
         throw new UnauthorizedException('User not found or deactivated');
       }
 
+      if (decoded.tokenVersion === undefined || decoded.tokenVersion !== user.tokenVersion) {
+        throw new UnauthorizedException('Token has been revoked');
+      }
+
       return user;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
@@ -134,42 +204,4 @@ export class AuthService {
     }
   }
 
-  /**
-   * Create initial admin user (환경변수에서 비밀번호 가져옴)
-   */
-  async createInitialAdmin(): Promise<void> {
-    const adminExists = await this.userRepository.findOne({
-      where: { role: 'admin' },
-    });
-
-    if (!adminExists) {
-      const adminPassword = process.env.INITIAL_ADMIN_PASSWORD;
-      if (!adminPassword) {
-        this.logger.warn('INITIAL_ADMIN_PASSWORD not set - skipping admin creation');
-        return;
-      }
-
-      const hashedPassword = await bcrypt.hash(adminPassword, 12);
-      const admin = this.userRepository.create({
-        username: 'admin',
-        email: 'admin@example.com',
-        password: hashedPassword,
-        role: 'admin',
-        isActive: true,
-        isEmailVerified: true,
-      });
-      await this.userRepository.save(admin);
-      this.logger.log('Initial admin user created');
-    }
-  }
-
-  async getUsers(page: number, limit: number) {
-    const [users, total] = await this.userRepository.findAndCount({
-      skip: (page - 1) * limit,
-      take: limit,
-      select: ['id', 'username', 'email', 'role', 'isActive', 'createdAt'],
-    });
-
-    return { users, total };
-  }
 }

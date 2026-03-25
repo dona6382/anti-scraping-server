@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
 import { SecurityEvent } from '../../core/database/entities';
@@ -6,8 +6,6 @@ import { RequestUtils } from '../../common/utils/request.utils';
 
 @Injectable()
 export class AnalysisService {
-  private readonly logger = new Logger(AnalysisService.name);
-
   constructor(
     @InjectRepository(SecurityEvent)
     private readonly eventRepo: Repository<SecurityEvent>,

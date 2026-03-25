@@ -1,19 +1,24 @@
 import { ExecutionContext } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
+import { AppConfigService } from '../../core/config/config.service';
 import { UserAgentGuard } from './user-agent.guard';
 import { SecurityEventService } from '../services/security-event.service';
 import { InvalidUserAgentException } from '../exceptions';
 
 describe('UserAgentGuard', () => {
   let guard: UserAgentGuard;
-  let configService: ConfigService;
+  let configService: AppConfigService;
   let securityEventService: SecurityEventService;
+  let reflector: Reflector;
 
   const mockSecurityEventService = {
     log: jest.fn(),
   };
 
   function createMockContext(userAgent: string, url = '/test'): ExecutionContext {
+    const handler = () => ({});
+    const cls = class {};
+
     return {
       switchToHttp: () => ({
         getRequest: () => ({
@@ -25,18 +30,22 @@ describe('UserAgentGuard', () => {
         }),
         getResponse: () => ({}),
       }),
-      getHandler: () => ({}),
-      getClass: () => ({}),
+      getHandler: () => handler,
+      getClass: () => cls,
     } as unknown as ExecutionContext;
   }
 
   beforeEach(() => {
-    configService = new ConfigService({
-      BLOCKED_USER_AGENTS: 'scrapy,python-requests,curl,wget',
-      SECURITY_STRICT_MODE: false,
-    });
+    configService = {
+      userAgentConfig: {
+        blockedAgents: ['scrapy', 'python-requests', 'curl', 'wget'],
+        strictMode: false,
+      },
+    } as unknown as AppConfigService;
     securityEventService = mockSecurityEventService as unknown as SecurityEventService;
-    guard = new UserAgentGuard(configService, securityEventService);
+    reflector = new Reflector();
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
+    guard = new UserAgentGuard(configService, securityEventService, reflector);
   });
 
   afterEach(() => {
@@ -86,13 +95,21 @@ describe('UserAgentGuard', () => {
     expect(await guard.canActivate(context)).toBe(true);
   });
 
+  it('@SkipUserAgent 데코레이터 있으면 건너뜀', async () => {
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(true);
+    const context = createMockContext('Scrapy/2.11');
+    expect(await guard.canActivate(context)).toBe(true);
+  });
+
   describe('Strict Mode', () => {
     beforeEach(() => {
-      configService = new ConfigService({
-        BLOCKED_USER_AGENTS: 'scrapy,curl',
-        SECURITY_STRICT_MODE: true,
-      });
-      guard = new UserAgentGuard(configService, securityEventService);
+      configService = {
+        userAgentConfig: {
+          blockedAgents: ['scrapy', 'curl'],
+          strictMode: true,
+        },
+      } as unknown as AppConfigService;
+      guard = new UserAgentGuard(configService, securityEventService, reflector);
     });
 
     it('빈 User-Agent 차단', async () => {

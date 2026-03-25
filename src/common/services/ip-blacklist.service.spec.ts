@@ -1,4 +1,4 @@
-import { ConfigService } from '@nestjs/config';
+import { AppConfigService } from '../../core/config/config.service';
 import { IpBlacklistService } from './ip-blacklist.service';
 
 describe('IpBlacklistService', () => {
@@ -17,19 +17,15 @@ describe('IpBlacklistService', () => {
     };
 
     const mockConfig = {
-      get: jest.fn((key: string, defaultValue?: any) => {
-        const config: Record<string, any> = {
-          'security.ipBlacklist.ttl': 3600,
-          'security.ipBlacklist.maxMemory': 10000,
-          'security.ipBlacklist.enabled': true,
-        };
-        return config[key] ?? defaultValue;
-      }),
+      ipBlacklistConfig: {
+        ttl: 3600,
+        enabled: true,
+      },
     };
 
     service = new IpBlacklistService(
       mockCache,
-      mockConfig as unknown as ConfigService,
+      mockConfig as unknown as AppConfigService,
     );
   });
 

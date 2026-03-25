@@ -1,16 +1,21 @@
 import { ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { HeadlessBrowserGuard } from './headless-browser.guard';
 import { SecurityEventService } from '../services/security-event.service';
 import { HeadlessBrowserException } from '../exceptions';
 
 describe('HeadlessBrowserGuard', () => {
   let guard: HeadlessBrowserGuard;
+  let reflector: Reflector;
 
   const mockSecurityEventService = {
     log: jest.fn(),
   };
 
   function createMockContext(headers: Record<string, string>): ExecutionContext {
+    const handler = () => ({});
+    const cls = class {};
+
     return {
       switchToHttp: () => ({
         getRequest: () => ({
@@ -22,8 +27,8 @@ describe('HeadlessBrowserGuard', () => {
         }),
         getResponse: () => ({}),
       }),
-      getHandler: () => ({}),
-      getClass: () => ({}),
+      getHandler: () => handler,
+      getClass: () => cls,
     } as unknown as ExecutionContext;
   }
 
@@ -39,8 +44,11 @@ describe('HeadlessBrowserGuard', () => {
   };
 
   beforeEach(() => {
+    reflector = new Reflector();
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
     guard = new HeadlessBrowserGuard(
       mockSecurityEventService as unknown as SecurityEventService,
+      reflector,
     );
     jest.clearAllMocks();
   });
@@ -95,5 +103,14 @@ describe('HeadlessBrowserGuard', () => {
       'user-agent': 'puppeteer-core/21.0.0',
     });
     await expect(guard.canActivate(context)).rejects.toThrow(HeadlessBrowserException);
+  });
+
+  it('@SkipHeadlessBrowser 데코레이터 있으면 건너뜀', async () => {
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(true);
+    const context = createMockContext({
+      ...normalBrowserHeaders,
+      'user-agent': 'Mozilla/5.0 HeadlessChrome/120.0.0.0',
+    });
+    expect(await guard.canActivate(context)).toBe(true);
   });
 });

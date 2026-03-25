@@ -47,9 +47,6 @@ export class SecurityEvent {
   @Column({ type: 'text' })
   description: string;
 
-  @Column({ default: false })
-  resolved: boolean;
-
   @Column({ type: 'uuid', nullable: true })
   userId?: string;
 

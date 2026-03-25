@@ -122,30 +122,6 @@ export abstract class BaseApplicationException extends HttpException {
 }
 
 /**
- * Validation Exception
- */
-export class ValidationException extends BaseApplicationException {
-  constructor(
-    message?: string,
-    validationErrors?: Record<string, string[]>,
-    context?: Record<string, unknown>
-  ) {
-    super(
-      ErrorCodes.VALIDATION_FAILED,
-      ErrorCategory.VALIDATION,
-      ErrorSeverity.LOW,
-      HttpStatus.BAD_REQUEST,
-      {
-        category: ErrorCategory.VALIDATION,
-        severity: ErrorSeverity.LOW,
-        context: { validationErrors, ...context },
-      },
-      message
-    );
-  }
-}
-
-/**
  * Security Exception
  */
 export class SecurityException extends BaseApplicationException {
@@ -184,27 +160,6 @@ export class SecurityException extends BaseApplicationException {
 }
 
 /**
- * Rate Limit Exception
- */
-export class RateLimitException extends SecurityException {
-  constructor(
-    retryAfter: number,
-    limit?: number,
-    context?: Record<string, unknown>
-  ) {
-    super(
-      ErrorCodes.RATE_LIMIT_EXCEEDED,
-      undefined,
-      {
-        retryAfter,
-        limit,
-        ...context,
-      }
-    );
-  }
-}
-
-/**
  * IP Blocked Exception
  */
 export class IpBlockedException extends SecurityException {
@@ -216,146 +171,6 @@ export class IpBlockedException extends SecurityException {
         // IP는 로깅용으로만 저장, 클라이언트에는 노출하지 않음
         ip,
         reason,
-      }
-    );
-  }
-}
-
-/**
- * Bot Detected Exception
- */
-export class BotDetectedException extends SecurityException {
-  constructor(detectionMethod: string, confidence: number) {
-    super(
-      ErrorCodes.BOT_DETECTED,
-      undefined,
-      {
-        // 탐지 방법은 로깅용으로만 저장
-        detectionMethod,
-        confidence,
-      }
-    );
-  }
-}
-
-/**
- * Business Logic Exception
- */
-export class BusinessLogicException extends BaseApplicationException {
-  constructor(
-    message?: string,
-    errorCode: string = ErrorCodes.BUSINESS_RULE_VIOLATION,
-    context?: Record<string, unknown>
-  ) {
-    super(
-      errorCode,
-      ErrorCategory.BUSINESS_LOGIC,
-      ErrorSeverity.MEDIUM,
-      HttpStatus.UNPROCESSABLE_ENTITY,
-      {
-        category: ErrorCategory.BUSINESS_LOGIC,
-        severity: ErrorSeverity.MEDIUM,
-        context: context || {},
-      },
-      message
-    );
-  }
-}
-
-/**
- * Resource Not Found Exception
- */
-export class ResourceNotFoundException extends BusinessLogicException {
-  constructor(resource: string, identifier?: string | number) {
-    super(
-      `${resource} not found`,
-      ErrorCodes.RESOURCE_NOT_FOUND,
-      {
-        resource,
-        // ID는 로깅용으로만 저장
-        identifier,
-      }
-    );
-  }
-}
-
-/**
- * External Service Exception
- */
-export class ExternalServiceException extends BaseApplicationException {
-  constructor(
-    serviceName: string,
-    originalError?: Error,
-    timeout?: boolean
-  ) {
-    const errorCode = timeout 
-      ? ErrorCodes.EXTERNAL_SERVICE_TIMEOUT 
-      : ErrorCodes.EXTERNAL_SERVICE_ERROR;
-
-    super(
-      errorCode,
-      ErrorCategory.EXTERNAL_SERVICE,
-      ErrorSeverity.HIGH,
-      HttpStatus.SERVICE_UNAVAILABLE,
-      originalError ? {
-        category: ErrorCategory.EXTERNAL_SERVICE,
-        severity: ErrorSeverity.HIGH,
-        originalError: originalError,
-        context: {
-          serviceName,
-          timeout: timeout || false,
-        },
-      } : {
-        category: ErrorCategory.EXTERNAL_SERVICE,
-        severity: ErrorSeverity.HIGH,
-        context: {
-          serviceName,
-          timeout: timeout || false,
-        },
-      }
-    );
-  }
-}
-
-/**
- * System Exception
- */
-export class SystemException extends BaseApplicationException {
-  constructor(
-    message?: string,
-    originalError?: Error,
-    context?: Record<string, unknown>
-  ) {
-    super(
-      ErrorCodes.INTERNAL_SERVER_ERROR,
-      ErrorCategory.SYSTEM,
-      ErrorSeverity.CRITICAL,
-      HttpStatus.INTERNAL_SERVER_ERROR,
-      originalError ? {
-        category: ErrorCategory.SYSTEM,
-        severity: ErrorSeverity.CRITICAL,
-        originalError: originalError,
-        context: context || {},
-      } : {
-        category: ErrorCategory.SYSTEM,
-        severity: ErrorSeverity.CRITICAL,
-        context: context || {},
-      },
-      message
-    );
-  }
-}
-
-/**
- * Database Exception
- */
-export class DatabaseException extends SystemException {
-  constructor(operation: string, originalError?: Error) {
-    super(
-      'Database operation failed',
-      originalError,
-      {
-        operation,
       }
     );
   }

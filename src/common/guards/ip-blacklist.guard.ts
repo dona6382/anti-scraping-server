@@ -53,7 +53,7 @@ export class IpBlacklistGuard extends BaseSecurityGuard {
       if (isBlocked) {
         // 차단 이유는 로깅만 하고 클라이언트에는 노출하지 않음
         const reason = await this.ipBlacklistService.getBlockReason(ip);
-        
+
         this.logger.warn(`IP blocked`, {
           ip: this.hashIp(ip),
           reason,
@@ -74,6 +74,22 @@ export class IpBlacklistGuard extends BaseSecurityGuard {
         });
 
         throw new IpBlockedException(this.hashIp(ip), 'Security policy');
+      }
+
+      // CIDR 범위 차단 확인
+      const cidrResult = await this.ipBlacklistService.isIpInBlockedCidr(ip);
+      if (cidrResult.blocked) {
+        this.securityEventService.log({
+          eventType: 'IP_BLOCKED',
+          severity: 'HIGH',
+          ip,
+          userAgent: request.headers['user-agent'] as string,
+          endpoint: request.url,
+          method: request.method,
+          description: `IP in blocked CIDR range: ${cidrResult.cidr}`,
+        });
+
+        throw new IpBlockedException(this.hashIp(ip), 'IP in blocked range');
       }
 
       // Threat score based preemptive blocking

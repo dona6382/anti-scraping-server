@@ -35,40 +35,4 @@ export class CacheFactory {
     return this.memoryCacheService;
   }
 
-  /**
-   * Redis 연결 상태 확인
-   */
-  checkRedisConnection(): boolean {
-    return this.redisCacheService.isRedisConnected();
-  }
-
-  /**
-   * 캐시 통계 조회
-   */
-  async getCacheStats(): Promise<{
-    type: 'redis' | 'memory';
-    connected: boolean;
-    info?: Record<string, unknown>;
-  }> {
-    const redisConfig = this.configService.redisConfig;
-    
-    if (redisConfig.host && this.redisCacheService.isRedisConnected()) {
-      const info = await this.redisCacheService.getRedisInfo();
-      return {
-        type: 'redis',
-        connected: true,
-        info: info || undefined,
-      };
-    }
-    
-    return {
-      type: 'memory',
-      connected: true,
-      info: {
-        // Memory cache stats would go here
-        uptime: process.uptime(),
-        memoryUsage: process.memoryUsage(),
-      },
-    };
-  }
 }

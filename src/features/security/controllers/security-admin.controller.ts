@@ -15,9 +15,7 @@ import {
 import {
   ApiTags,
   ApiOperation,
-  ApiResponse,
   ApiParam,
-  ApiBody,
   ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
@@ -26,10 +24,11 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { IpBlacklistService } from '../../../common/services/ip-blacklist.service';
 import { JwtAuthGuard, RolesGuard } from '../../auth/guards/auth.guards';
 import { Roles } from '../../auth/auth.decorators';
-import { BlockIpDto } from '../dto/security-admin.dto';
+import { BlockIpDto, CidrBlockDto } from '../dto/security-admin.dto';
 import { ResponseBuilder } from '../../../common/utils/response.builder';
 import { PaginationUtils } from '../../../common/utils/pagination.utils';
 import { RequestUtils } from '../../../common/utils/request.utils';
+import { CidrUtils } from '../../../common/utils/cidr.utils';
 
 /**
  * Security Admin Controller
@@ -102,6 +101,47 @@ export class SecurityAdminController {
     }
     const info = await this.ipBlacklistService.getBlockInfo(ip);
     return ResponseBuilder.success({ ...info, isBlocked: !!info });
+  }
+
+  /**
+   * CIDR 범위 차단
+   */
+  @Post('blacklist/cidr')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Block a CIDR range' })
+  async blockCidr(@Body() dto: CidrBlockDto) {
+    if (!CidrUtils.isValidCidr(dto.cidr)) {
+      throw new BadRequestException('Invalid CIDR format (e.g. 192.168.0.0/24)');
+    }
+    await this.ipBlacklistService.blockCidr(dto.cidr, dto.reason, dto.ttl);
+    this.logger.log(`Admin blocked CIDR: ${dto.cidr} for reason: ${dto.reason}`);
+    return ResponseBuilder.success(null, 'CIDR range has been blocked');
+  }
+
+  /**
+   * CIDR 범위 차단 해제
+   */
+  @Delete('blacklist/cidr/:cidr')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Unblock a CIDR range' })
+  @ApiParam({ name: 'cidr', description: 'CIDR range to unblock (e.g. 192.168.0.0/24)' })
+  async unblockCidr(@Param('cidr') cidr: string) {
+    if (!CidrUtils.isValidCidr(cidr)) {
+      throw new BadRequestException('Invalid CIDR format');
+    }
+    await this.ipBlacklistService.unblockCidr(cidr);
+    this.logger.log(`Admin unblocked CIDR: ${cidr}`);
+    return ResponseBuilder.success(null, 'CIDR range has been unblocked');
+  }
+
+  /**
+   * 차단된 CIDR 목록 조회
+   */
+  @Get('blacklist/cidrs')
+  @ApiOperation({ summary: 'Get all blocked CIDR ranges' })
+  async getBlockedCidrs() {
+    const entries = await this.ipBlacklistService.getBlockedCidrs();
+    return ResponseBuilder.success(entries);
   }
 
   @Get('statistics')

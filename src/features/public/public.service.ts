@@ -1,11 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ResponseBuilder } from '../../common/utils/response.builder';
 import { SystemUtils } from '../../common/utils/system.utils';
 
 @Injectable()
 export class PublicService {
-  private readonly logger = new Logger(PublicService.name);
-
   async getPublicData() {
     return ResponseBuilder.success({
       message: 'Public data access successful',

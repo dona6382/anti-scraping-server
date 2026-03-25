@@ -14,30 +14,6 @@ export interface ExtendedRequest extends Omit<Request, 'connection' | 'socket'> 
   query: Record<string, string | string[] | undefined>;
   connection?: { remoteAddress?: string };
   socket?: { remoteAddress?: string };
-  clientInfo?: ClientInfo;
-  securityContext?: SecurityContext;
-  requestId?: string;
-  timestamp?: number;
-
-  honeypotData?: Record<string, unknown>;
-}
-
-export interface ClientInfo {
-  ip: string;
-  userAgent: string;
-  acceptLanguage?: string;
-  acceptEncoding?: string;
-  referer?: string;
-  origin?: string;
-  timestamp: Date;
-  fingerprint?: string;
-}
-
-export interface SecurityContext {
-  guardsExecuted: string[];
-  guardsBlocked: string[];
-  violations: SecurityViolation[];
-  metadata: Record<string, unknown>;
 }
 
 // Security types
@@ -49,15 +25,6 @@ export type SecurityReason =
   | 'HONEYPOT_TRIGGERED'
   | 'INVALID_USER_AGENT'
   | 'HEADLESS_BROWSER_DETECTED';
-
-export interface SecurityViolation {
-  type: SecurityReason;
-  ip: string;
-  userAgent: string;
-  timestamp: Date;
-  endpoint: string;
-  details?: Record<string, unknown>;
-}
 
 export interface BlacklistEntry {
   ip: string;

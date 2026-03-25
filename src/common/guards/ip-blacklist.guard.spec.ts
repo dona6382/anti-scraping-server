@@ -37,6 +37,7 @@ describe('IpBlacklistGuard', () => {
     ipBlacklistService = {
       isBlocked: jest.fn(),
       getBlockReason: jest.fn(),
+      isIpInBlockedCidr: jest.fn().mockResolvedValue({ blocked: false }),
     };
 
     securityEventService = {
@@ -93,6 +94,26 @@ describe('IpBlacklistGuard', () => {
   it('서비스 에러 시 fail-open (요청 허용)', async () => {
     ipBlacklistService.isBlocked.mockRejectedValue(new Error('Redis connection failed'));
     const context = createMockContext('10.0.0.1');
+    expect(await guard.canActivate(context)).toBe(true);
+  });
+
+  it('CIDR 범위에 포함된 IP 거부', async () => {
+    ipBlacklistService.isBlocked.mockResolvedValue(false);
+    ipBlacklistService.isIpInBlockedCidr.mockResolvedValue({ blocked: true, cidr: '10.0.0.0/8' });
+    const context = createMockContext('10.0.0.1');
+    await expect(guard.canActivate(context)).rejects.toThrow(IpBlockedException);
+    expect(securityEventService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'IP_BLOCKED',
+        description: expect.stringContaining('CIDR'),
+      }),
+    );
+  });
+
+  it('CIDR 범위에 포함되지 않은 IP 허용', async () => {
+    ipBlacklistService.isBlocked.mockResolvedValue(false);
+    ipBlacklistService.isIpInBlockedCidr.mockResolvedValue({ blocked: false });
+    const context = createMockContext('8.8.8.8');
     expect(await guard.canActivate(context)).toBe(true);
   });
 

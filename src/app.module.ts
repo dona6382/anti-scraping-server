@@ -14,6 +14,8 @@ import { ApiModule } from './api/api.module';
 // Global filter & guards
 import { UnifiedExceptionFilter } from './common/filters/global-exception.filter';
 import { IpBlacklistGuard } from './common/guards/ip-blacklist.guard';
+import { UserAgentGuard } from './common/guards/user-agent.guard';
+import { HeadlessBrowserGuard } from './common/guards/headless-browser.guard';
 
 import { AppController } from './app.controller';
 
@@ -45,6 +47,14 @@ import { AppController } from './app.controller';
     {
       provide: APP_GUARD,
       useClass: IpBlacklistGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: UserAgentGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: HeadlessBrowserGuard,
     },
 
     // Global exception filter

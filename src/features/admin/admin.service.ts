@@ -99,9 +99,31 @@ export class AdminService {
   }
 
   async clearSystemCache() {
-    this.logger.warn('System cache clear requested');
-    await this.cacheService.clear();
-    return ResponseBuilder.success(null, 'System cache cleared successfully');
+    this.logger.warn('System cache clear requested (preserving security data)');
+
+    // 보안 캐시 프리픽스 (삭제하지 않음)
+    const securityPrefixes = ['blacklist:', 'threat:', 'auto_block:'];
+
+    // 전체 키 조회
+    const allKeys = await this.cacheService.keys('*');
+
+    // 보안 키가 아닌 것만 삭제
+    const keysToDelete = allKeys.filter(
+      key => !securityPrefixes.some(prefix => key.startsWith(prefix)),
+    );
+
+    if (keysToDelete.length > 0) {
+      await this.cacheService.deleteMany(keysToDelete);
+    }
+
+    return ResponseBuilder.success(
+      {
+        deleted: keysToDelete.length,
+        preserved: allKeys.length - keysToDelete.length,
+        securityDataPreserved: true,
+      },
+      'Application cache cleared (security data preserved)',
+    );
   }
 
   async forceHealthCheck() {

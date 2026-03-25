@@ -8,6 +8,7 @@ import { RequestUtils } from '../utils/request.utils';
 import { ICacheService } from '../../core/cache/interfaces/cache.interface';
 import { IpBlacklistService } from './ip-blacklist.service';
 import { ThreatScoreService } from './threat-score.service';
+import { RealtimeGateway } from '../../features/realtime/realtime.gateway';
 
 export type SecurityEventType =
   | 'IP_BLOCKED'
@@ -65,6 +66,8 @@ export class SecurityEventService {
     @Inject(forwardRef(() => IpBlacklistService))
     private readonly ipBlacklistService: IpBlacklistService,
     private readonly threatScoreService: ThreatScoreService,
+    @Inject(forwardRef(() => RealtimeGateway))
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   /**
@@ -91,6 +94,15 @@ export class SecurityEventService {
 
       this.securityEventRepository.save(event).catch((err) => {
         this.logger.error(`Failed to save security event: ${err.message}`);
+      });
+
+      // Broadcast to WebSocket clients
+      this.realtimeGateway?.broadcastSecurityEvent({
+        eventType: dto.eventType,
+        severity: dto.severity,
+        ip: dto.ip ? RequestUtils.hashIp(dto.ip, 'ws') : undefined,
+        description: dto.description,
+        timestamp: new Date().toISOString(),
       });
 
       // Update threat score
@@ -135,6 +147,15 @@ export class SecurityEventService {
             this.logger.warn(
               `Auto-blocked IP ${RequestUtils.hashIp(ip, 'log')}: ${newCount} violations → ${threshold.blockTtl}s ban`,
             );
+
+            // Broadcast auto-block to WebSocket clients
+            this.realtimeGateway?.broadcastAutoBlock({
+              ip: RequestUtils.hashIp(ip, 'ws'),
+              reason: `${newCount} violations (${eventType})`,
+              ttl: threshold.blockTtl,
+              violations: newCount,
+              timestamp: new Date().toISOString(),
+            });
 
             // 자동 차단 이벤트 DB 기록 (AUTO_BLOCKED 타입으로 재귀 방지)
             const autoBlockEvent = this.securityEventRepository.create({

@@ -3,6 +3,18 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
+/**
+ * 정상 브라우저 헤더 (HeadlessBrowserGuard 통과용)
+ */
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Sec-CH-UA': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+  'Sec-Fetch-Site': 'none',
+};
+
 describe('Security Guard Chain (e2e)', () => {
   let app: INestApplication;
 
@@ -65,9 +77,9 @@ describe('Security Guard Chain (e2e)', () => {
 
   describe('Public API', () => {
     it('GET /api/public/data → 200 공개 데이터', () => {
-      return request(app.getHttpServer())
-        .get('/api/public/data')
-        .set('User-Agent', 'Mozilla/5.0 Chrome/120')
+      const req = request(app.getHttpServer()).get('/api/public/data');
+      Object.entries(BROWSER_HEADERS).forEach(([k, v]) => req.set(k, v));
+      return req
         .expect(200)
         .expect((res) => {
           expect(res.body.status).toBe('success');
@@ -130,31 +142,41 @@ describe('Security Guard Chain (e2e)', () => {
     });
 
     it('GET /admin/system/info → 401 토큰 없이 접근', () => {
-      return request(app.getHttpServer())
-        .get('/admin/system/info')
-        .expect(401);
+      const req = request(app.getHttpServer()).get('/admin/system/info');
+      Object.entries(BROWSER_HEADERS).forEach(([k, v]) => req.set(k, v));
+      return req.expect(401);
     });
 
     it('GET /admin/system/info → 403 일반 사용자 접근', () => {
-      return request(app.getHttpServer())
-        .get('/admin/system/info')
+      const req = request(app.getHttpServer()).get('/admin/system/info');
+      Object.entries(BROWSER_HEADERS).forEach(([k, v]) => req.set(k, v));
+      return req
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(403);
     });
   });
 
   describe('User-Agent Guard', () => {
-    it('Scrapy UA → health에는 UA guard 미적용 (SkipThrottle)', () => {
+    it('Scrapy UA → health에는 SkipUserAgent 적용 → 200', () => {
       return request(app.getHttpServer())
         .get('/health/live')
         .set('User-Agent', 'Scrapy/2.11')
         .expect(200);
     });
 
-    it('Scrapy UA → /test/security-full에서 403 차단', () => {
+    it('Scrapy UA → /api/public/data에서 403 차단', () => {
       return request(app.getHttpServer())
-        .get('/test/security-full')
+        .get('/api/public/data')
         .set('User-Agent', 'Scrapy/2.11')
+        .expect(403);
+    });
+  });
+
+  describe('Headless Browser Guard', () => {
+    it('HeadlessChrome UA → /api/public/data에서 403 차단', () => {
+      return request(app.getHttpServer())
+        .get('/api/public/data')
+        .set('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 HeadlessChrome/120.0.0.0 Safari/537.36')
         .expect(403);
     });
   });

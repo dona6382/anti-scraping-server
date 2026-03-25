@@ -516,6 +516,7 @@
             .status-cluster { display: none; }
         }
     </style>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 </head>
 <body>
 
@@ -727,6 +728,21 @@
                 </div>
                 <button class="btn btn-amber" onclick="addToBlacklist()">▶ Block IP</button>
                 <div id="blacklist-response" class="response-panel"></div>
+            </div>
+        </div>
+
+        <!-- Card: Live Security Feed -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon green">📡</div>
+                    <span class="card-name">Live Security Feed</span>
+                </div>
+                <span id="ws-status" style="font-family:var(--mono);font-size:0.7rem;color:var(--text-muted)">CONNECTING...</span>
+            </div>
+            <div class="card-body">
+                <div id="live-feed" style="max-height:300px;overflow-y:auto;background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;"></div>
+                <p class="card-desc" style="margin-top:0.5rem;">Real-time security events via WebSocket. Trigger tests above to see events appear.</p>
             </div>
         </div>
 
@@ -998,6 +1014,44 @@
             guard: 'ThrottlerGuard',
             results: results.slice(-5)
         }, !!blocked);
+    }
+
+    // ═══ WebSocket Connection ═══
+    let socket = null;
+    try {
+        socket = io('http://localhost:3000/security');
+
+        socket.on('connect', () => {
+            document.getElementById('ws-status').textContent = 'LIVE';
+            document.getElementById('ws-status').style.color = 'var(--green)';
+        });
+
+        socket.on('disconnect', () => {
+            document.getElementById('ws-status').textContent = 'OFFLINE';
+            document.getElementById('ws-status').style.color = 'var(--red)';
+        });
+
+        socket.on('security-event', (event) => {
+            addLiveEvent(event);
+        });
+
+        socket.on('auto-block', (data) => {
+            addLiveEvent({ ...data, eventType: 'AUTO_BLOCKED', severity: 'HIGH' });
+            bumpBlock();
+        });
+    } catch(e) { console.log('WebSocket not available'); }
+
+    function addLiveEvent(event) {
+        const feed = document.getElementById('live-feed');
+        if (!feed) return;
+        const div = document.createElement('div');
+        div.className = 'live-event';
+        div.style.cssText = 'padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:0.72rem;animation:fadeUp 0.3s;';
+        const color = event.severity === 'HIGH' || event.severity === 'CRITICAL' ? 'var(--red)' : event.severity === 'MEDIUM' ? 'var(--amber)' : 'var(--green)';
+        div.innerHTML = `<span style="color:${color}">\u25CF ${event.eventType}</span> <span style="color:var(--text-dim)">${event.description?.substring(0,80) || ''}</span> <span style="color:var(--text-muted);float:right">${new Date().toLocaleTimeString()}</span>`;
+        feed.prepend(div);
+        // Keep max 50 events
+        while (feed.children.length > 50) feed.removeChild(feed.lastChild);
     }
 </script>
 </body>

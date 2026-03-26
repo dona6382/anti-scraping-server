@@ -1,6 +1,6 @@
 # Anti-Scraping Server
 
-5단계 보안 레이어를 갖춘 웹 스크래핑/봇 탐지 및 차단 서버.
+6단계 보안 체인을 갖춘 웹 스크래핑/봇 탐지 및 차단 서버.
 NestJS + TypeScript + PostgreSQL + Redis 기반.
 
 ## 기술 스택
@@ -11,33 +11,50 @@ NestJS + TypeScript + PostgreSQL + Redis 기반.
 | Language | TypeScript 5 |
 | Database | PostgreSQL 16 (TypeORM) |
 | Cache | Redis 7 / In-Memory fallback |
-| Auth | JWT + bcrypt + RBAC |
-| Security | helmet, throttler, IP blacklist, UA filter, headless detection |
+| Auth | JWT (access 15m + refresh 7d) + bcrypt + RBAC + account lockout |
+| Security | helmet, throttler, IP/CIDR blacklist, UA filter, headless detection, JS challenge, fingerprint |
+| Realtime | WebSocket (Socket.io) — 보안 이벤트 실시간 스트림 |
 | Validation | class-validator + class-transformer |
 | API Docs | Swagger (OpenAPI 3.0) |
 | Container | Docker Compose |
-| Test | Jest (57 unit + 16 e2e) |
+| Test | Jest (135 unit + 28 e2e) |
 
-## 보안 레이어 (5단계)
+## 보안 체인 (6단계)
 
 ```
-Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → Honeypot
+Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → ChallengeGuard → Route Handler
 ```
 
-| 레이어 | 설명 | 적용 범위 |
-|--------|------|----------|
-| Rate Limiting | IP별 요청 속도 제한 | 전역 (APP_GUARD) |
-| IP Blacklist | Redis/Memory 기반 동적 IP 차단 + **자동 차단** | 전역 (APP_GUARD) |
-| User-Agent Filter | 봇/스크래퍼 UA 패턴 매칭 | 라우트별 |
-| Headless Detection | Puppeteer, Selenium 등 자동화 탐지 (점수 기반) | 라우트별 |
-| Honeypot | 숨겨진 필드로 자동화 도구 탐지 | 라우트별 |
+| # | 레이어 | 설명 | 적용 범위 |
+|---|--------|------|----------|
+| 1 | **Rate Limiting** | IP별 요청 속도 제한 (configurable) | 전역 (APP_GUARD) |
+| 2 | **IP Blacklist** | 동적 IP/CIDR 차단 + 자동 차단 + 위협 점수 사전 차단 | 전역 (APP_GUARD) |
+| 3 | **User-Agent Filter** | 봇/스크래퍼 UA 패턴 매칭 + Googlebot 허용 | 전역 (APP_GUARD) |
+| 4 | **Headless Detection** | 9개 시그널 가중치 점수제 (Puppeteer, Selenium, PhantomJS 등) | 전역 (APP_GUARD) |
+| 5 | **JS Challenge** | Proof-of-Work + Browser Fingerprint (프록시 회전 방어) | 전역 (APP_GUARD) |
+| 6 | **Route Handler** | 비즈니스 로직 (JWT/RBAC 인증은 라우트별) | 라우트별 |
+
+### JS Challenge + Browser Fingerprint (v2.4.0)
+프록시만 바꿔서 IP 기반 차단을 우회하는 공격에 대응:
+
+1. 유효한 쿠키 없는 요청 → ChallengeGuard가 PoW 챌린지 HTML 반환
+2. 브라우저가 JavaScript 실행: Canvas/Navigator 핑거프린트 생성 + SHA-256 PoW 풀이
+3. 서버에 제출 → HMAC 서명, IP 서브넷, 일회용 토큰 검증
+4. 통과 시 서명된 쿠키 발급 (24h, /24 서브넷 바인딩, HttpOnly)
+
+**보안 특성:**
+- HMAC-SHA256 토큰 서명 + `crypto.timingSafeEqual` (timing attack 방어)
+- Atomic `getAndDelete`로 토큰 일회용 보장 (TOCTOU 방지)
+- Cookie HMAC 128-bit + IP 서브넷 바인딩
+- XSS 방어 (`JSON.stringify` + `\u003c` escape)
+- `CHALLENGE_SECRET` 프로덕션 필수 환경변수
 
 ### 추가 보안 기능
-- **자동 IP 차단**: 5분 내 위반 3회→1시간, 5회→24시간, 10회→7일 단계별 차단
-- **GeoIP / VPN / Tor 탐지**: 데이터센터 IP 대역 (AWS, GCP, DO 등), VPN 서비스 대역 자동 탐지
-- **IP Reputation**: 위반 횟수 누적 기반 점진적 차단 에스컬레이션
+- **자동 IP 차단**: 15분 내 위반 10회→30분, 20회→1시간, 50회→24시간 단계별 차단
 - **위협 점수 시스템**: IP별 위협 점수 관리 (가중치: LOW=5, MEDIUM=15, HIGH=30, CRITICAL=50), 1시간 TTL 감쇠, 70점 이상 사전 차단
-- **요청 패턴 분석 (봇 탐지)**: 시간대별 차단 분포, 상위 차단 IP/UA 순위, 엔드포인트별 통계, 요청 간격 변동계수 기반 봇 탐지, 공격 패턴 클러스터링
+- **GeoIP / VPN / Tor 탐지**: 데이터센터 IP 대역 (AWS, GCP, DO 등), VPN 서비스 대역 자동 탐지
+- **요청 패턴 분석**: 요청 간격 변동계수(CV) 기반 봇 탐지, 공격 패턴 클러스터링, 유사 패턴 IP 매칭
+- **실시간 대시보드**: WebSocket으로 보안 이벤트 실시간 스트림 (JWT+admin 인증)
 
 ## 빠른 시작
 
@@ -95,9 +112,15 @@ docker-compose up -d
 ### Auth (인증)
 | Method | Path | 설명 |
 |--------|------|------|
-| POST | `/auth/login` | 로그인 (JWT 발급) |
+| POST | `/auth/login` | 로그인 (access + refresh token 발급) |
 | POST | `/auth/register` | 회원가입 |
-| POST | `/auth/change-password` | 비밀번호 변경 (JWT 필요) |
+| POST | `/auth/refresh` | Refresh token으로 access token 재발급 |
+| POST | `/auth/change-password` | 비밀번호 변경 (JWT 필요, tokenVersion++) |
+
+### Challenge
+| Method | Path | 설명 |
+|--------|------|------|
+| POST | `/challenge/verify` | 브라우저 챌린지 검증 (PoW + Fingerprint) |
 
 ### Admin (JWT + admin 역할 필요)
 | Method | Path | 설명 |
@@ -146,21 +169,24 @@ src/
 │   └── types/                  # 전역 타입 정의 (단일 소스)
 │
 ├── common/                     # 공유 계층 (@Global)
-│   ├── guards/                 # 보안 Guard (Base, UserAgent, IpBlacklist, Headless)
+│   ├── guards/                 # 보안 Guard (Base, UserAgent, IpBlacklist, Headless, Challenge)
 │   ├── filters/                # UnifiedExceptionFilter
-│   ├── services/               # IpBlacklistService, SecurityEventService
+│   ├── services/               # IpBlacklist, SecurityEvent, ThreatScore, Challenge
 │   ├── exceptions/             # 통합 예외 계층 (BaseApplicationException)
-│   ├── constants/              # 에러 코드, 보안 상수
-│   └── utils/                  # RequestUtils, ResponseBuilder
+│   ├── constants/              # 에러 코드, 보안 상수, threshold 상수
+│   └── utils/                  # RequestUtils, ResponseBuilder, CidrUtils, PaginationUtils
 │
 ├── features/                   # 비즈니스 모듈
-│   ├── auth/                   # JWT 인증 + RBAC
+│   ├── auth/                   # JWT 인증 (access+refresh) + RBAC + account lockout
 │   ├── admin/                  # 시스템 관리
-│   ├── security/               # IP 차단 관리
+│   ├── security/               # IP/CIDR 차단 관리
 │   ├── health/                 # 헬스체크 (DB/Redis 실제 체크)
 │   ├── public/                 # 공개 API
-│   ├── client-info/            # 클라이언트 핑거프린팅
-│   └── testing/                # 보안 테스트
+│   ├── client-info/            # 클라이언트 핑거프린팅 + GeoIP
+│   ├── analysis/               # 위협 분석 (패턴 분석, 봇 탐지, Admin API)
+│   ├── challenge/              # JS Challenge 검증 엔드포인트
+│   ├── realtime/               # WebSocket 실시간 보안 이벤트 (@Global)
+│   └── testing/                # 보안 테스트 (프로덕션 비활성화)
 │
 └── api/v1/                     # API 버전 관리
 ```
@@ -180,6 +206,8 @@ DB_DATABASE=anti_scraping
 ### 선택
 ```env
 IP_HASH_SALT=your-salt              # IP 해시 솔트 (없으면 랜덤 생성)
+CHALLENGE_SECRET=your-challenge-key # Challenge HMAC 키 (프로덕션 필수)
+API_KEY=your-api-key                # API key bypass용 (Challenge Guard)
 INITIAL_ADMIN_PASSWORD=Admin@1234   # 초기 admin 비밀번호
 REDIS_HOST=localhost                # Redis (없으면 in-memory)
 SECURITY_STRICT_MODE=false          # strict 모드
@@ -195,7 +223,8 @@ npm run start:dev      # 개발 서버 (watch 모드)
 npm run build          # 프로덕션 빌드
 npm run lint           # ESLint
 npm run format         # Prettier
-npm test               # Jest 테스트 (7 suites, 57 tests)
+npm test               # Jest 단위 테스트 (10 suites, 135 tests)
+npm run test:e2e       # E2E 통합 테스트 (28 tests)
 npm run test:cov       # 커버리지 리포트
 ```
 
@@ -213,6 +242,8 @@ ApiModule → V1Module        → Auth, Admin, Security, Health, Public, ...
 ### 보안 이벤트 흐름
 ```
 Guard 위반 탐지 → SecurityEventService.log() → PostgreSQL 저장 (비동기)
+                → ThreatScoreService.recordViolation() → 위협 점수 갱신
+                → RealtimeGateway.broadcast() → WebSocket 실시간 알림
                 → Logger 출력 (IP 해시화)
 ```
 

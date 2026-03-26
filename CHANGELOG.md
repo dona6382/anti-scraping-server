@@ -1,5 +1,57 @@
 # Changelog
 
+## [2.4.0] - 2026-03-26
+
+### Features
+- **JS Challenge + Browser Fingerprint**: 프록시 회전 공격 방어를 위한 Proof-of-Work 챌린지 시스템
+  - SHA-256 기반 PoW (difficulty 3, 클라이언트 ~50ms 풀이)
+  - HMAC-SHA256 서명된 일회용 토큰 (30s TTL)
+  - Canvas + Navigator 기반 브라우저 핑거프린트 수집
+  - 서명된 쿠키 (128-bit HMAC, HttpOnly, 24h TTL, /24 서브넷 바인딩)
+  - `@SkipChallenge()` 데코레이터 + API key bypass (환경변수 검증)
+- **ChallengeGuard**: 6단계 보안 체인의 마지막 Guard (APP_GUARD)
+- **ChallengeController**: POST `/challenge/verify` 엔드포인트 (rate limit 10/min)
+- **Atomic getAndDelete**: ICacheService 인터페이스 확장, Redis GETDEL + Memory 구현
+
+### Security (A-Group — Critical/High 수정)
+- **x-api-key 검증 강화**: 환경변수 `API_KEY` 대조 + `timingSafeEqual` (이전: 아무 값이나 bypass)
+- **XSS 방어**: `JSON.stringify(token).replace(/</g, '\\u003c')` + `Number(difficulty)` (이전: 직접 문자열 삽입)
+- **async generateToken**: `await cache.set()` (이전: fire-and-forget → 캐시 실패 시 토큰 검증 불가)
+- **Timing-safe HMAC 비교**: `crypto.timingSafeEqual` 적용 — 토큰/쿠키 서명 검증 (이전: `===` 비교)
+- **Cookie HMAC 확장**: 64-bit → 128-bit (32 hex chars)
+- **VerifyChallengeDto**: class-validator 데코레이터 (`@IsString`, `@IsNotEmpty`, `@MaxLength`)
+- **@Res({ passthrough: true })**: NestJS 인터셉터/필터 정상 작동
+
+### Security (B-Group — Medium 수정)
+- **CHALLENGE_SECRET 필수화**: 프로덕션 환경에서 미설정 시 부팅 실패
+- **Token TOCTOU 방지**: `getAndDelete` atomic 연산으로 토큰 재사용 차단
+- **`</script>` escape**: `\u003c`로 HTML parser breakout 방어
+- **x-api-key timing-safe**: Guard에서도 `timingSafeEqual` 적용
+
+### Runtime Bug Fixes (실전 브라우저 + Playwright 테스트에서 발견)
+- **IPv6 토큰 파싱**: 구분자 `:`가 `::1`과 충돌 → `|`로 변경
+- **Rate limit 충돌**: 글로벌 ThrottlerGuard가 challenge verify 차단 → `@SkipThrottle` 제거 + `@Throttle(10/min)` 정상 작동
+- **Cookie URL-encoding**: 브라우저가 `:`를 `%3A`로 인코딩 → guard에서 `decodeURIComponent` 적용
+- **fetch Set-Cookie 미적용**: `fetch()` → hidden form submit + HTML redirect로 변경 (쿠키 확실히 설정)
+- **returnUrl**: hidden field로 원래 URL 전달 + open redirect 방지 (pathname만 추출)
+- **meta refresh XSS**: meta 태그 제거, JS-only redirect + `\u003c` escape
+- **Debug 로그 IP 노출**: `RequestUtils.hashIp()` 적용
+
+### Testing
+- `challenge.service.spec.ts`: 26 unit tests (토큰, PoW, 쿠키, 핑거프린트, XSS, IPv6)
+- `challenge.guard.spec.ts`: 14 unit tests (skip, api-key, cookie, fail-open, URL-encoding)
+- E2E Challenge Flow: 12 tests (DTO 검증, MaxLength, 잘못된 토큰, api-key, returnUrl)
+- Playwright 실전 테스트: 3 requests로 챌린지 플로우 검증 완료
+- **Total: 135 unit (10 suites) + 28 e2e tests**
+
+### Security Review Summary
+- 4개 에이전트 5회 심층분석 (최초 → A그룹 → A+B그룹 → 실전 버그 후 → 최종)
+- 최초: CRITICAL 2 / HIGH 4 → 최종: **CRITICAL 0 / HIGH 0 / MEDIUM 0**
+- Security Researcher 최종 판정: **STRONG**
+- Playwright 실전 테스트: GET(403 challenge) → POST(verify + cookie) → GET(200 data) ✅
+
+---
+
 ## [2.3.0] - 2026-03-24
 
 ### Features

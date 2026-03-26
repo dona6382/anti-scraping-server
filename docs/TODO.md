@@ -1,54 +1,49 @@
 # TODO
 
-## Next Priority
+## 완료 (v2.1.0 ~ v2.4.0)
 
-### 보안 Guard 전역화 — 통합 보안 체인
-**목표:** 모든 API 요청이 동일한 5단계 보안 체인을 통과하도록 변경
-
-**현재 문제:**
-- `ThrottlerGuard`, `IpBlacklistGuard`만 전역 (APP_GUARD)
-- `UserAgentGuard`, `HeadlessBrowserGuard`는 라우트별 `@UseGuards()`로 개별 적용
-- 엔드포인트마다 보안 수준이 다름 — 테스트/관리가 복잡
-
-**변경:**
-```
-모든 요청 → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → Route Handler
-```
-
-- `UserAgentGuard`, `HeadlessBrowserGuard`를 `app.module.ts`에 APP_GUARD 등록
-- `@SkipUserAgent()`, `@SkipHeadlessBrowser()` 데코레이터 추가 (Health, Auth 등 제외용)
-- 기존 `@UseGuards(UserAgentGuard)` 개별 적용 코드 제거
-- 아무 API 호출해도 전체 보안 체인 작동
-
-**영향 범위:**
-- `src/app.module.ts` — APP_GUARD 2개 추가
-- `src/common/guards/user-agent.guard.ts` — @SkipUserAgent 데코레이터 추가
-- `src/common/guards/headless-browser.guard.ts` — @SkipHeadlessBrowser 데코레이터 추가
-- `src/features/testing/testing.controller.ts` — 개별 @UseGuards 제거
-- `src/features/public/public.controller.ts` — 개별 @UseGuards 제거
-- Health, Auth 엔드포인트에 Skip 데코레이터 적용
-- E2E 테스트 업데이트
+- [x] 3계층 모듈 구조 정리 (Core → Common → Features)
+- [x] JWT 인증 활성화 + Admin/Security RBAC 보호
+- [x] IpBlacklistGuard 전역화 (APP_GUARD)
+- [x] SecurityEventService + DB 기록
+- [x] 자동 IP 차단 (위반 횟수 기반 단계별)
+- [x] GeoIP / VPN / Tor / 데이터센터 IP 탐지
+- [x] JWT Refresh Token + 토큰 무효화 (tokenVersion)
+- [x] 계정 잠금 (5회 실패 → 15분 잠금)
+- [x] testing 모듈 프로덕션 비활성화
+- [x] client-info 엔드포인트 JWT 인증 + IP 해시화
+- [x] admin/cache 네임스페이스 분리
+- [x] 실시간 WebSocket 대시보드 (JWT+admin)
+- [x] CIDR / IP 범위 차단
+- [x] UserAgentGuard, HeadlessBrowserGuard 전역화 (APP_GUARD)
+- [x] @SkipUserAgent, @SkipHeadlessBrowser, @SkipChallenge 데코레이터
+- [x] 위협 점수 시스템 (ThreatScoreService)
+- [x] 패턴 분석 시스템 (AnalysisService) + Admin API 8개
+- [x] JS Challenge + Browser Fingerprint (PoW + HMAC + 서명 쿠키)
+- [x] 보안 강화: timingSafeEqual, atomic getAndDelete, XSS 방어, DTO MaxLength
+- [x] process.env → AppConfigService 일부 통일
 
 ---
 
-## Backlog (설계/기능 변경)
+## Backlog
 
-### 기능 추가
-- [ ] JWT Refresh Token + 토큰 무효화 (블랙리스트)
-- [ ] 계정 잠금 (failedLoginAttempts 카운터)
-- [ ] testing 모듈 프로덕션 비활성화
-- [ ] client-info 엔드포인트 인증 추가 + 민감 헤더 필터링
-- [ ] admin/cache 네임스페이스별 분리 (블랙리스트 보호)
-- [ ] 실시간 WebSocket 대시보드
-- [ ] CIDR / IP 범위 차단
+### P1 — 기능 개선
+- [ ] 적응형 PoW 난이도: `getDifficulty()` ↔ ThreatScoreService 연동
+- [ ] CIDR 매칭 최적화: O(N) → Trie 또는 정렬 기반 이진 탐색
+- [ ] IPv6 서브넷 처리 개선: /64 prefix 기반 쿠키 바인딩
+- [ ] EventEmitter 디커플링: SecurityEventService → Guard 직접 의존 제거
 
-### 리팩토링
-- [ ] process.env → AppConfigService 전면 통일 (6곳+)
+### P2 — 보안 강화
+- [ ] TLS Fingerprinting (JA3/JA4) — 프록시 회전 추가 방어
+- [ ] Behavioral Analysis Middleware — 요청 간격/패턴 실시간 분석
+- [ ] Tarpit Strategy — 봇에게 의도적으로 느린 응답
+- [ ] Swagger 프로덕션 보호 (Basic Auth 또는 비활성화)
 - [ ] auto-block 카운터 Redis INCR 원자적 증가
-- [ ] 라이브러리화 (`AntiScrapingModule.forRoot()` DynamicModule)
 
-### 보안 강화
-- [ ] Swagger 프로덕션 보호 (Basic Auth)
-- [ ] 봇 탐지 CV threshold 동적 조정
-- [ ] TLS fingerprinting (JA3/JA4)
-- [ ] 클라이언트 사이드 JS SDK (Canvas, WebGL fingerprint)
+### P3 — 아키텍처
+- [ ] 라이브러리화: `AntiScrapingModule.forRoot()` DynamicModule
+- [ ] process.env 잔여 사용처 → AppConfigService 전면 통일
+- [ ] 봇 탐지 CV threshold 동적 조정 (Admin API)
+
+### 별도 프로젝트
+- [ ] 공격 스크래퍼 레포: 이 서버를 대상으로 스크래핑 시도 (포트폴리오 "공격 vs 방어")

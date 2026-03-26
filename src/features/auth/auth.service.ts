@@ -78,7 +78,6 @@ export class AuthService {
       password: hashedPassword,
       role: 'user',
       isActive: true,
-      isEmailVerified: false,
     });
 
     const savedUser = await this.userRepository.save(user);

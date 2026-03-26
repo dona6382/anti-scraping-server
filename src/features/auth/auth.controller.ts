@@ -16,6 +16,7 @@ import { JwtAuthGuard, AuthenticatedRequest } from './guards/auth.guards';
 import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
 import { SkipUserAgent } from '../../common/guards/user-agent.guard';
 import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
+import { SkipChallenge } from '../../common/guards/challenge.guard';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -27,6 +28,7 @@ export class AuthController {
   @SkipIpBlacklist()
   @SkipUserAgent()
   @SkipHeadlessBrowser()
+  @SkipChallenge()
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'User login' })
   @ApiResponse({ status: 200, description: 'Login successful' })
@@ -39,6 +41,7 @@ export class AuthController {
   @SkipIpBlacklist()
   @SkipUserAgent()
   @SkipHeadlessBrowser()
+  @SkipChallenge()
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
@@ -51,6 +54,7 @@ export class AuthController {
   @SkipIpBlacklist()
   @SkipUserAgent()
   @SkipHeadlessBrowser()
+  @SkipChallenge()
   @Throttle({ default: { ttl: 300000, limit: 3 } })
   @ApiOperation({ summary: 'User registration' })
   async register(@Body() registerDto: RegisterDto) {

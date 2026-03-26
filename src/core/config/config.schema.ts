@@ -39,10 +39,6 @@ export interface AppConfig {
     database: string;
     synchronize: boolean;
   };
-  logging: {
-    level: 'error' | 'warn' | 'log' | 'debug' | 'verbose';
-    enableFileLogging: boolean;
-  };
 }
 
 // Basic validation function (without Joi for now)
@@ -61,7 +57,7 @@ export const configFactory = (): AppConfig => ({
   server: {
     port: parseInt(process.env.PORT || '3000', 10),
     nodeEnv: (process.env.NODE_ENV as 'development' | 'production' | 'test') || 'development',
-    corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+    corsOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
   },
   security: {
     strictMode: process.env.SECURITY_STRICT_MODE === 'true',
@@ -74,8 +70,8 @@ export const configFactory = (): AppConfig => ({
       enabled: process.env.IP_BLACKLIST_ENABLED !== 'false',
     },
     userAgent: {
-      blockedAgents: process.env.BLOCKED_USER_AGENTS?.split(',') || 
-        ['scrapy', 'python-requests', 'curl', 'bot'],
+      blockedAgents: process.env.BLOCKED_USER_AGENTS?.split(',') ||
+        ['scrapy', 'python-requests', 'go-http-client', 'httpclient'],
       strictMode: process.env.USER_AGENT_STRICT_MODE === 'true',
     },
     honeypot: {
@@ -96,9 +92,5 @@ export const configFactory = (): AppConfig => ({
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_DATABASE || 'anti_scraping',
     synchronize: process.env.DB_SYNCHRONIZE === 'true',
-  },
-  logging: {
-    level: (process.env.LOG_LEVEL as 'error' | 'warn' | 'log' | 'debug' | 'verbose') || 'log',
-    enableFileLogging: process.env.ENABLE_FILE_LOGGING !== 'false',
   },
 });

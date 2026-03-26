@@ -8,6 +8,7 @@ import { HealthService } from '../health/health.service';
 import { ICacheService } from '../../core/cache/interfaces';
 import { ResponseBuilder } from '../../common/utils/response.builder';
 import { SystemUtils } from '../../common/utils/system.utils';
+import { APP_VERSION } from '../../common/constants/app.constants';
 
 @Injectable()
 export class AdminService {
@@ -33,7 +34,7 @@ export class AdminService {
       },
       application: {
         name: 'Anti-Scraping Server',
-        version: '2.0.0',
+        version: APP_VERSION,
         environment: this.configService.nodeEnv,
         port: this.configService.port,
         startedAt: this.startedAt.toISOString(),

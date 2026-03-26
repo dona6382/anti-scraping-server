@@ -165,7 +165,7 @@ describe('AuthService', () => {
     it('새 사용자 등록 성공', async () => {
       userRepository.findOne.mockResolvedValue(null);
 
-      const result = await service.register({
+      await service.register({
         username: 'newuser',
         email: 'new@example.com',
         password: 'securepassword',

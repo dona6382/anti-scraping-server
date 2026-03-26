@@ -8,10 +8,12 @@ import { SecurityEvent } from '../core/database/entities';
 import { IpBlacklistService } from './services/ip-blacklist.service';
 import { SecurityEventService } from './services/security-event.service';
 import { ThreatScoreService } from './services/threat-score.service';
+import { ChallengeService } from './services/challenge.service';
 
 import { UserAgentGuard } from './guards/user-agent.guard';
 import { IpBlacklistGuard } from './guards/ip-blacklist.guard';
 import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
+import { ChallengeGuard } from './guards/challenge.guard';
 
 /**
  * Common Module
@@ -38,17 +40,21 @@ import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
     IpBlacklistService,
     SecurityEventService,
     ThreatScoreService,
+    ChallengeService,
     UserAgentGuard,
     IpBlacklistGuard,
     HeadlessBrowserGuard,
+    ChallengeGuard,
   ],
   exports: [
     IpBlacklistService,
     SecurityEventService,
     ThreatScoreService,
+    ChallengeService,
     UserAgentGuard,
     IpBlacklistGuard,
     HeadlessBrowserGuard,
+    ChallengeGuard,
     ThrottlerModule,
   ],
 })

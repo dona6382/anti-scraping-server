@@ -11,7 +11,7 @@ export interface TestRequestData {
 
 }
 
-export interface TestResult {
+interface TestResult {
   test: string;
   status: 'passed' | 'failed' | 'error';
   message: string;
@@ -89,7 +89,7 @@ export class TestingService {
       test: 'IP Validation',
       status: 'passed',
       message: 'IP extracted successfully',
-      details: { ip }
+      details: { ipHash: RequestUtils.hashIp(ip, 'test') }
     };
   }
 
@@ -112,7 +112,7 @@ export class TestingService {
     };
   }
 
-  private testRateLimit(request: ExtendedRequest): TestResult {
+  private testRateLimit(_request: ExtendedRequest): TestResult {
     return {
       test: 'Rate Limit',
       status: 'passed',

@@ -1,7 +1,7 @@
 /**
  * Pagination Utilities
  */
-export interface PaginationParams {
+interface PaginationParams {
   page: number;
   limit: number;
   skip: number;
@@ -16,8 +16,8 @@ export interface PaginationMeta {
 
 export class PaginationUtils {
   static parse(page?: number, limit?: number, maxLimit = 100): PaginationParams {
-    const p = Math.max(page ?? 1, 1);
-    const l = Math.min(Math.max(limit ?? 50, 1), maxLimit);
+    const p = Math.max(Number(page) || 1, 1);
+    const l = Math.min(Math.max(Number(limit) || 50, 1), maxLimit);
     return { page: p, limit: l, skip: (p - 1) * l };
   }
 

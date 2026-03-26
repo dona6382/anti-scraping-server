@@ -26,9 +26,6 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
-  @Column({ default: false })
-  isEmailVerified: boolean;
-
   @Column({ type: 'int', default: 0 })
   tokenVersion: number;
 

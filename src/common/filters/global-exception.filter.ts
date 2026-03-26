@@ -34,15 +34,32 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
+    // Challenge HTML 응답 처리 (JSON이 아닌 HTML 반환)
+    if (exception instanceof HttpException) {
+      const exceptionResponse = exception.getResponse();
+      if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null &&
+        (exceptionResponse as Record<string, unknown>).type === 'CHALLENGE_REQUIRED'
+      ) {
+        response
+          .status(exception.getStatus())
+          .header('Content-Type', 'text/html')
+          .header('Cache-Control', 'no-store')
+          .send((exceptionResponse as Record<string, unknown>).html);
+        return;
+      }
+    }
+
     // 예외 정보 추출
     const exceptionInfo = this.extractExceptionInfo(exception);
-    
+
     // 내부 로깅 (상세 정보 포함)
     this.logException(exceptionInfo, request);
 
     // 클라이언트 응답 (안전한 정보만)
     const clientResponse = this.createClientResponse(exceptionInfo, request);
-    
+
     response
       .status(exceptionInfo.statusCode)
       .json(clientResponse);
@@ -122,7 +139,7 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
       statusCode: exceptionInfo.statusCode,
       method: request.method,
       url: request.url,
-      ip: this.getClientIp(request),
+      ip: RequestUtils.hashIp(this.getClientIp(request), 'log'),
       userAgent: request.headers['user-agent'],
       timestamp: SystemUtils.timestamp(),
     };

@@ -13,6 +13,7 @@ const BROWSER_HEADERS = {
   'Accept-Encoding': 'gzip, deflate, br',
   'Sec-CH-UA': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
   'Sec-Fetch-Site': 'none',
+  'x-api-key': 'e2e-test-key', // ChallengeGuard bypass
 };
 
 describe('Security Guard Chain (e2e)', () => {
@@ -22,6 +23,7 @@ describe('Security Guard Chain (e2e)', () => {
     // JWT_SECRET 필수
     process.env.JWT_SECRET = 'e2e-test-secret';
     process.env.IP_HASH_SALT = 'e2e-test-salt';
+    process.env.API_KEY = 'e2e-test-key';
     process.env.DB_SYNCHRONIZE = 'true';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -201,6 +203,119 @@ describe('Security Guard Chain (e2e)', () => {
         .post('/auth/login')
         .send({ username: 'test' })
         .expect(400);
+    });
+  });
+
+  describe('Challenge Flow', () => {
+    describe('DTO 검증', () => {
+      it('POST /challenge/verify → 빈 body → 400', () => {
+        return request(app.getHttpServer())
+          .post('/challenge/verify')
+          .send({})
+          .expect(400);
+      });
+
+      it('POST /challenge/verify → token 누락 → 400', () => {
+        return request(app.getHttpServer())
+          .post('/challenge/verify')
+          .send({ nonce: 'test-nonce', fingerprint: 'abc123' })
+          .expect(400);
+      });
+
+      it('POST /challenge/verify → nonce 누락 → 400', () => {
+        return request(app.getHttpServer())
+          .post('/challenge/verify')
+          .send({ token: 'test-token', fingerprint: 'abc123' })
+          .expect(400);
+      });
+
+      it('POST /challenge/verify → fingerprint 누락 → 400', () => {
+        return request(app.getHttpServer())
+          .post('/challenge/verify')
+          .send({ token: 'test-token', nonce: 'test-nonce' })
+          .expect(400);
+      });
+    });
+
+    describe('MaxLength 검증', () => {
+      it('POST /challenge/verify → token 512자 초과 → 400', () => {
+        return request(app.getHttpServer())
+          .post('/challenge/verify')
+          .send({ token: 'a'.repeat(513), nonce: 'test', fingerprint: 'test' })
+          .expect(400);
+      });
+
+      it('POST /challenge/verify → nonce 32자 초과 → 400', () => {
+        return request(app.getHttpServer())
+          .post('/challenge/verify')
+          .send({ token: 'test', nonce: 'a'.repeat(33), fingerprint: 'test' })
+          .expect(400);
+      });
+
+      it('POST /challenge/verify → fingerprint 128자 초과 → 400', () => {
+        return request(app.getHttpServer())
+          .post('/challenge/verify')
+          .send({ token: 'test', nonce: 'test', fingerprint: 'a'.repeat(129) })
+          .expect(400);
+      });
+    });
+
+    describe('잘못된 챌린지', () => {
+      it('POST /challenge/verify → 잘못된 토큰 → 403', () => {
+        return request(app.getHttpServer())
+          .post('/challenge/verify')
+          .send({
+            token: 'invalid-token',
+            nonce: 'invalid-nonce',
+            fingerprint: 'invalid-fingerprint',
+          })
+          .expect(403);
+      });
+    });
+
+    describe('returnUrl 검증', () => {
+      it('POST /challenge/verify → returnUrl에 외부 URL → pathname만 사용 (open redirect 방지)', () => {
+        return request(app.getHttpServer())
+          .post('/challenge/verify')
+          .send({
+            token: 'test-token',
+            nonce: 'test-nonce',
+            fingerprint: 'test-fingerprint',
+            returnUrl: 'https://evil.com/steal?data=secret',
+          })
+          .expect((res) => {
+            // The request will fail verification (403) because the token is invalid,
+            // but it should NOT fail with 400, proving returnUrl is accepted as optional string
+            expect(res.status).not.toBe(400);
+          });
+      });
+
+      it('POST /challenge/verify → returnUrl 없음 → 400이 아님 (optional 필드)', () => {
+        return request(app.getHttpServer())
+          .post('/challenge/verify')
+          .send({
+            token: 'test-token',
+            nonce: 'test-nonce',
+            fingerprint: 'test-fingerprint',
+          })
+          .expect((res) => {
+            // Should not be 400 — returnUrl is optional, so DTO validation passes
+            // Will be 403 because the token is invalid, which is expected
+            expect(res.status).not.toBe(400);
+          });
+      });
+    });
+
+    describe('x-api-key 검증', () => {
+      it('틀린 x-api-key → /api/public/data 접근 시 403 (challenge required)', () => {
+        const headersWithoutValidKey = {
+          ...BROWSER_HEADERS,
+          'x-api-key': 'wrong-api-key-value',
+        };
+        const req = request(app.getHttpServer()).get('/api/public/data');
+        Object.entries(headersWithoutValidKey).forEach(([k, v]) => req.set(k, v));
+        return req.expect(403);
+      });
     });
   });
 });

@@ -49,6 +49,14 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
     this.cache.delete(key);
   }
 
+  async getAndDelete<T>(key: string): Promise<T | null> {
+    const result = await this.get<T>(key);
+    if (result !== null) {
+      this.cache.delete(key);
+    }
+    return result;
+  }
+
   async exists(key: string): Promise<boolean> {
     const entry = this.cache.get(key);
     

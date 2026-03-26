@@ -9,7 +9,7 @@ import { HEADLESS_SCORES } from '../constants/threshold.constants';
 /**
  * Headless Browser 체크를 건너뛰는 데코레이터
  */
-export const SKIP_HEADLESS_BROWSER_KEY = 'skipHeadlessBrowser';
+const SKIP_HEADLESS_BROWSER_KEY = 'skipHeadlessBrowser';
 export const SkipHeadlessBrowser = () => SetMetadata(SKIP_HEADLESS_BROWSER_KEY, true);
 
 /**

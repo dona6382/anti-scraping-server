@@ -10,6 +10,7 @@ import { AdminModule } from '../../features/admin/admin.module';
 import { TestingModule } from '../../features/testing/testing.module';
 import { AnalysisModule } from '../../features/analysis/analysis.module';
 import { RealtimeModule } from '../../features/realtime/realtime.module';
+import { ChallengeModule } from '../../features/challenge/challenge.module';
 
 const coreModules = [
   AuthModule,
@@ -20,6 +21,7 @@ const coreModules = [
   AdminModule,
   AnalysisModule,
   RealtimeModule,
+  ChallengeModule,
 ];
 
 // TestingModule은 프로덕션에서 비활성화 (내부 정보 노출 방지)

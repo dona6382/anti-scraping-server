@@ -34,7 +34,7 @@ export class CidrUtils {
     const parts = cidr.split('/');
     if (parts.length !== 2) return false;
     const prefix = parseInt(parts[1], 10);
-    if (isNaN(prefix) || prefix < 0 || prefix > 32) return false;
+    if (isNaN(prefix) || prefix < 16 || prefix > 32) return false;  // min /16
     const octets = parts[0].split('.');
     if (octets.length !== 4) return false;
     return octets.every((o) => {

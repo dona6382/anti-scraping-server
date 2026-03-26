@@ -13,7 +13,7 @@ describe('IpBlacklistGuard', () => {
   let threatScoreService: jest.Mocked<Partial<ThreatScoreService>>;
   let reflector: Reflector;
 
-  function createMockContext(ip = '192.168.1.100', skipBlacklist = false): ExecutionContext {
+  function createMockContext(ip = '192.168.1.100', _skipBlacklist = false): ExecutionContext {
     const handler = () => ({});
     const cls = class {};
 

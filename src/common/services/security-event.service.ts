@@ -10,7 +10,7 @@ import { IpBlacklistService } from './ip-blacklist.service';
 import { ThreatScoreService } from './threat-score.service';
 import { RealtimeGateway } from '../../features/realtime/realtime.gateway';
 
-export type SecurityEventType =
+type SecurityEventType =
   | 'IP_BLOCKED'
   | 'IP_UNBLOCKED'
   | 'BOT_DETECTED'
@@ -23,9 +23,9 @@ export type SecurityEventType =
   | 'SYSTEM_ALERT'
   | 'AUTO_BLOCKED';
 
-export type SecuritySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+type SecuritySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-export interface LogSecurityEventDto {
+interface LogSecurityEventDto {
   eventType: SecurityEventType;
   severity: SecuritySeverity;
   ip?: string;
@@ -47,11 +47,11 @@ export interface LogSecurityEventDto {
  * 위반 횟수에 따른 단계별 차단
  */
 const AUTO_BLOCK_POLICY = {
-  WINDOW_MS: 5 * 60 * 1000,       // 5분 윈도우
+  WINDOW_MS: 15 * 60 * 1000,      // 15분 윈도우
   THRESHOLDS: [
-    { violations: 3, blockTtl: 3600 },       // 3회 → 1시간
-    { violations: 5, blockTtl: 86400 },      // 5회 → 24시간
-    { violations: 10, blockTtl: 604800 },    // 10회 → 7일
+    { violations: 10, blockTtl: 1800 },    // 10회 → 30분
+    { violations: 20, blockTtl: 3600 },    // 20회 → 1시간
+    { violations: 50, blockTtl: 86400 },   // 50회 → 24시간
   ],
 } as const;
 
@@ -107,7 +107,7 @@ export class SecurityEventService {
 
       // Update threat score
       if (dto.ip && dto.severity) {
-        this.threatScoreService.recordViolation(dto.ip, dto.eventType, dto.severity).catch(() => {});
+        this.threatScoreService.recordViolation(dto.ip, dto.eventType, dto.severity).catch(err => this.logger.error('Failed to record violation', err?.message));
       }
 
       // 자동 차단 체크 (IP가 있고, 이미 차단 이벤트가 아닌 경우)
@@ -165,7 +165,7 @@ export class SecurityEventService {
               description: `Auto-blocked after ${newCount} violations (${eventType}). TTL: ${threshold.blockTtl}s`,
               actions: { blocked: true, notified: false, escalated: false, autoResolved: false },
             });
-            this.securityEventRepository.save(autoBlockEvent).catch(() => {});
+            this.securityEventRepository.save(autoBlockEvent).catch(err => this.logger.error('Failed to save auto-block event', err?.message));
           }
           break;
         }

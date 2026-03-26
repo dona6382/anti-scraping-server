@@ -38,7 +38,7 @@ describe('UserAgentGuard', () => {
   beforeEach(() => {
     configService = {
       userAgentConfig: {
-        blockedAgents: ['scrapy', 'python-requests', 'curl', 'wget'],
+        blockedAgents: ['scrapy', 'python-requests', 'go-http-client', 'httpclient'],
         strictMode: false,
       },
     } as unknown as AppConfigService;
@@ -69,14 +69,21 @@ describe('UserAgentGuard', () => {
     await expect(guard.canActivate(context)).rejects.toThrow(InvalidUserAgentException);
   });
 
-  it('curl User-Agent 차단', async () => {
-    const context = createMockContext('curl/8.1.2');
+  it('go-http-client User-Agent 차단', async () => {
+    const context = createMockContext('Go-http-client/1.1');
     await expect(guard.canActivate(context)).rejects.toThrow(InvalidUserAgentException);
   });
 
-  it('wget User-Agent 차단', async () => {
-    const context = createMockContext('Wget/1.21');
+  it('httpclient User-Agent 차단', async () => {
+    const context = createMockContext('Apache-HttpClient/4.5.13');
     await expect(guard.canActivate(context)).rejects.toThrow(InvalidUserAgentException);
+  });
+
+  it('Googlebot UA 허용', async () => {
+    const context = createMockContext(
+      'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+    );
+    expect(await guard.canActivate(context)).toBe(true);
   });
 
   it('차단 시 SecurityEvent 기록', async () => {
@@ -105,7 +112,7 @@ describe('UserAgentGuard', () => {
     beforeEach(() => {
       configService = {
         userAgentConfig: {
-          blockedAgents: ['scrapy', 'curl'],
+          blockedAgents: ['scrapy', 'go-http-client'],
           strictMode: true,
         },
       } as unknown as AppConfigService;

@@ -1,14 +1,14 @@
 # Anti-Scraping Server 리팩토링 히스토리
 
-> 2026-03-23 ~ 2026-03-24 진행된 전체 프로젝트 리팩토링 기록
+> 2026-03-23 ~ 2026-03-26 진행된 전체 프로젝트 리팩토링 기록
 
 ## 개요
 
 개인 포트폴리오 프로젝트를 프로덕션 수준으로 끌어올리기 위한 대규모 리팩토링.
-4개 에이전트(코드 리뷰어, 백엔드 개발자, 보안 테스트 엔지니어, 보안 연구원) + PM이 반복적으로 분석/수정/검증하는 방식으로 진행.
+5개 에이전트(TS 코드 리뷰어, NestJS 백엔드 개발자, 보안 테스트 엔지니어, 보안 연구원, PM)가 반복적으로 분석/수정/검증하는 방식으로 진행.
 
 **시작 상태**: v2.0.0 — 기본 구조만 있고, 인증 비활성화, 테스트 0개, 중복 코드 다수
-**최종 상태**: v2.3.0 — 57 unit + 16 e2e 테스트, 5단계 보안 + 위협 분석 시스템, PM 평가 9.0/10
+**최종 상태**: v2.4.0 — 133 unit + 26 e2e 테스트, 6단계 보안 체인 + JS Challenge + 위협 분석, Security Researcher 판정: STRONG
 
 ---
 
@@ -184,15 +184,85 @@
 
 ---
 
+## Phase 8: JS Challenge + Browser Fingerprint (v2.4.0)
+
+프록시만 바꿔서 IP 기반 차단을 우회하는 공격에 대응하기 위한 PoW + Fingerprint 시스템.
+
+### 구현
+- **ChallengeGuard** (APP_GUARD, 체인 5번째): 쿠키 없는 요청에 PoW 챌린지 HTML 반환
+- **ChallengeService**: HMAC-SHA256 토큰 생성/검증, PoW 검증, 서명 쿠키, 핑거프린트 저장
+- **ChallengeController**: POST `/challenge/verify` (rate limit 10/min, DTO 검증)
+- **ICacheService.getAndDelete**: 토큰 일회용 보장을 위한 atomic 연산 (Redis GETDEL + Memory)
+
+### 보안 심층분석 (3회 반복)
+
+**1차 분석** — 최초 구현 후:
+- CRITICAL 2건: x-api-key 무검증 bypass, XSS via HTML 템플릿
+- HIGH 4건: cache.set 미await, timing attack, Cookie HMAC 64-bit, 테스트 0%
+- PM 판정: **REJECT**
+
+**2차 분석** — A그룹 수정 후 (7건 Critical/High 수정):
+- 7/7 수정 완료 확인, 잔존 이슈 MEDIUM 이하
+- PM 판정: **APPROVE** (코드), **NEEDS WORK** (테스트)
+
+**3차 분석** — A+B그룹 수정 + 테스트 작성 후:
+- 12/12 이슈 전부 해결
+- PM 판정: **✅ APPROVE**
+
+**4차 분석** — 실전 브라우저 + Playwright 테스트 후:
+- 런타임 버그 5건 발견 (IPv6, Rate Limit, Cookie encoding, fetch/form, returnUrl)
+- 에이전트 추가 이슈 3건 (SkipThrottle 무효화, meta XSS, 테스트 false positive)
+- PM 판정: **⚠️ CONDITIONAL**
+
+**5차 분석 (최종)** — 전체 수정 + 회귀 테스트 후:
+- 모든 이슈 해결, 회귀 방지 테스트 추가
+- 135 unit + 28 E2E (Challenge 전용 52개)
+- PM 판정: **✅ APPROVE** — Security Researcher: STRONG
+
+### A그룹 수정 (Critical/High)
+| # | 수정 내용 |
+|---|----------|
+| A1 | x-api-key 환경변수 검증 + timingSafeEqual |
+| A2 | XSS 방어: JSON.stringify + `\u003c` escape |
+| A3 | generateToken() async + await cache.set |
+| A4 | crypto.timingSafeEqual (토큰/쿠키 HMAC) |
+| A5 | Cookie HMAC 64→128-bit (32 hex) |
+| A6 | VerifyChallengeDto (class-validator) |
+| A7 | @Res({ passthrough: true }) |
+
+### B그룹 수정 (Medium + 테스트)
+| # | 수정 내용 |
+|---|----------|
+| B2-1 | CHALLENGE_SECRET 프로덕션 필수화 |
+| B2-2 | Token TOCTOU → atomic getAndDelete |
+| B2-3 | `</script>` XSS 추가 방어 |
+| B2-4 | x-api-key timingSafeEqual |
+| B3 | DTO @MaxLength(512/32/128) |
+| B1 | 테스트: service 25개 + guard 13개 + E2E 9개 |
+
+### 런타임 버그 수정 (실전 Playwright 테스트에서 발견)
+| # | 수정 내용 |
+|---|----------|
+| R1 | IPv6 `::1` 토큰 구분자 `:`→`\|` |
+| R2 | Rate limit: `@SkipThrottle` 제거, `@Throttle(10/min)` 정상 작동 |
+| R3 | Cookie URL-encoding: `decodeURIComponent` 적용 |
+| R4 | fetch → hidden form submit + HTML redirect (Set-Cookie 확실 적용) |
+| R5 | returnUrl hidden field + open redirect 방지 (pathname 추출) |
+| C1 | meta refresh XSS 제거 → JS-only redirect + `\u003c` escape |
+| C2 | debug 로그 IP `hashIp()` 적용 |
+| T1-T3 | 회귀 방지: IPv6 토큰, URL-encoded 쿠키, returnUrl 테스트 추가 |
+
+---
+
 ## 에이전트별 분석 횟수
 
 | 에이전트 | 분석 횟수 | 역할 |
 |---------|----------|------|
-| ts-code-reviewer | 5회 | 타입 안전성, 코드 일관성, dead code |
-| nestjs-backend-dev | 5회 | 아키텍처, NestJS 패턴, 성능, TypeORM |
-| nestjs-security-test-engineer | 5회 | 인증/인가, 입력 검증, 정보 노출, Rate Limit |
-| security-researcher | 5회 | 고급 보안 (우회 시나리오, OWASP, Docker) |
-| project-manager | 3회 | 기능 갭 분석, 우선순위, 문서 정합성 |
+| ts-code-reviewer | 10회 | 타입 안전성, 코드 일관성, dead code |
+| nestjs-backend-dev | 10회 | 아키텍처, NestJS 패턴, DI, 성능 |
+| nestjs-security-test-engineer | 10회 | 테스트 커버리지, 인증/인가, 입력 검증 |
+| security-researcher | 10회 | 공격 벡터, 암호화, timing attack, XSS |
+| project-manager | 8회 | 기능 갭 분석, 우선순위, 종합 보고서 |
 
 ---
 
@@ -201,10 +271,11 @@
 | 항목 | 결과 |
 |------|------|
 | TypeScript 빌드 | 0 에러 |
-| Unit Tests | 57 passing (7 suites) |
-| E2E Tests | 16 passing (1 suite) |
-| `as any` 잔존 | 0건 (프로덕션 코드) |
-| 보안 검증 | 4개 에이전트 ALL PASS |
+| Unit Tests | 135 passing (10 suites) |
+| E2E Tests | 28 passing (1 suite) |
+| Playwright 실전 | 3 requests로 챌린지 통과 |
+| 보안 취약점 (C/H/M) | 0건 |
+| Security Researcher 판정 | **STRONG** |
 
 ---
 
@@ -212,10 +283,10 @@
 
 | 항목 | 현재 상태 | 이유 |
 |------|----------|------|
-| JWT 토큰 무효화 | 미구현 | Refresh Token + 블랙리스트 필요 (신규 기능) |
-| Headless 탐지 | 헤더 기반만 | 클라이언트 사이드 JS SDK 필요 |
+| PoW 난이도 | 고정값 3 | ThreatScore 연동 구현 예정 (P1) |
+| IPv6 서브넷 | full IP fallback | /64 prefix 처리 개선 예정 |
 | Fail-open 전략 | Redis 장애 시 보안 우회 | 가용성 우선 설계 결정 |
-| process.env 직접 참조 | 6곳+ | AppConfigService 전면 통일은 대규모 리팩토링 |
+| process.env 직접 참조 | 일부 잔존 | AppConfigService 전면 통일은 P3 |
 | 봇 탐지 CV threshold | 0.3 고정 | 분석 API 전용, 자동 차단 미연동 |
 | auto-block 카운터 | 비원자적 | Redis INCR로 교체 시 해결 가능 |
 
@@ -229,3 +300,4 @@
 | 2.1.0 | 2026-03-23 | 대규모 리팩토링 (인증, 보안, 테스트, Docker) |
 | 2.2.0 | 2026-03-24 | 자동 차단, GeoIP/VPN, E2E, reCAPTCHA 제거, UI 리디자인 |
 | 2.3.0 | 2026-03-24 | 위협 분석 시스템 (ThreatScore, PatternAnalysis, 사전 차단) |
+| 2.4.0 | 2026-03-26 | JS Challenge + Browser Fingerprint, 6단계 보안 체인, 보안 강화 (A+B그룹) |

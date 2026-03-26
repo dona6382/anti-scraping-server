@@ -106,20 +106,6 @@ export class IpBlacklistService {
   }
 
   /**
-   * 차단 목록 초기화
-   */
-  async clearBlocklist(): Promise<void> {
-    const pattern = `${this.keyPrefix}:*`;
-    const keys = await this.cache.keys(pattern);
-
-    if (keys.length > 0) {
-      await this.cache.deleteMany(keys);
-    }
-
-    this.logger.warn(`Cleared blacklist: ${keys.length} IPs removed`);
-  }
-
-  /**
    * 통계 조회
    */
   async getStatistics(): Promise<IpStatistics> {
@@ -145,28 +131,6 @@ export class IpBlacklistService {
       topReasons,
       redisConnected,
     };
-  }
-
-  /**
-   * 만료된 항목 정리
-   */
-  async cleanupExpired(): Promise<number> {
-    const entries = await this.getBlocklist();
-    const now = new Date();
-    let cleaned = 0;
-    
-    for (const entry of entries) {
-      if (entry.expiresAt && new Date(entry.expiresAt) < now) {
-        await this.unblockIp(entry.ip);
-        cleaned++;
-      }
-    }
-    
-    if (cleaned > 0) {
-      this.logger.log(`Cleaned up ${cleaned} expired blacklist entries`);
-    }
-    
-    return cleaned;
   }
 
   /**

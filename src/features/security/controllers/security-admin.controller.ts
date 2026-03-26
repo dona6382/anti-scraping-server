@@ -121,11 +121,11 @@ export class SecurityAdminController {
   /**
    * CIDR 범위 차단 해제
    */
-  @Delete('blacklist/cidr/:cidr')
+  @Delete('blacklist/cidr')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Unblock a CIDR range' })
-  @ApiParam({ name: 'cidr', description: 'CIDR range to unblock (e.g. 192.168.0.0/24)' })
-  async unblockCidr(@Param('cidr') cidr: string) {
+  @ApiQuery({ name: 'cidr', required: true, type: String, example: '192.168.1.0/24' })
+  async unblockCidr(@Query('cidr') cidr: string) {
     if (!CidrUtils.isValidCidr(cidr)) {
       throw new BadRequestException('Invalid CIDR format');
     }

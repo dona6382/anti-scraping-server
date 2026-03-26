@@ -4,7 +4,6 @@ import {
   Post,
   Body,
   Req,
-  Logger,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -24,8 +23,6 @@ import { ResponseBuilder } from '../../common/utils/response.builder';
 @ApiTags('Testing')
 @Controller('test')
 export class TestingController {
-  private readonly logger = new Logger(TestingController.name);
-
   constructor(private readonly testingService: TestingService) {}
 
   @Get()

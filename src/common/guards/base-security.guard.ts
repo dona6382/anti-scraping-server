@@ -34,13 +34,6 @@ export abstract class BaseSecurityGuard implements CanActivate {
   }
 
   /**
-   * IP 유효성 검사
-   */
-  protected isValidIpAddress(ip: string): boolean {
-    return RequestUtils.isValidIpAddress(ip);
-  }
-
-  /**
    * 보안 위반 로깅
    */
   protected logSecurityViolation(request: ExtendedRequest, reason: string): void {

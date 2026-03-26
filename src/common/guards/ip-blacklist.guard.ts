@@ -12,7 +12,7 @@ import { ThreatScoreService } from '../services/threat-score.service';
 /**
  * IP Blacklist 체크를 건너뛰는 데코레이터
  */
-export const SKIP_IP_BLACKLIST_KEY = 'skipIpBlacklist';
+const SKIP_IP_BLACKLIST_KEY = 'skipIpBlacklist';
 export const SkipIpBlacklist = () => SetMetadata(SKIP_IP_BLACKLIST_KEY, true);
 
 /**

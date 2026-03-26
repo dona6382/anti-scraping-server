@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 
 // Core modules
 import { CoreModule } from './core/core.module';
@@ -16,6 +17,7 @@ import { UnifiedExceptionFilter } from './common/filters/global-exception.filter
 import { IpBlacklistGuard } from './common/guards/ip-blacklist.guard';
 import { UserAgentGuard } from './common/guards/user-agent.guard';
 import { HeadlessBrowserGuard } from './common/guards/headless-browser.guard';
+import { BehavioralGuard } from './common/guards/behavioral.guard';
 import { ChallengeGuard } from './common/guards/challenge.guard';
 
 import { AppController } from './app.controller';
@@ -59,6 +61,10 @@ import { AppController } from './app.controller';
     },
     {
       provide: APP_GUARD,
+      useClass: BehavioralGuard,
+    },
+    {
+      provide: APP_GUARD,
       useClass: ChallengeGuard,
     },
 
@@ -69,4 +75,8 @@ import { AppController } from './app.controller';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestLoggerMiddleware).forRoutes('*');
+  }
+}

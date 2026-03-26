@@ -13,6 +13,7 @@ import { ChallengeService } from './services/challenge.service';
 import { UserAgentGuard } from './guards/user-agent.guard';
 import { IpBlacklistGuard } from './guards/ip-blacklist.guard';
 import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
+import { BehavioralGuard } from './guards/behavioral.guard';
 import { ChallengeGuard } from './guards/challenge.guard';
 
 /**
@@ -44,6 +45,7 @@ import { ChallengeGuard } from './guards/challenge.guard';
     UserAgentGuard,
     IpBlacklistGuard,
     HeadlessBrowserGuard,
+    BehavioralGuard,
     ChallengeGuard,
   ],
   exports: [
@@ -54,6 +56,7 @@ import { ChallengeGuard } from './guards/challenge.guard';
     UserAgentGuard,
     IpBlacklistGuard,
     HeadlessBrowserGuard,
+    BehavioralGuard,
     ChallengeGuard,
     ThrottlerModule,
   ],

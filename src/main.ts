@@ -186,6 +186,22 @@ function setupStaticFiles(app: NestExpressApplication): void {
  * Setup Swagger documentation
  */
 function setupSwagger(app: NestExpressApplication): void {
+  // Swagger Basic Auth 보호 (공격자가 API 스키마를 열람하지 못하도록)
+  const swaggerUser = process.env.SWAGGER_USER || 'admin';
+  const swaggerPass = process.env.SWAGGER_PASSWORD || process.env.JWT_SECRET?.substring(0, 8) || 'changeme';
+  app.use('/api-docs', (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const auth = req.headers.authorization;
+    if (auth) {
+      const [, encoded] = auth.split(' ');
+      const decoded = Buffer.from(encoded || '', 'base64').toString();
+      const [user, pass] = decoded.split(':');
+      if (user === swaggerUser && pass === swaggerPass) {
+        return next();
+      }
+    }
+    res.setHeader('WWW-Authenticate', 'Basic realm="API Documentation"');
+    res.status(401).send('Authentication required');
+  });
   const config = new DocumentBuilder()
     .setTitle('Anti-Scraping Server API')
     .setDescription(getSwaggerDescription())

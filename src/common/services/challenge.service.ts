@@ -1,7 +1,9 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, forwardRef } from '@nestjs/common';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { ICacheService } from '../../core/cache/interfaces/cache.interface';
 import { RequestUtils } from '../utils/request.utils';
+import { ThreatScoreService } from './threat-score.service';
+import { SecurityEventService } from './security-event.service';
 
 const CHALLENGE_SECRET = process.env.CHALLENGE_SECRET || (() => {
   const fallback = randomBytes(32).toString('hex');
@@ -12,6 +14,14 @@ const CHALLENGE_SECRET = process.env.CHALLENGE_SECRET || (() => {
 })();
 const TOKEN_TTL = 30; // 30 seconds
 export const COOKIE_TTL = 86400; // 24 hours
+const PROXY_ROTATION_SUBNET_THRESHOLD = 3; // >3 unique subnets triggers alert
+
+export interface FingerprintData {
+  ips: string[];       // hashed IPs
+  subnets: string[];   // /24 subnets (plain, for comparison)
+  rawIps: string[];    // raw IPs (for threat score recording)
+  count: number;       // total request count
+}
 
 /**
  * Challenge Service
@@ -23,6 +33,8 @@ export class ChallengeService {
 
   constructor(
     @Inject('ICacheService') private readonly cache: ICacheService,
+    @Inject(forwardRef(() => ThreatScoreService)) private readonly threatScoreService: ThreatScoreService,
+    @Inject(forwardRef(() => SecurityEventService)) private readonly securityEventService: SecurityEventService,
   ) {}
 
   /**
@@ -86,7 +98,7 @@ export class ChallengeService {
       const hash = createHash('sha256')
         .update(token + nonce)
         .digest('hex');
-      const difficulty = this.getDifficulty(ip);
+      const difficulty = await this.getDifficulty(ip);
       const prefix = '0'.repeat(difficulty);
       return hash.startsWith(prefix);
     } catch (error) {
@@ -143,28 +155,72 @@ export class ChallengeService {
   }
 
   /**
-   * PoW 난이도 결정 (위협 수준에 따라 조정 가능)
+   * PoW 난이도 결정 — 위협 점수에 따라 적응형 조정
+   * 기본 3 (4096 해시), 위협 높을수록 4~5 (65K~1M 해시)
    */
-  getDifficulty(_ip: string): number {
-    return 3; // 기본값: "000"으로 시작하는 해시 탐색
+  async getDifficulty(ip: string): Promise<number> {
+    try {
+      const score = await this.threatScoreService.getScore(ip);
+      const totalScore = score?.totalScore ?? 0;
+      if (totalScore >= 50) return 5; // ~1M hashes, ~500ms
+      if (totalScore >= 30) return 4; // ~65K hashes, ~30ms
+      return 3; // ~4K hashes, ~2ms (기본)
+    } catch {
+      return 3;
+    }
   }
 
   /**
-   * 핑거프린트 저장 (추적용)
+   * 핑거프린트 저장 (추적용) + 프록시 로테이션 탐지
+   * 같은 핑거프린트가 3개 이상의 /24 서브넷에서 관측되면 의심 활동으로 기록
    */
   async storeFingerprint(fingerprint: string, ip: string): Promise<void> {
     const key = `fp:${fingerprint}`;
-    const existing = await this.cache.get<{ ips: string[]; count: number }>(
-      key,
-    );
+    const existing = await this.cache.get<FingerprintData>(key);
     const ips = existing?.ips || [];
+    const subnets = existing?.subnets || [];
+    const rawIps = existing?.rawIps || [];
     const hashedIp = RequestUtils.hashIp(ip, 'fp');
     if (!ips.includes(hashedIp)) ips.push(hashedIp);
+
+    const subnet = this.getSubnet(ip);
+    if (!subnets.includes(subnet)) subnets.push(subnet);
+    if (!rawIps.includes(ip)) rawIps.push(ip);
+
     await this.cache.set(
       key,
-      { ips, count: (existing?.count || 0) + 1 },
+      { ips, subnets, rawIps, count: (existing?.count || 0) + 1 },
       COOKIE_TTL,
     );
+
+    // Proxy rotation detection: >3 unique /24 subnets
+    if (subnets.length > PROXY_ROTATION_SUBNET_THRESHOLD) {
+      this.logger.warn(
+        `Proxy rotation detected for fingerprint ${fingerprint.substring(0, 8)}...: ${subnets.length} subnets`,
+      );
+
+      this.securityEventService.log({
+        eventType: 'SUSPICIOUS_ACTIVITY',
+        severity: 'HIGH',
+        ip,
+        description: 'Same fingerprint from multiple subnets',
+        eventData: {
+          fingerprint: fingerprint.substring(0, 16),
+          uniqueSubnets: subnets.length,
+          uniqueIps: ips.length,
+          totalRequests: (existing?.count || 0) + 1,
+        },
+      }).catch(err => this.logger.error('Failed to log proxy rotation event', err?.message));
+
+      // Record threat score violation for all associated IPs
+      for (const associatedIp of rawIps) {
+        this.threatScoreService.recordViolation(
+          associatedIp,
+          'SUSPICIOUS_ACTIVITY',
+          'HIGH',
+        ).catch(err => this.logger.error('Failed to record threat violation', err?.message));
+      }
+    }
   }
 
   /**

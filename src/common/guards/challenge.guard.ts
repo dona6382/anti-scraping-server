@@ -80,7 +80,7 @@ export class ChallengeGuard extends BaseSecurityGuard {
     // 유효한 쿠키 없음 — 챌린지 발급
     try {
       const challengeToken = await this.challengeService.generateToken(ip);
-      const difficulty = this.challengeService.getDifficulty(ip);
+      const difficulty = await this.challengeService.getDifficulty(ip);
 
       this.logSecurityViolation(request, 'Challenge required - no valid cookie');
 

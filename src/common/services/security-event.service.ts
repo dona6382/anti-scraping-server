@@ -10,7 +10,7 @@ import { IpBlacklistService } from './ip-blacklist.service';
 import { ThreatScoreService } from './threat-score.service';
 import { RealtimeGateway } from '../../features/realtime/realtime.gateway';
 
-export type SecurityEventType =
+type SecurityEventType =
   | 'IP_BLOCKED'
   | 'IP_UNBLOCKED'
   | 'BOT_DETECTED'
@@ -23,9 +23,9 @@ export type SecurityEventType =
   | 'SYSTEM_ALERT'
   | 'AUTO_BLOCKED';
 
-export type SecuritySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+type SecuritySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-export interface LogSecurityEventDto {
+interface LogSecurityEventDto {
   eventType: SecurityEventType;
   severity: SecuritySeverity;
   ip?: string;
@@ -47,11 +47,11 @@ export interface LogSecurityEventDto {
  * 위반 횟수에 따른 단계별 차단
  */
 const AUTO_BLOCK_POLICY = {
-  WINDOW_MS: 5 * 60 * 1000,       // 5분 윈도우
+  WINDOW_MS: 15 * 60 * 1000,      // 15분 윈도우
   THRESHOLDS: [
-    { violations: 3, blockTtl: 3600 },       // 3회 → 1시간
-    { violations: 5, blockTtl: 86400 },      // 5회 → 24시간
-    { violations: 10, blockTtl: 604800 },    // 10회 → 7일
+    { violations: 10, blockTtl: 1800 },    // 10회 → 30분
+    { violations: 20, blockTtl: 3600 },    // 20회 → 1시간
+    { violations: 50, blockTtl: 86400 },   // 50회 → 24시간
   ],
 } as const;
 

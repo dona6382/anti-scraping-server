@@ -16,6 +16,7 @@ import { UnifiedExceptionFilter } from './common/filters/global-exception.filter
 import { IpBlacklistGuard } from './common/guards/ip-blacklist.guard';
 import { UserAgentGuard } from './common/guards/user-agent.guard';
 import { HeadlessBrowserGuard } from './common/guards/headless-browser.guard';
+import { ChallengeGuard } from './common/guards/challenge.guard';
 
 import { AppController } from './app.controller';
 
@@ -55,6 +56,10 @@ import { AppController } from './app.controller';
     {
       provide: APP_GUARD,
       useClass: HeadlessBrowserGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ChallengeGuard,
     },
 
     // Global exception filter

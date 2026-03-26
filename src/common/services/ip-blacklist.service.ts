@@ -106,20 +106,6 @@ export class IpBlacklistService {
   }
 
   /**
-   * 차단 목록 초기화
-   */
-  async clearBlocklist(): Promise<void> {
-    const pattern = `${this.keyPrefix}:*`;
-    const keys = await this.cache.keys(pattern);
-
-    if (keys.length > 0) {
-      await this.cache.deleteMany(keys);
-    }
-
-    this.logger.warn(`Cleared blacklist: ${keys.length} IPs removed`);
-  }
-
-  /**
    * 통계 조회
    */
   async getStatistics(): Promise<IpStatistics> {

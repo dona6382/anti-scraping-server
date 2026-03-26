@@ -10,7 +10,7 @@ import { SUSPICIOUS_UA_PATTERNS, ALLOWED_BOTS } from '../constants/security.cons
 /**
  * User-Agent 체크를 건너뛰는 데코레이터
  */
-export const SKIP_USER_AGENT_KEY = 'skipUserAgent';
+const SKIP_USER_AGENT_KEY = 'skipUserAgent';
 export const SkipUserAgent = () => SetMetadata(SKIP_USER_AGENT_KEY, true);
 
 /**
@@ -91,18 +91,21 @@ export class UserAgentGuard extends BaseSecurityGuard {
       return true;
     }
 
+    // ALLOWED_BOTS 체크를 먼저! (Googlebot 등 검색엔진 보호)
+    const isAllowedBot = ALLOWED_BOTS.some(bot => userAgent.includes(bot));
+    if (isAllowedBot) return true;
+
+    // 그 다음 blockedAgents 체크
     if (this.blockedUserAgents.some(blocked => userAgent.includes(blocked))) {
       return false;
     }
 
+    // strict mode 패턴 체크
     if (this.strictMode) {
-      const isAllowedBot = ALLOWED_BOTS.some(bot => userAgent.includes(bot));
-      if (!isAllowedBot) {
-        const isSuspicious = SUSPICIOUS_UA_PATTERNS.some(pattern => pattern.test(userAgent));
-        if (isSuspicious) {
-          this.logger.warn(`Suspicious User-Agent pattern detected: ${userAgent.substring(0, 100)}`);
-          return false;
-        }
+      const isSuspicious = SUSPICIOUS_UA_PATTERNS.some(pattern => pattern.test(userAgent));
+      if (isSuspicious) {
+        this.logger.warn(`Suspicious User-Agent pattern detected: ${userAgent.substring(0, 100)}`);
+        return false;
       }
     }
 

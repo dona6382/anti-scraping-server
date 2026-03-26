@@ -31,7 +31,7 @@
 ```
 src/
 ├── main.ts                  # 부트스트랩 (helmet, body limit, graceful shutdown)
-├── app.module.ts            # 루트 모듈 (전역 Guard 5개 + Filter 등록)
+├── app.module.ts            # 루트 모듈 (전역 Guard 6개 + Filter 등록)
 ├── app.controller.ts        # 루트 엔드포인트
 ├── core/                    # 인프라 계층 (@Global)
 │   ├── config/              # ConfigModule, AppConfigService
@@ -62,7 +62,7 @@ src/
 
 ## 전역 보안 체인
 ```
-모든 요청 → ThrottlerGuard → IpBlacklistGuard (+ CIDR + 위협 점수) → UserAgentGuard → HeadlessBrowserGuard → ChallengeGuard → Route Handler
+모든 요청 → ThrottlerGuard → IpBlacklistGuard (+ CIDR + 위협 점수) → UserAgentGuard → HeadlessBrowserGuard → BehavioralGuard → ChallengeGuard → Route Handler
 ```
 
 ## 개발 프로세스
@@ -145,6 +145,6 @@ DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_DATABASE  # PostgreSQL
 ## 주의사항
 - Redis 미설정 시 In-Memory 캐시로 자동 fallback
 - DB_SYNCHRONIZE=true는 개발 환경에서만 사용
-- 전역 Guard 5개: ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → ChallengeGuard
+- 전역 Guard 6개: ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → BehavioralGuard → ChallengeGuard
 - Health/Root 엔드포인트는 모든 Guard Skip (모니터링 프로브용)
 - Testing 모듈은 프로덕션에서 자동 비활성화

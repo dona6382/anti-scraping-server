@@ -1,6 +1,116 @@
 # Anti-Scraping Server
 
-6단계 보안 체인을 갖춘 웹 스크래핑/봇 탐지 및 차단 서버.
+> Production-grade web scraping defense system with 7-layer security chain.
+> Built with NestJS + TypeScript + PostgreSQL + Redis.
+
+## Overview (English)
+
+This project is a multi-layer bot detection and blocking server designed to defend web applications against scraping, credential stuffing, and automated abuse. Every incoming request passes through a 6-stage security guard chain — rate limiting, IP/CIDR blacklisting with automatic escalation, User-Agent pattern filtering, headless browser detection (9-signal weighted scoring for Puppeteer/Selenium/PhantomJS), a JavaScript Proof-of-Work challenge paired with browser fingerprinting, and finally the route handler itself. The system is built to stop not only naive bots but also sophisticated attackers who rotate proxies or spoof browser environments.
+
+The architecture follows a strict layered design: a global Core module (config, cache, database), a shared Common module (guards, services, utilities), and isolated Feature modules (auth, admin, analysis, realtime, etc.). Redis serves as the primary cache with automatic in-memory fallback, and all guards follow a fail-open strategy — if an infrastructure dependency is down, requests are allowed through with full logging rather than causing an outage. JWT authentication supports access/refresh token rotation, RBAC, and account lockout. A real-time WebSocket dashboard streams security events to authenticated admins.
+
+Code quality was enforced through a **5-round agent security review process**: design review, pre-implementation security audit, TDD implementation, dual code review (type safety + security testing), and PM sign-off — with any issues cycling back through implementation. The test suite includes 135 unit tests across 10 suites and 28 end-to-end integration tests covering the full security chain.
+
+## Security Chain
+
+```
+Request
+  │
+  ▼
+┌─────────────────────┐
+│ 1. Rate Limiting     │  IP-based request throttling (configurable window + limit)
+└─────────┬───────────┘
+          ▼
+┌─────────────────────┐
+│ 2. IP Blacklist      │  Dynamic IP/CIDR blocking + auto-ban escalation + threat score pre-block
+└─────────┬───────────┘
+          ▼
+┌─────────────────────┐
+│ 3. User-Agent Filter │  Bot/scraper UA pattern matching (Googlebot whitelisted)
+└─────────┬───────────┘
+          ▼
+┌─────────────────────┐
+│ 4. Headless Detect   │  9-signal weighted scoring (Puppeteer, Selenium, PhantomJS, etc.)
+└─────────┬───────────┘
+          ▼
+┌─────────────────────┐
+│ 5. Behavioral Guard   │  Real-time request interval CV analysis (auto-blocks mechanical patterns)
+└─────────┬───────────┘
+          ▼
+┌─────────────────────┐
+│ 6. JS Challenge      │  Proof-of-Work + browser fingerprint (defeats proxy rotation)
+└─────────┬───────────┘
+          ▼
+┌─────────────────────┐
+│ 7. Route Handler     │  Business logic (JWT/RBAC auth applied per-route)
+└─────────────────────┘
+```
+
+## Key Features
+
+- **7-Layer Guard Chain** — Every request passes through six global security guards before reaching any route handler, all registered as `APP_GUARD` for zero-config coverage.
+- **JS Challenge with Proof-of-Work** — Clients must solve a SHA-256 PoW puzzle and submit a canvas/navigator fingerprint; cookies are HMAC-signed, one-time-use, and subnet-bound.
+- **Threat Scoring Engine** — Per-IP threat scores with weighted violations (LOW=5 to CRITICAL=50), 1-hour TTL decay, and automatic pre-blocking at score 70+.
+- **Automatic IP Ban Escalation** — 10 violations in 15 min = 30-min ban; 20 = 1 hour; 50 = 24 hours. Supports manual IP/CIDR management via admin API.
+- **Behavioral Analysis** — Request interval coefficient-of-variation (CV) for bot detection, attack pattern clustering, and similar-pattern IP matching.
+- **Headless Browser Detection** — 9 weighted signals detect automation frameworks, including navigator property checks, WebDriver flags, and plugin/language anomalies.
+- **Real-Time Dashboard** — WebSocket-powered security event stream with JWT + admin role authentication.
+- **GeoIP / VPN / Tor Detection** — Flags datacenter IP ranges (AWS, GCP, DigitalOcean) and known VPN/proxy service subnets.
+- **Fail-Open Resilience** — Guards gracefully degrade on infrastructure failure (Redis down, DB timeout) — requests pass through with full incident logging.
+- **Cache-First Architecture** — Redis primary with automatic in-memory fallback via factory pattern; no configuration change needed.
+- **5-Round Security Review** — Every feature goes through design, security audit, TDD implementation, dual review, and PM sign-off before merge.
+
+## Quick Start
+
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 14+
+- Redis 7+ (optional — falls back to in-memory cache)
+
+### Install & Run
+
+```bash
+# Install dependencies
+npm install
+
+# Configure environment
+cp .env.example .env
+# Edit .env — set JWT_SECRET, DB credentials at minimum
+
+# Start development server
+npm run start:dev
+```
+
+### Endpoints
+
+- API: http://localhost:3000
+- Swagger Docs: http://localhost:3000/api-docs
+- Test UI: http://localhost:3000/public
+- Health Check: http://localhost:3000/health
+
+### Docker
+
+```bash
+export JWT_SECRET=your-secret-key
+export IP_HASH_SALT=your-salt
+
+docker-compose up -d
+# Services: app (3000) + postgres (5432) + redis (6379) + redis-commander (8081)
+```
+
+### Test
+
+```bash
+npm test               # 135 unit tests
+npm run test:e2e       # 28 integration tests
+npm run test:cov       # Coverage report
+```
+
+---
+
+## 한국어 문서 (Korean Documentation)
+
+7단계 보안 체인을 갖춘 웹 스크래핑/봇 탐지 및 차단 서버.
 NestJS + TypeScript + PostgreSQL + Redis 기반.
 
 ## 기술 스택
@@ -17,12 +127,12 @@ NestJS + TypeScript + PostgreSQL + Redis 기반.
 | Validation | class-validator + class-transformer |
 | API Docs | Swagger (OpenAPI 3.0) |
 | Container | Docker Compose |
-| Test | Jest (135 unit + 28 e2e) |
+| Test | Jest (138 unit + 28 e2e) |
 
-## 보안 체인 (6단계)
+## 보안 체인 (7단계)
 
 ```
-Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → ChallengeGuard → Route Handler
+Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → BehavioralGuard → ChallengeGuard → Route Handler
 ```
 
 | # | 레이어 | 설명 | 적용 범위 |
@@ -31,8 +141,9 @@ Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessB
 | 2 | **IP Blacklist** | 동적 IP/CIDR 차단 + 자동 차단 + 위협 점수 사전 차단 | 전역 (APP_GUARD) |
 | 3 | **User-Agent Filter** | 봇/스크래퍼 UA 패턴 매칭 + Googlebot 허용 | 전역 (APP_GUARD) |
 | 4 | **Headless Detection** | 9개 시그널 가중치 점수제 (Puppeteer, Selenium, PhantomJS 등) | 전역 (APP_GUARD) |
-| 5 | **JS Challenge** | Proof-of-Work + Browser Fingerprint (프록시 회전 방어) | 전역 (APP_GUARD) |
-| 6 | **Route Handler** | 비즈니스 로직 (JWT/RBAC 인증은 라우트별) | 라우트별 |
+| 5 | **Behavioral Guard** | 실시간 요청 간격 CV 분석 — 기계적 패턴 자동 차단 | 전역 (APP_GUARD) |
+| 6 | **JS Challenge** | Proof-of-Work + Browser Fingerprint (프록시 회전 방어) | 전역 (APP_GUARD) |
+| 7 | **Route Handler** | 비즈니스 로직 (JWT/RBAC 인증은 라우트별) | 라우트별 |
 
 ### JS Challenge + Browser Fingerprint (v2.4.0)
 프록시만 바꿔서 IP 기반 차단을 우회하는 공격에 대응:

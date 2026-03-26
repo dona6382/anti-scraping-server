@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ResponseBuilder } from '../../common/utils/response.builder';
 import { SystemUtils } from '../../common/utils/system.utils';
+import { APP_VERSION } from '../../common/constants/app.constants';
 
 @Injectable()
 export class PublicService {
@@ -43,7 +44,7 @@ export class PublicService {
   async getHealthStatus() {
     return ResponseBuilder.success({
       status: 'healthy',
-      version: '2.0.0',
+      version: APP_VERSION,
       environment: process.env.NODE_ENV || 'development',
       uptime: SystemUtils.formatUptime(process.uptime()),
     });

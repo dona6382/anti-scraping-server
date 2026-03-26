@@ -19,7 +19,7 @@ export class ClientInfoController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get client information' })
   async getClientInfo(@Req() request: Request, @Query('detailed') detailed?: boolean) {
-    this.logger.log(`Client info requested from ${RequestUtils.extractClientIp(request as ExtendedRequest)}`);
+    this.logger.log(`Client info requested from ${RequestUtils.hashIp(RequestUtils.extractClientIp(request as ExtendedRequest), 'log')}`);
     
     try {
       const clientInfo = await this.clientInfoService.getClientInfo(request);
@@ -38,16 +38,15 @@ export class ClientInfoController {
   }
 
   @Get('ip')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get client IP information' })
   async getClientIpInfo(@Req() request: Request) {
     const clientInfo = await this.clientInfoService.getClientInfo(request);
     return {
-      ip: clientInfo.ip.address,
+      ipHash: RequestUtils.hashIp(clientInfo.ip.address, 'client'),
       type: clientInfo.ip.type,
       isPrivate: clientInfo.ip.isPrivate,
-      isProxy: clientInfo.ip.isProxy,
-      isVpn: clientInfo.ip.isVpn,
-      isTor: clientInfo.ip.isTor,
     };
   }
 
@@ -58,9 +57,8 @@ export class ClientInfoController {
   async getSecurityAnalysis(@Req() request: Request) {
     const clientInfo = await this.clientInfoService.getClientInfo(request);
     return {
-      ip: clientInfo.ip.address,
+      ipHash: RequestUtils.hashIp(clientInfo.ip.address, 'client'),
       security: clientInfo.security,
-      proxy: clientInfo.proxy,
       client: {
         isBot: clientInfo.client.isBot,
         isCrawler: clientInfo.client.isCrawler,
@@ -85,14 +83,11 @@ export class ClientInfoController {
 
   private getSimplifiedInfo(clientInfo: ClientInfo) {
     return {
-      ip: clientInfo.ip.address,
+      ipHash: RequestUtils.hashIp(clientInfo.ip.address, 'client'),
       location: {
         country: clientInfo.location.country,
         city: clientInfo.location.city,
       },
-      proxy: clientInfo.proxy.detected,
-      vpn: clientInfo.ip.isVpn,
-      tor: clientInfo.ip.isTor,
       device: clientInfo.client.deviceType,
       browser: clientInfo.client.browser,
       os: clientInfo.client.os,

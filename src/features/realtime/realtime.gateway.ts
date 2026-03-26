@@ -19,6 +19,7 @@ export class RealtimeGateway
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(RealtimeGateway.name);
   private connectedClients = 0;
+  private authenticatedClients = new Set<string>();
 
   constructor(private readonly authService: AuthService) {}
 
@@ -40,6 +41,7 @@ export class RealtimeGateway
         client.disconnect();
         return;
       }
+      this.authenticatedClients.add(client.id);
       this.connectedClients++;
       this.logger.log(`Admin connected: ${client.id}`);
     } catch {
@@ -49,7 +51,10 @@ export class RealtimeGateway
   }
 
   handleDisconnect(client: Socket) {
-    this.connectedClients--;
+    if (this.authenticatedClients.has(client.id)) {
+      this.authenticatedClients.delete(client.id);
+      this.connectedClients--;
+    }
     this.logger.log(
       `Client disconnected: ${client.id} (total: ${this.connectedClients})`,
     );
@@ -75,29 +80,5 @@ export class RealtimeGateway
     timestamp: string;
   }) {
     this.server.emit('auto-block', data);
-  }
-
-  /** Broadcast threat score update */
-  broadcastThreatScore(data: {
-    ip: string;
-    totalScore: number;
-    violations: number;
-    timestamp: string;
-  }) {
-    this.server.emit('threat-score', data);
-  }
-
-  /** Send current stats periodically or on request */
-  broadcastStats(stats: {
-    connectedClients: number;
-    totalBlocked: number;
-    recentEvents: number;
-    timestamp: string;
-  }) {
-    this.server.emit('stats', stats);
-  }
-
-  getConnectedClients(): number {
-    return this.connectedClients;
   }
 }

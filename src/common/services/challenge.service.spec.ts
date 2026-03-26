@@ -1,4 +1,4 @@
-import { createHash, createHmac } from 'crypto';
+import { createHash } from 'crypto';
 import { ChallengeService, COOKIE_TTL } from './challenge.service';
 
 describe('ChallengeService', () => {

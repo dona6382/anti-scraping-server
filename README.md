@@ -101,7 +101,7 @@ docker-compose up -d
 ### Test
 
 ```bash
-npm test               # 135 unit tests
+npm test               # 162 unit tests (13 suites)
 npm run test:e2e       # 28 integration tests
 npm run test:cov       # Coverage report
 ```
@@ -127,7 +127,7 @@ NestJS + TypeScript + PostgreSQL + Redis 기반.
 | Validation | class-validator + class-transformer |
 | API Docs | Swagger (OpenAPI 3.0) |
 | Container | Docker Compose |
-| Test | Jest (138 unit + 28 e2e) |
+| Test | Jest (162 unit + 28 e2e) |
 
 ## 보안 체인 (7단계)
 
@@ -334,7 +334,7 @@ npm run start:dev      # 개발 서버 (watch 모드)
 npm run build          # 프로덕션 빌드
 npm run lint           # ESLint
 npm run format         # Prettier
-npm test               # Jest 단위 테스트 (10 suites, 135 tests)
+npm test               # Jest 단위 테스트 (13 suites, 162 tests)
 npm run test:e2e       # E2E 통합 테스트 (28 tests)
 npm run test:cov       # 커버리지 리포트
 ```

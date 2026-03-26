@@ -25,7 +25,7 @@
 - **Validation**: class-validator + class-transformer (DTO 기반)
 - **API Docs**: Swagger (`/api-docs`)
 - **Container**: Docker Compose (app + postgres + redis)
-- **Test**: Jest (135 unit + 28 e2e)
+- **Test**: Jest (162 unit + 28 e2e)
 
 ## 프로젝트 구조
 ```
@@ -129,7 +129,7 @@ src/
 ```bash
 npm run start:dev      # 개발 서버 (watch)
 npm run build          # 빌드
-npm test               # Jest 테스트 (135 tests)
+npm test               # Jest 테스트 (162 tests, 13 suites)
 npm run test:e2e       # E2E 테스트 (28 tests)
 npm run lint           # ESLint
 docker-compose up -d   # Docker 실행

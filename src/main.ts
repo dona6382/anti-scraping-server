@@ -188,7 +188,7 @@ function setupStaticFiles(app: NestExpressApplication): void {
 function setupSwagger(app: NestExpressApplication): void {
   // Swagger Basic Auth 보호 (공격자가 API 스키마를 열람하지 못하도록)
   const swaggerUser = process.env.SWAGGER_USER || 'admin';
-  const swaggerPass = process.env.SWAGGER_PASSWORD || process.env.JWT_SECRET?.substring(0, 8) || 'changeme';
+  const swaggerPass = process.env.SWAGGER_PASSWORD || 'changeme';
   const swaggerAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const auth = req.headers.authorization;
     if (auth) {

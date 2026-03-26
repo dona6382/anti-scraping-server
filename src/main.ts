@@ -189,7 +189,7 @@ function setupSwagger(app: NestExpressApplication): void {
   // Swagger Basic Auth 보호 (공격자가 API 스키마를 열람하지 못하도록)
   const swaggerUser = process.env.SWAGGER_USER || 'admin';
   const swaggerPass = process.env.SWAGGER_PASSWORD || process.env.JWT_SECRET?.substring(0, 8) || 'changeme';
-  app.use('/api-docs', (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const swaggerAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const auth = req.headers.authorization;
     if (auth) {
       const [, encoded] = auth.split(' ');
@@ -201,7 +201,9 @@ function setupSwagger(app: NestExpressApplication): void {
     }
     res.setHeader('WWW-Authenticate', 'Basic realm="API Documentation"');
     res.status(401).send('Authentication required');
-  });
+  };
+  app.use('/api-docs', swaggerAuth);
+  app.use('/api-docs-json', swaggerAuth);
   const config = new DocumentBuilder()
     .setTitle('Anti-Scraping Server API')
     .setDescription(getSwaggerDescription())

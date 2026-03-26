@@ -388,4 +388,48 @@ describe('ChallengeService', () => {
       expect(html).toContain('\\u003c');
     });
   });
+
+  describe('getDifficulty()', () => {
+    it('위협 점수 없음 (null) → 난이도 3', async () => {
+      mockThreatScore.getScore.mockResolvedValue(null);
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(3);
+    });
+
+    it('위협 점수 20 → 난이도 3 (30 미만)', async () => {
+      mockThreatScore.getScore.mockResolvedValue({ totalScore: 20 });
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(3);
+    });
+
+    it('위협 점수 30 → 난이도 4', async () => {
+      mockThreatScore.getScore.mockResolvedValue({ totalScore: 30 });
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(4);
+    });
+
+    it('위협 점수 50 → 난이도 5', async () => {
+      mockThreatScore.getScore.mockResolvedValue({ totalScore: 50 });
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(5);
+    });
+
+    it('위협 점수 80 → 난이도 5', async () => {
+      mockThreatScore.getScore.mockResolvedValue({ totalScore: 80 });
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(5);
+    });
+
+    it('ThreatScore 에러 시 → 난이도 3 (fallback)', async () => {
+      mockThreatScore.getScore.mockRejectedValue(new Error('Redis connection failed'));
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(3);
+    });
+  });
 });

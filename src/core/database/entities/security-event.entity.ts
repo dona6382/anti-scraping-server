@@ -47,9 +47,6 @@ export class SecurityEvent {
   @Column({ type: 'text' })
   description: string;
 
-  @Column({ type: 'uuid', nullable: true })
-  userId?: string;
-
   @CreateDateColumn()
   createdAt: Date;
 

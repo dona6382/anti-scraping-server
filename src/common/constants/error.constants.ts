@@ -1,15 +1,4 @@
 /**
- * Error Response Strategy
- * 환경별 에러 응답 전략 정의
- */
-
-export enum ErrorResponseMode {
-  DEVELOPMENT = 'development',
-  STAGING = 'staging',
-  PRODUCTION = 'production',
-}
-
-/**
  * Error Category
  * 에러 분류 체계
  */

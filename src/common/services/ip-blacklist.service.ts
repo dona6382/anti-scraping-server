@@ -148,28 +148,6 @@ export class IpBlacklistService {
   }
 
   /**
-   * 만료된 항목 정리
-   */
-  async cleanupExpired(): Promise<number> {
-    const entries = await this.getBlocklist();
-    const now = new Date();
-    let cleaned = 0;
-    
-    for (const entry of entries) {
-      if (entry.expiresAt && new Date(entry.expiresAt) < now) {
-        await this.unblockIp(entry.ip);
-        cleaned++;
-      }
-    }
-    
-    if (cleaned > 0) {
-      this.logger.log(`Cleaned up ${cleaned} expired blacklist entries`);
-    }
-    
-    return cleaned;
-  }
-
-  /**
    * CIDR 범위 차단
    */
   async blockCidr(cidr: string, reason: SecurityReason, ttl?: number): Promise<void> {

@@ -1,11 +1,10 @@
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { 
-  ErrorCategory, 
-  ErrorSeverity, 
-  ErrorCodes, 
+import {
+  ErrorCategory,
+  ErrorSeverity,
+  ErrorCodes,
   UserFriendlyMessages,
   InternalErrorDetails,
-  ErrorResponseMode,
 } from '../constants/error.constants';
 
 /**
@@ -45,48 +44,6 @@ export abstract class BaseApplicationException extends HttpException {
     
     // 내부 로깅
     this.logError();
-  }
-
-  /**
-   * 환경에 따른 응답 생성
-   */
-  public override getResponse(mode: ErrorResponseMode = ErrorResponseMode.PRODUCTION): Record<string, unknown> {
-    const baseResponse = {
-      success: false,
-      error: {
-        code: this.errorCode,
-        message: this.message,
-        timestamp: this.timestamp.toISOString(),
-      },
-    };
-
-    // 개발 환경에서만 상세 정보 추가
-    if (mode === ErrorResponseMode.DEVELOPMENT) {
-      return {
-        ...baseResponse,
-        error: {
-          ...baseResponse.error,
-          category: this.category,
-          severity: this.severity,
-          details: this.internalDetails?.context,
-          stack: this.stack?.split('\n').slice(0, 10),
-        },
-      };
-    }
-
-    // Staging 환경에서는 제한된 정보
-    if (mode === ErrorResponseMode.STAGING) {
-      return {
-        ...baseResponse,
-        error: {
-          ...baseResponse.error,
-          category: this.category,
-        },
-      };
-    }
-
-    // Production 환경에서는 최소 정보
-    return baseResponse;
   }
 
   /**

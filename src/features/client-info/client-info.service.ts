@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { Request } from 'express';
 import { RequestUtils } from '../../common/utils/request.utils';
-import { ExtendedRequest } from '../../core/types';
+import { ExtendedRequest, ICacheService } from '../../core/types';
 
 /**
  * 클라이언트 정보 인터페이스
@@ -70,7 +70,9 @@ export interface ClientInfo {
  */
 @Injectable()
 export class ClientInfoService {
-  constructor() {}
+  constructor(
+    @Inject('ICacheService') private readonly cacheService: ICacheService,
+  ) {}
 
   /**
    * 전체 클라이언트 정보 수집
@@ -193,31 +195,49 @@ export class ClientInfoService {
    * 위치 정보 (실제 구현에서는 IP 지리 정보 API 사용)
    */
   private async getLocationInfo(ip: string): Promise<ClientInfo['location']> {
+    const nullLocation = { country: null, countryCode: null, region: null, city: null, isp: null };
+
     // private IP는 GeoIP 조회 불가
     if (RequestUtils.isPrivateIp(ip) || ip === 'unknown') {
-      return { country: null, countryCode: null, region: null, city: null, isp: null };
+      return nullLocation;
     }
 
     try {
-      // ip-api.com (무료, 분당 45회 제한)
-      const response = await fetch(`http://ip-api.com/json/${ip}?fields=country,countryCode,regionName,city,isp,status`);
-      if (!response.ok) {
-        return { country: null, countryCode: null, region: null, city: null, isp: null };
-      }
-      const data = await response.json();
-      if (data.status !== 'success') {
-        return { country: null, countryCode: null, region: null, city: null, isp: null };
-      }
+      // Check cache first
+      const cached = await this.cacheService.get<ClientInfo['location']>('geo:' + ip);
+      if (cached) return cached;
 
-      return {
-        country: data.country ?? null,
-        countryCode: data.countryCode ?? null,
-        region: data.regionName ?? null,
-        city: data.city ?? null,
-        isp: data.isp ?? null,
-      };
+      // ip-api.com (무료, 분당 45회 제한) with 3s timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+
+      try {
+        const response = await fetch(
+          `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=country,countryCode,regionName,city,isp,status`,
+          { signal: controller.signal },
+        );
+        if (!response.ok) return nullLocation;
+
+        const data = await response.json();
+        if (data.status !== 'success') return nullLocation;
+
+        const result: ClientInfo['location'] = {
+          country: data.country ?? null,
+          countryCode: data.countryCode ?? null,
+          region: data.regionName ?? null,
+          city: data.city ?? null,
+          isp: data.isp ?? null,
+        };
+
+        // Cache for 1 hour
+        await this.cacheService.set('geo:' + ip, result, 3600);
+
+        return result;
+      } finally {
+        clearTimeout(timeout);
+      }
     } catch {
-      return { country: null, countryCode: null, region: null, city: null, isp: null };
+      return nullLocation;
     }
   }
 

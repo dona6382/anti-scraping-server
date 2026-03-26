@@ -131,6 +131,33 @@ export class RedisCacheService implements ICacheService, OnModuleInit, OnModuleD
   }
 
   /**
+   * 값 조회 후 즉시 삭제 (atomic — TOCTOU 방지)
+   */
+  async getAndDelete<T>(key: string): Promise<T | null> {
+    if (!this.client || !this.isConnected) {
+      return null;
+    }
+
+    try {
+      // Redis GETDEL (Redis 6.2+) — atomic get+delete
+      const value = await this.client.getdel(key);
+      if (!value) return null;
+      return JSON.parse(value);
+    } catch {
+      // GETDEL 미지원 시 fallback (pipeline으로 최소화)
+      try {
+        const value = await this.client.get(key);
+        if (!value) return null;
+        await this.client.del(key);
+        return JSON.parse(value);
+      } catch (error) {
+        this.logger.error(`Redis GETDEL error for key ${key}: ${error instanceof Error ? error.message : String(error)}`);
+        return null;
+      }
+    }
+  }
+
+  /**
    * 키 존재 확인
    */
   async exists(key: string): Promise<boolean> {
@@ -266,56 +293,6 @@ export class RedisCacheService implements ICacheService, OnModuleInit, OnModuleD
       this.logger.error(`Redis SCAN error for pattern ${pattern}: ${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
-  }
-
-  /**
-   * Redis 연결 상태 확인
-   */
-  isRedisConnected(): boolean {
-    return this.isConnected && this.client !== null;
-  }
-
-  /**
-   * Redis 정보 조회
-   */
-  async getRedisInfo(): Promise<Record<string, unknown> | null> {
-    if (!this.client || !this.isConnected) {
-      return null;
-    }
-
-    try {
-      const info = await this.client.info();
-      const memory = await this.client.info('memory');
-      const keyspace = await this.client.info('keyspace');
-      
-      return {
-        connected: this.isConnected,
-        version: this.extractInfoValue(info, 'redis_version'),
-        uptime: this.extractInfoValue(info, 'uptime_in_seconds'),
-        connectedClients: this.extractInfoValue(info, 'connected_clients'),
-        usedMemory: this.extractInfoValue(memory, 'used_memory_human'),
-        totalKeys: this.extractKeyspaceKeys(keyspace),
-      };
-    } catch (error) {
-      this.logger.error(`Redis INFO error: ${error instanceof Error ? error.message : String(error)}`);
-      return null;
-    }
-  }
-
-  /**
-   * Redis info 파싱 헬퍼
-   */
-  private extractInfoValue(info: string, key: string): string | null {
-    const match = info.match(new RegExp(`${key}:(.+)`));
-    return match ? match[1].trim() : null;
-  }
-
-  /**
-   * Keyspace에서 키 개수 추출
-   */
-  private extractKeyspaceKeys(keyspace: string): number {
-    const match = keyspace.match(/keys=(\d+)/);
-    return match ? parseInt(match[1], 10) : 0;
   }
 
   /**

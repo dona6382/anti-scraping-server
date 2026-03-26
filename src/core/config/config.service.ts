@@ -67,8 +67,4 @@ export class AppConfigService {
     return this.configService.get('database', { infer: true });
   }
 
-  // Utility Methods
-  get<T = unknown>(key: keyof AppConfig): T {
-    return this.configService.get(key) as T;
-  }
 }

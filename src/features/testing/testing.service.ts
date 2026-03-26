@@ -112,7 +112,7 @@ export class TestingService {
     };
   }
 
-  private testRateLimit(request: ExtendedRequest): TestResult {
+  private testRateLimit(_request: ExtendedRequest): TestResult {
     return {
       test: 'Rate Limit',
       status: 'passed',

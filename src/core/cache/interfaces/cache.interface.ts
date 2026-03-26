@@ -6,6 +6,7 @@ export interface ICacheService {
   get<T>(key: string): Promise<T | null>;
   set<T>(key: string, value: T, ttl?: number): Promise<void>;
   delete(key: string): Promise<void>;
+  getAndDelete<T>(key: string): Promise<T | null>;
   exists(key: string): Promise<boolean>;
   clear(): Promise<void>;
   getMany<T>(keys: string[]): Promise<(T | null)[]>;

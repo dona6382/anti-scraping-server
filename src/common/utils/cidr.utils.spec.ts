@@ -75,9 +75,15 @@ describe('CidrUtils', () => {
   describe('isValidCidr', () => {
     it('valid CIDR formats', () => {
       expect(CidrUtils.isValidCidr('192.168.0.0/24')).toBe(true);
-      expect(CidrUtils.isValidCidr('10.0.0.0/8')).toBe(true);
-      expect(CidrUtils.isValidCidr('0.0.0.0/0')).toBe(true);
+      expect(CidrUtils.isValidCidr('172.16.0.0/16')).toBe(true);
       expect(CidrUtils.isValidCidr('255.255.255.255/32')).toBe(true);
+    });
+
+    it('prefix < 16 rejected (too broad)', () => {
+      expect(CidrUtils.isValidCidr('0.0.0.0/0')).toBe(false);
+      expect(CidrUtils.isValidCidr('10.0.0.0/8')).toBe(false);
+      expect(CidrUtils.isValidCidr('10.0.0.0/15')).toBe(false);
+      expect(CidrUtils.isValidCidr('172.16.0.0/16')).toBe(true);
     });
 
     it('missing prefix → false', () => {

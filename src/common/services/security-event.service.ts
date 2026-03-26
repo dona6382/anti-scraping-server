@@ -107,7 +107,7 @@ export class SecurityEventService {
 
       // Update threat score
       if (dto.ip && dto.severity) {
-        this.threatScoreService.recordViolation(dto.ip, dto.eventType, dto.severity).catch(() => {});
+        this.threatScoreService.recordViolation(dto.ip, dto.eventType, dto.severity).catch(err => this.logger.error('Failed to record violation', err?.message));
       }
 
       // 자동 차단 체크 (IP가 있고, 이미 차단 이벤트가 아닌 경우)
@@ -165,7 +165,7 @@ export class SecurityEventService {
               description: `Auto-blocked after ${newCount} violations (${eventType}). TTL: ${threshold.blockTtl}s`,
               actions: { blocked: true, notified: false, escalated: false, autoResolved: false },
             });
-            this.securityEventRepository.save(autoBlockEvent).catch(() => {});
+            this.securityEventRepository.save(autoBlockEvent).catch(err => this.logger.error('Failed to save auto-block event', err?.message));
           }
           break;
         }

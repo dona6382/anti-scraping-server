@@ -21,6 +21,7 @@ export interface RequestLogEntry {
 export const REQUEST_LOG_TTL = 3600; // 1시간
 export const MAX_ENTRIES_PER_IP = 200; // IP당 최대 저장 수
 export const REQUEST_LOG_PREFIX = 'req_log:';
+export const ACTIVE_IPS_KEY = 'req_log:active_ips';
 
 // 로깅 제외 경로 (노이즈 감소)
 const EXCLUDED_PATHS = ['/health', '/health/live', '/health/ready', '/favicon.ico'];
@@ -83,5 +84,12 @@ export class RequestLoggerMiddleware implements NestMiddleware {
     }
 
     await this.cache.set(key, logs, REQUEST_LOG_TTL);
+
+    // 활성 IP 목록 업데이트 (scoreboard에서 cache.keys 대신 사용)
+    const activeIps = await this.cache.get<string[]>(ACTIVE_IPS_KEY) || [];
+    if (!activeIps.includes(normalizedIp)) {
+      activeIps.push(normalizedIp);
+      await this.cache.set(ACTIVE_IPS_KEY, activeIps, REQUEST_LOG_TTL);
+    }
   }
 }

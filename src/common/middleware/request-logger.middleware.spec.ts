@@ -117,7 +117,9 @@ describe('RequestLoggerMiddleware', () => {
       m: 'GET',
       s: 200,
     }));
-    mockCache.get.mockResolvedValue(existingLogs);
+    mockCache.get
+      .mockResolvedValueOnce(existingLogs)  // req_log:{ip}
+      .mockResolvedValueOnce(null);          // active_ips
 
     const req = createMockReq('/api/new');
     const res = createMockRes(201);
@@ -126,7 +128,7 @@ describe('RequestLoggerMiddleware', () => {
     await finishCallback!();
     await new Promise(resolve => setImmediate(resolve));
 
-    expect(mockCache.set).toHaveBeenCalledTimes(1);
+    expect(mockCache.set).toHaveBeenCalledTimes(2); // logs + active_ips
     const savedLogs = mockCache.set.mock.calls[0][1];
     expect(savedLogs).toHaveLength(MAX_ENTRIES_PER_IP);
     // The newest entry should be at the end

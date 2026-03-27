@@ -12,6 +12,7 @@ import { AnalysisModule } from '../../features/analysis/analysis.module';
 import { RealtimeModule } from '../../features/realtime/realtime.module';
 import { ChallengeModule } from '../../features/challenge/challenge.module';
 import { HoneypotModule } from '../../features/honeypot/honeypot.module';
+import { ScoreboardModule } from '../../features/scoreboard/scoreboard.module';
 
 const coreModules = [
   AuthModule,
@@ -24,6 +25,7 @@ const coreModules = [
   RealtimeModule,
   ChallengeModule,
   HoneypotModule,
+  ScoreboardModule,
 ];
 
 // TestingModule은 프로덕션에서 비활성화 (내부 정보 노출 방지)

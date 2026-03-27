@@ -407,11 +407,19 @@
             background: transparent;
             border: 1px solid var(--border);
             color: var(--text-dim);
+            transition: all 0.2s;
         }
 
         .btn-outline:hover {
             border-color: var(--green);
             color: var(--green);
+        }
+
+        .btn-outline.active, .btn-primary.active {
+            background: var(--green);
+            color: var(--bg-deep);
+            border-color: var(--green);
+            box-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
         }
 
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -515,6 +523,443 @@
             .stats-bar { grid-template-columns: 1fr; }
             .status-cluster { display: none; }
         }
+
+        /* ═══ TABS ═══ */
+        .tab-bar {
+            display: flex;
+            gap: 0.25rem;
+            margin-bottom: 2rem;
+            background: rgba(13, 21, 32, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.3rem;
+        }
+
+        .tab-btn {
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 0.8rem 1.8rem;
+            background: transparent;
+            border: none;
+            border-radius: 10px;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.25s;
+            flex: 1;
+            text-align: center;
+        }
+
+        .tab-btn:hover {
+            color: var(--text);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .tab-btn.active {
+            color: #fff;
+            background: linear-gradient(135deg, rgba(0,255,136,0.15), rgba(0,212,255,0.1));
+            border: 1px solid var(--green);
+            box-shadow: 0 0 12px rgba(0,255,136,0.15);
+        }
+
+        .tab-btn[data-tab="scoreboard-panel"] {
+            position: relative;
+        }
+        .tab-btn[data-tab="scoreboard-panel"]::after {
+            content: "⚔️";
+            margin-left: 0.4rem;
+            font-size: 0.9rem;
+        }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; animation: fadeUp 0.4s ease-out; }
+
+        /* ═══ SCOREBOARD ═══ */
+        .sb-match-header {
+            text-align: center;
+            padding: 2rem 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(180deg, rgba(0,255,136,0.04) 0%, transparent 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .sb-match-header .sb-versus {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .sb-team-label {
+            font-family: var(--sans);
+            font-weight: 700;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .sb-team-label.defense { color: var(--green); }
+        .sb-team-label.attack { color: #ff4757; }
+
+        .sb-big-score {
+            font-family: var(--mono);
+            font-weight: 700;
+            font-size: 3.2rem;
+            line-height: 1;
+        }
+
+        .sb-big-score.defense { color: var(--green); }
+        .sb-big-score.attack { color: #ff4757; }
+
+        .sb-colon {
+            font-family: var(--mono);
+            font-weight: 300;
+            font-size: 2.8rem;
+            color: var(--text-muted);
+            line-height: 1;
+        }
+
+        .sb-match-sub {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 0.75rem;
+            letter-spacing: 0.08em;
+        }
+
+        /* Score Cards Row */
+        .sb-cards-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            align-items: stretch;
+        }
+
+        @media (max-width: 900px) {
+            .sb-cards-row { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 500px) {
+            .sb-cards-row { grid-template-columns: 1fr; }
+            .sb-big-score { font-size: 2.4rem; }
+            .sb-bottom-row { grid-template-columns: 1fr !important; }
+        }
+
+        .sb-score-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sb-score-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+        }
+
+        .sb-score-card.defense::before { background: var(--green); }
+        .sb-score-card.attack::before { background: #ff4757; }
+        .sb-score-card.threats::before { background: #ff9f43; }
+
+        .sb-card-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 0.4rem;
+        }
+
+        .sb-card-score {
+            font-family: var(--mono);
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .sb-score-card.defense .sb-card-score { color: var(--green); }
+        .sb-score-card.attack .sb-card-score { color: #ff4757; }
+        .sb-score-card.threats .sb-card-score { color: #ff9f43; }
+
+        .sb-progress-track {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-deep);
+            border-radius: 3px;
+            margin-bottom: 0.5rem;
+            overflow: hidden;
+        }
+
+        .sb-progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.6s ease;
+        }
+
+        .sb-progress-fill.green { background: var(--green); }
+        .sb-progress-fill.red { background: #ff4757; }
+
+        .sb-card-detail {
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            color: var(--text-dim);
+        }
+
+        /* Time Filter */
+        .sb-time-filter {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sb-time-filter select {
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            background: var(--bg-deep);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.5rem 0.8rem;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .sb-time-filter select:focus {
+            outline: none;
+            border-color: var(--green);
+        }
+
+        /* Guard Contribution */
+        .sb-guard-section {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .sb-guard-title {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-dim);
+            margin-bottom: 1rem;
+        }
+
+        .sb-guard-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.7rem;
+        }
+
+        .sb-guard-name {
+            font-size: 0.8rem;
+            color: var(--text);
+            width: 130px;
+            flex-shrink: 0;
+        }
+
+        .sb-guard-bar-track {
+            flex: 1;
+            height: 18px;
+            background: var(--bg-deep);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .sb-guard-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s ease;
+            min-width: 2px;
+        }
+
+        .sb-guard-pct {
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            width: 50px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        /* Bottom Row */
+        .sb-bottom-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .sb-panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .sb-panel-title {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-dim);
+            margin-bottom: 1rem;
+        }
+
+        /* Timeline Chart */
+        .sb-timeline {
+            display: flex;
+            align-items: flex-end;
+            gap: 3px;
+            height: 160px;
+            padding-top: 0.5rem;
+        }
+
+        .sb-timeline-bar {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            min-width: 4px;
+            border-radius: 2px 2px 0 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .sb-timeline-bar .blocked {
+            background: var(--green);
+            transition: height 0.4s ease;
+        }
+
+        .sb-timeline-bar .success {
+            background: #ff4757;
+            transition: height 0.4s ease;
+        }
+
+        .sb-timeline-legend {
+            display: flex;
+            gap: 1.2rem;
+            margin-top: 0.75rem;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        .sb-timeline-legend span::before {
+            content: '';
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 0.4rem;
+            vertical-align: middle;
+        }
+
+        .sb-timeline-legend .legend-blocked::before { background: var(--green); }
+        .sb-timeline-legend .legend-success::before { background: #ff4757; }
+
+        /* Recommendations */
+        .sb-rec-section {
+            margin-bottom: 1rem;
+        }
+
+        .sb-rec-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .sb-rec-label {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+        }
+
+        .sb-rec-label.defense {
+            color: var(--green);
+            background: var(--green-bg);
+            border-left: 3px solid var(--green);
+        }
+
+        .sb-rec-label.attack {
+            color: #ff4757;
+            background: rgba(255,71,87,0.08);
+            border-left: 3px solid #ff4757;
+        }
+
+        .sb-rec-item {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+            padding: 0.4rem 0 0.4rem 0.8rem;
+            border-left: 1px solid var(--border);
+            margin-left: 0.3rem;
+        }
+
+        .sb-rec-priority {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            font-weight: 600;
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            margin-right: 0.4rem;
+        }
+
+        .sb-rec-priority.HIGH { background: rgba(255,71,87,0.15); color: #ff4757; }
+        .sb-rec-priority.MEDIUM { background: rgba(255,159,67,0.15); color: #ff9f43; }
+        .sb-rec-priority.LOW { background: rgba(0,212,255,0.15); color: var(--cyan); }
+
+        /* Token input for scoreboard */
+        .sb-auth-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .sb-auth-bar label {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+        }
+
+        .sb-auth-bar input {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.5rem 0.8rem;
+            background: var(--bg-deep);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 0.78rem;
+        }
+
+        .sb-auth-bar input:focus {
+            outline: none;
+            border-color: var(--green);
+            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1);
+        }
+
+        .sb-loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+            font-family: var(--mono);
+            font-size: 0.85rem;
+        }
     </style>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 </head>
@@ -563,6 +1008,41 @@
         </div>
     </div>
 
+    <!-- ═══ AUTH PANEL (hidden by default) ═══ -->
+    <div id="auth-toggle" style="text-align:right; margin-bottom:0.5rem;">
+        <button onclick="toggleAuthPanel()" style="background:none; border:1px solid var(--border); color:var(--text-dim); padding:0.3rem 0.8rem; border-radius:6px; cursor:pointer; font-size:0.75rem; font-family:var(--mono);">🔑 Admin Auth</button>
+    </div>
+    <div id="auth-panel" style="display:none; background:var(--card-bg); border:1px solid var(--border); border-radius:10px; padding:1rem 1.2rem; margin-bottom:1.2rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.8rem;">
+            <span style="color:var(--amber); font-size:0.85rem;">🔑</span>
+            <span style="color:var(--text); font-size:0.85rem; font-weight:600;">Admin Authentication</span>
+            <span style="color:var(--text-dim); font-size:0.6rem; font-style:italic; margin-left:0.3rem;">개인 테스트용 — JWT token 버튼 활성화</span>
+            <span id="auth-status" style="margin-left:auto; font-size:0.7rem; color:var(--text-dim);">Not authenticated</span>
+        </div>
+        <div id="auth-login-form" style="display:flex; gap:0.5rem; margin-bottom:0.6rem; flex-wrap:wrap;">
+            <input type="text" id="auth-username" placeholder="Username" style="flex:1; min-width:120px; padding:0.5rem 0.8rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:var(--mono); font-size:0.8rem;">
+            <input type="password" id="auth-password" placeholder="Password" style="flex:1; min-width:120px; padding:0.5rem 0.8rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:var(--mono); font-size:0.8rem;">
+            <button onclick="doAdminLogin()" style="padding:0.5rem 1rem; background:var(--green); color:#0a0e17; border:none; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.8rem; font-family:var(--mono);">Login</button>
+        </div>
+        <div id="auth-token-display" style="display:none;">
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <input type="text" id="auth-token-value" readonly style="flex:1; padding:0.4rem 0.6rem; background:var(--bg); border:1px solid var(--green); border-radius:6px; color:var(--green); font-family:var(--mono); font-size:0.7rem;">
+                <button onclick="copyToken()" style="padding:0.4rem 0.8rem; background:var(--border); color:var(--text); border:none; border-radius:6px; cursor:pointer; font-size:0.75rem;">Copy</button>
+                <button onclick="doAdminLogout()" style="padding:0.4rem 0.8rem; background:var(--red); color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:0.75rem;">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ TABS ═══ -->
+    <div class="tab-bar">
+        <button class="tab-btn active" data-tab="tests-panel">🛡️ Security Tests</button>
+        <button class="tab-btn" data-tab="feed-panel">📡 Live Feed</button>
+        <button class="tab-btn" data-tab="scoreboard-panel">Scoreboard</button>
+    </div>
+
+    <!-- ═══ TAB: SECURITY TESTS ═══ -->
+    <div id="tests-panel" class="tab-panel active">
+
     <!-- ═══ ENDPOINT TESTS ═══ -->
     <div class="section-label">Endpoint Security Tests</div>
 
@@ -575,7 +1055,7 @@
                     <div class="card-icon green">📊</div>
                     <span class="card-name">Public Data</span>
                 </div>
-                <span class="card-tag tag-public">🛡 5 Guards</span>
+                <span class="card-tag tag-public">🛡 7 Layers</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">Basic rate limiting only. Open endpoint for public data access.</p>
@@ -591,7 +1071,7 @@
                     <div class="card-icon amber">🔒</div>
                     <span class="card-name">Protected Stats</span>
                 </div>
-                <span class="card-tag tag-public">🛡 5 Guards</span>
+                <span class="card-tag tag-public">🛡 7 Layers</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">IP blacklist + User-Agent filter + headless browser detection.</p>
@@ -600,57 +1080,14 @@
             </div>
         </div>
 
-        <!-- Card 3: Contact Form -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <div class="card-icon amber">📧</div>
-                    <span class="card-name">Form Submission</span>
-                </div>
-                <span class="card-tag tag-public">🛡 5 Guards</span>
-            </div>
-            <div class="card-body">
-                <p class="card-desc">Hidden honeypot fields trap automated submissions.</p>
-                <form id="contact-form">
-                    <div class="field-row">
-                        <div class="field">
-                            <label>Name</label>
-                            <input type="text" id="name" name="name" required placeholder="John Doe">
-                        </div>
-                        <div class="field">
-                            <label>Email</label>
-                            <input type="email" id="email" name="email" required placeholder="john@example.com">
-                        </div>
-                    </div>
-                    <!-- Honeypot Fields -->
-                    <div class="hidden-field" aria-hidden="true">
-                        <label for="email_confirm">Leave empty</label>
-                        <input type="text" name="email_confirm" id="email_confirm" tabindex="-1" autocomplete="off">
-                    </div>
-                    <div class="invisible-field">
-                        <input type="text" name="website" placeholder="website">
-                    </div>
-                    <div class="opacity-field">
-                        <input type="text" name="phone_verify" placeholder="phone">
-                    </div>
-                    <div class="field">
-                        <label>Message</label>
-                        <textarea id="message" name="message" required placeholder="Type your message..."></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">▶ Submit</button>
-                </form>
-                <div id="contact-response" class="response-panel"></div>
-            </div>
-        </div>
-
-        <!-- Card 4: Rate Limit -->
+        <!-- Card 3: Rate Limit -->
         <div class="card">
             <div class="card-header">
                 <div class="card-title">
                     <div class="card-icon cyan">⏱</div>
                     <span class="card-name">Rate Limiter</span>
                 </div>
-                <span class="card-tag tag-public">🛡 5 Guards</span>
+                <span class="card-tag tag-public">🛡 7 Layers</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">Click rapidly to trigger rate limiting protection.</p>
@@ -672,7 +1109,7 @@
                     <div class="card-icon green">🔍</div>
                     <span class="card-name">Search API</span>
                 </div>
-                <span class="card-tag tag-public">🛡 5 Guards</span>
+                <span class="card-tag tag-public">🛡 7 Layers</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">Search endpoint with headless browser detection layer.</p>
@@ -692,7 +1129,7 @@
                     <div class="card-icon red">⚙</div>
                     <span class="card-name">Blacklist Stats</span>
                 </div>
-                <span class="card-tag tag-admin">🛡 5 Guards + JWT</span>
+                <span class="card-tag tag-admin">🛡 7 Layers + JWT</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">View IP blocking statistics. Requires admin JWT token.</p>
@@ -708,7 +1145,7 @@
                     <div class="card-icon red">🚫</div>
                     <span class="card-name">IP Block Manager</span>
                 </div>
-                <span class="card-tag tag-admin">🛡 5 Guards + JWT</span>
+                <span class="card-tag tag-admin">🛡 7 Layers + JWT</span>
             </div>
             <div class="card-body">
                 <p class="card-desc">Add IPs to the blacklist with reason and expiry.</p>
@@ -731,21 +1168,6 @@
             </div>
         </div>
 
-        <!-- Card: Live Security Feed -->
-        <div class="card" style="grid-column: 1 / -1;">
-            <div class="card-header">
-                <div class="card-title">
-                    <div class="card-icon green">📡</div>
-                    <span class="card-name">Live Security Feed</span>
-                </div>
-                <span id="ws-status" style="font-family:var(--mono);font-size:0.7rem;color:var(--text-muted)">CONNECTING...</span>
-            </div>
-            <div class="card-body">
-                <div id="live-feed" style="max-height:300px;overflow-y:auto;background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;"></div>
-                <p class="card-desc" style="margin-top:0.5rem;">Real-time security events via WebSocket. Trigger tests above to see events appear.</p>
-            </div>
-        </div>
-
         <!-- Card 8: Security Chain Tester -->
         <div class="card" style="grid-column: 1 / -1;">
             <div class="card-header">
@@ -757,17 +1179,124 @@
             </div>
             <div class="card-body">
                 <p class="card-desc">Intentionally trigger each security layer to verify the chain is working.</p>
-                <div class="btn-group" style="flex-wrap: wrap; gap: 0.5rem;">
-                    <button class="btn btn-primary" onclick="testNormalRequest()">✓ Normal Request</button>
-                    <button class="btn btn-outline" onclick="testBotUA()">🤖 Bot UA (Scrapy)</button>
-                    <button class="btn btn-outline" onclick="testHeadlessUA()">👻 Headless Chrome</button>
-                    <button class="btn btn-outline" onclick="testRapidFire()">⏱ Rapid Fire (x25)</button>
+                <div class="btn-group chain-btns" style="flex-wrap: wrap; gap: 0.5rem;">
+                    <button class="btn btn-outline" onclick="chainBtnClick(this); testNormalRequest()">✓ Normal Request</button>
+                    <button class="btn btn-outline" onclick="chainBtnClick(this); testBotUA()">🤖 Bot UA (Scrapy)</button>
+                    <button class="btn btn-outline" onclick="chainBtnClick(this); testHeadlessUA()">👻 Headless Chrome</button>
+                    <button class="btn btn-outline" onclick="chainBtnClick(this); testRapidFire()">⏱ Rapid Fire (x25)</button>
                 </div>
                 <div id="chain-response" class="response-panel"></div>
             </div>
         </div>
 
     </div>
+    </div><!-- /tests-panel -->
+
+    <!-- ═══ TAB: LIVE FEED ═══ -->
+    <div id="feed-panel" class="tab-panel">
+        <div class="card" style="width:100%;">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon green">📡</div>
+                    <span class="card-name">Live Security Feed</span>
+                </div>
+                <span id="ws-status" style="font-family:var(--mono);font-size:0.7rem;color:var(--text-muted)">CONNECTING...</span>
+            </div>
+            <div class="card-body">
+                <div id="live-feed" style="max-height:500px;overflow-y:auto;background:var(--bg-deep);border:1px solid var(--border);border-radius:8px;"></div>
+                <p class="card-desc" style="margin-top:0.5rem;">Real-time security events via WebSocket. Trigger tests in the Security Tests tab to see events appear.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ TAB: SCOREBOARD ═══ -->
+    <div id="scoreboard-panel" class="tab-panel">
+
+        <!-- Auth Token -->
+        <div class="sb-auth-bar">
+            <label>JWT Token</label>
+            <input type="password" id="sb-token" placeholder="Paste admin JWT token..." />
+            <button class="btn btn-primary" onclick="sbRefresh()">Load Scoreboard</button>
+        </div>
+
+        <!-- Match Score Header -->
+        <div class="sb-match-header" id="sb-match-header">
+            <div class="sb-versus">
+                <div>
+                    <div class="sb-team-label defense">🛡️ DEFENSE</div>
+                </div>
+                <div class="sb-big-score defense" id="sb-def-score">--</div>
+                <div class="sb-colon">:</div>
+                <div class="sb-big-score attack" id="sb-atk-score">--</div>
+                <div>
+                    <div class="sb-team-label attack">⚔️ ATTACK</div>
+                </div>
+            </div>
+            <div class="sb-match-sub" id="sb-period">Waiting for data...</div>
+        </div>
+
+        <!-- Score Cards Row -->
+        <div class="sb-cards-row">
+            <div class="sb-score-card defense">
+                <div class="sb-card-label">Defense Score</div>
+                <div class="sb-card-score" id="sb-def-pct">--%</div>
+                <div class="sb-progress-track">
+                    <div class="sb-progress-fill green" id="sb-def-bar" style="width:0%"></div>
+                </div>
+                <div class="sb-card-detail" id="sb-def-detail">-- blocked / -- total</div>
+            </div>
+            <div class="sb-score-card attack">
+                <div class="sb-card-label">Attack Score</div>
+                <div class="sb-card-score" id="sb-atk-pct">--%</div>
+                <div class="sb-progress-track">
+                    <div class="sb-progress-fill red" id="sb-atk-bar" style="width:0%"></div>
+                </div>
+                <div class="sb-card-detail" id="sb-atk-detail">-- success / -- total</div>
+            </div>
+            <div class="sb-score-card threats">
+                <div class="sb-card-label">Active Threats</div>
+                <div class="sb-card-score" id="sb-threats">--</div>
+                <div class="sb-card-detail" id="sb-top-attacker">&nbsp;</div>
+            </div>
+            <div class="sb-time-filter">
+                <select id="sb-hours" onchange="sbRefresh()">
+                    <option value="1">Last 1h</option>
+                    <option value="6">Last 6h</option>
+                    <option value="24">Last 24h</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Guard Contribution -->
+        <div class="sb-guard-section">
+            <div class="sb-guard-title">Guard Contribution</div>
+            <div id="sb-guards">
+                <div class="sb-loading">Load scoreboard to see guard contributions</div>
+            </div>
+        </div>
+
+        <!-- Bottom Row: Timeline + Recommendations -->
+        <div class="sb-bottom-row">
+            <div class="sb-panel">
+                <div class="sb-panel-title">Timeline (5-min intervals)</div>
+                <div class="sb-timeline" id="sb-timeline">
+                    <div class="sb-loading" style="width:100%">No data</div>
+                </div>
+                <div class="sb-timeline-legend">
+                    <span class="legend-blocked">Blocked</span>
+                    <span class="legend-success">Success</span>
+                </div>
+            </div>
+            <div class="sb-panel">
+                <div class="sb-panel-title">Recommendations</div>
+                <div id="sb-recommendations">
+                    <div class="sb-loading">Load scoreboard to see recommendations</div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /scoreboard-panel -->
+
 </main>
 
 <footer class="footer">
@@ -852,7 +1381,10 @@
     async function fetchWithFingerprint(url, options = {}) {
         const headers = options.headers || {};
         headers['X-Browser-Fingerprint'] = JSON.stringify(window._browserFingerprint);
-        return fetch(url, { ...options, headers });
+        if (adminToken && url.includes('/admin/')) {
+            headers['Authorization'] = `Bearer ${adminToken}`;
+        }
+        return fetch(url, { ...options, headers, credentials: 'same-origin' });
     }
 
     // ═══ TEST FUNCTIONS ═══
@@ -860,6 +1392,11 @@
         bumpReq();
         try {
             const r = await fetchWithFingerprint(`${API_BASE}/api/public/data`);
+            const ct = r.headers.get('content-type') || '';
+            if (ct.includes('text/html') && r.status === 403) {
+                displayResponse('public-response', { status: 403, message: 'Challenge required — visit /api/public/data in browser first to solve PoW, then retry' }, true);
+                return;
+            }
             const d = await r.json();
             displayResponse('public-response', d, !r.ok);
         } catch (e) { displayResponse('public-response', e.message, true); }
@@ -869,29 +1406,16 @@
         bumpReq();
         try {
             const r = await fetchWithFingerprint(`${API_BASE}/api/public/stats`);
+            const ct = r.headers.get('content-type') || '';
+            if (ct.includes('text/html') && r.status === 403) {
+                displayResponse('protected-response', { status: 403, message: 'Challenge required — visit /api/public/data in browser first' }, true);
+                return;
+            }
             const d = await r.json();
             displayResponse('protected-response', d, !r.ok);
         } catch (e) { displayResponse('protected-response', e.message, true); }
     }
 
-    document.getElementById('contact-form').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        bumpReq();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData);
-        data._browserProps = window._browserFingerprint;
-
-        try {
-            const r = await fetchWithFingerprint(`${API_BASE}/test/action`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            const result = await r.json();
-            displayResponse('contact-response', result, !r.ok);
-            if (r.ok) e.target.reset();
-        } catch (e2) { displayResponse('contact-response', e2.message, true); }
-    });
 
     let rateCounter = 0;
     async function testRateLimit() {
@@ -950,13 +1474,95 @@
         } catch (e) { displayResponse('blacklist-response', e.message, true); }
     }
 
+    // ═══ CHAIN BUTTON ACTIVE STATE ═══
+    function chainBtnClick(el) {
+        document.querySelectorAll('.chain-btns .btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    // ═══ ADMIN AUTH ═══
+    let adminToken = sessionStorage.getItem('adminToken') || '';
+
+    function toggleAuthPanel() {
+        const panel = document.getElementById('auth-panel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function doAdminLogin() {
+        const username = document.getElementById('auth-username').value;
+        const password = document.getElementById('auth-password').value;
+        if (!username || !password) return;
+
+        try {
+            const r = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+            body: JSON.stringify({ username, password })
+            });
+            const d = await r.json();
+            if (r.ok && d.access_token) {
+                adminToken = d.access_token;
+                sessionStorage.setItem('adminToken', adminToken);
+                document.getElementById('auth-status').textContent = `✅ ${d.user?.username || username} (${d.user?.role})`;
+                document.getElementById('auth-status').style.color = 'var(--green)';
+                document.getElementById('auth-login-form').style.display = 'none';
+                document.getElementById('auth-token-display').style.display = 'block';
+                document.getElementById('auth-token-value').value = adminToken.substring(0, 40) + '...';
+                // Auto-fill scoreboard token if exists
+                const sbToken = document.getElementById('sb-token');
+                if (sbToken) sbToken.value = adminToken;
+            } else {
+                document.getElementById('auth-status').textContent = `❌ ${d.message || 'Login failed'}`;
+                document.getElementById('auth-status').style.color = 'var(--red)';
+            }
+        } catch (e) {
+            document.getElementById('auth-status').textContent = `❌ ${e.message}`;
+            document.getElementById('auth-status').style.color = 'var(--red)';
+        }
+    }
+
+    function doAdminLogout() {
+        adminToken = '';
+        sessionStorage.removeItem('adminToken');
+        document.getElementById('auth-status').textContent = 'Not authenticated';
+        document.getElementById('auth-status').style.color = 'var(--text-dim)';
+        document.getElementById('auth-login-form').style.display = 'flex';
+        document.getElementById('auth-token-display').style.display = 'none';
+    }
+
+    function copyToken() {
+        navigator.clipboard.writeText(adminToken).then(() => {
+            document.getElementById('auth-status').textContent = '📋 Copied!';
+            setTimeout(() => { document.getElementById('auth-status').textContent = '✅ Authenticated'; }, 1500);
+        });
+    }
+
+    // Restore token on load
+    if (adminToken) {
+        document.getElementById('auth-status').textContent = '✅ Authenticated (restored)';
+        document.getElementById('auth-status').style.color = 'var(--green)';
+        document.getElementById('auth-login-form').style.display = 'none';
+        document.getElementById('auth-token-display').style.display = 'block';
+        document.getElementById('auth-token-value').value = adminToken.substring(0, 40) + '...';
+        const sbToken = document.getElementById('sb-token');
+        if (sbToken) sbToken.value = adminToken;
+    }
+
+    // ═══ SAFE JSON PARSE ═══
+    async function safeJson(r) {
+        const ct = r.headers.get('content-type') || '';
+        if (ct.includes('application/json')) return r.json();
+        return { status: r.status, message: r.status === 403 ? 'Blocked (non-JSON response)' : await r.text().then(t => t.substring(0, 100)) };
+    }
+
     // ═══ SECURITY CHAIN TEST FUNCTIONS ═══
     async function testNormalRequest() {
         bumpReq();
         try {
-            const r = await fetch(`${API_BASE}/api/public/data`);
-            const d = await r.json();
-            displayResponse('chain-response', { test: 'Normal Browser Request', status: r.status, guards: '5/5 passed', data: d }, !r.ok);
+            const r = await fetch(`${API_BASE}/api/public/data`, { credentials: 'same-origin' });
+            const d = await safeJson(r);
+            displayResponse('chain-response', { test: 'Normal Browser Request', status: r.status, guards: '6/6 passed', data: d }, !r.ok);
         } catch (e) { displayResponse('chain-response', e.message, true); }
     }
 
@@ -966,7 +1572,7 @@
             const r = await fetch(`${API_BASE}/api/public/data`, {
                 headers: { 'User-Agent': 'Scrapy/2.11' }
             });
-            const d = await r.json();
+            const d = await safeJson(r);
             if (r.status === 403) bumpBlock();
             displayResponse('chain-response', {
                 test: 'Bot User-Agent (Scrapy)',
@@ -984,7 +1590,7 @@
             const r = await fetch(`${API_BASE}/api/public/data`, {
                 headers: { 'User-Agent': 'Mozilla/5.0 HeadlessChrome/120.0.0.0' }
             });
-            const d = await r.json();
+            const d = await safeJson(r);
             if (r.status === 403) bumpBlock();
             displayResponse('chain-response', {
                 test: 'Headless Browser (HeadlessChrome)',
@@ -1001,7 +1607,7 @@
         for (let i = 0; i < 25; i++) {
             bumpReq();
             try {
-                const r = await fetch(`${API_BASE}/api/public/data`);
+                const r = await fetch(`${API_BASE}/api/public/data`, { credentials: 'same-origin' });
                 results.push({ request: i + 1, status: r.status });
                 if (r.status === 429) { bumpBlock(); break; }
             } catch (e) { results.push({ request: i + 1, error: e.message }); break; }
@@ -1033,6 +1639,7 @@
 
         socket.on('security-event', (event) => {
             addLiveEvent(event);
+            sbIncrementFromEvent(event);
         });
 
         socket.on('auto-block', (data) => {
@@ -1052,6 +1659,214 @@
         feed.prepend(div);
         // Keep max 50 events
         while (feed.children.length > 50) feed.removeChild(feed.lastChild);
+    }
+
+    // ═══ TAB SWITCHING ═══
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    // ═══ SCOREBOARD ═══
+    const SB_BLOCK_TYPES = ['IP_BLOCKED','AUTO_BLOCKED','USER_AGENT_BLOCKED','HEADLESS_BROWSER_DETECTED','BOT_DETECTED','RATE_LIMITED','HONEYPOT_TRIGGERED'];
+    const SB_GUARD_COLORS = {
+        'IP Blacklist': '#00ff88',
+        'Rate Limiting': '#00d4ff',
+        'User-Agent Filter': '#ff9f43',
+        'Headless Detection': '#a55eea',
+        'Behavioral Analysis': '#ffa502',
+        'Honeypot': '#ff6b81'
+    };
+
+    let sbData = { defense: null, attack: null, activeThreats: 0, totalBlocked: 0, totalSuccess: 0, totalEvents: 0 };
+    let sbRefreshTimer = null;
+
+    function sbGetToken() {
+        return adminToken || document.getElementById('sb-token').value.trim();
+    }
+
+    function sbGetHours() {
+        return document.getElementById('sb-hours').value;
+    }
+
+    async function sbFetchJson(path) {
+        const token = sbGetToken();
+        if (!token) throw new Error('JWT token required');
+        const r = await fetch(`${API_BASE}${path}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!r.ok) {
+            const body = await r.json().catch(() => ({}));
+            throw new Error(body.message || `HTTP ${r.status}`);
+        }
+        return r.json();
+    }
+
+    async function sbRefresh() {
+        const token = sbGetToken();
+        if (!token) return alert('Please enter an admin JWT token');
+        const hours = sbGetHours();
+
+        try {
+            const [summary, layers, timeline, recs] = await Promise.all([
+                sbFetchJson(`/admin/scoreboard/summary?hours=${hours}`),
+                sbFetchJson(`/admin/scoreboard/layers?hours=${hours}`),
+                sbFetchJson(`/admin/scoreboard/timeline?hours=${hours}`),
+                sbFetchJson(`/admin/scoreboard/recommendations?hours=${hours}`)
+            ]);
+
+            sbRenderSummary(summary.data);
+            sbRenderLayers(layers.data);
+            sbRenderTimeline(timeline.data);
+            sbRenderRecommendations(recs.data);
+
+            // Start auto-refresh
+            if (sbRefreshTimer) clearInterval(sbRefreshTimer);
+            sbRefreshTimer = setInterval(sbAutoRefresh, 30000);
+        } catch (e) {
+            alert('Scoreboard error: ' + e.message);
+        }
+    }
+
+    async function sbAutoRefresh() {
+        const hours = sbGetHours();
+        try {
+            const [summary, layers, timeline, recs] = await Promise.all([
+                sbFetchJson(`/admin/scoreboard/summary?hours=${hours}`),
+                sbFetchJson(`/admin/scoreboard/layers?hours=${hours}`),
+                sbFetchJson(`/admin/scoreboard/timeline?hours=${hours}`),
+                sbFetchJson(`/admin/scoreboard/recommendations?hours=${hours}`)
+            ]);
+            sbRenderSummary(summary.data);
+            sbRenderLayers(layers.data);
+            sbRenderTimeline(timeline.data);
+            sbRenderRecommendations(recs.data);
+        } catch (e) {
+            console.warn('Scoreboard auto-refresh failed:', e.message);
+        }
+    }
+
+    function sbRenderSummary(data) {
+        const defScore = Math.round(data.defense.score);
+        const atkScore = Math.round(data.attack.score);
+
+        sbData.totalBlocked = data.defense.totalBlocked;
+        sbData.totalSuccess = data.attack.totalSuccess;
+        sbData.totalEvents = data.defense.totalEvents;
+        sbData.activeThreats = data.activeThreats;
+
+        // Match header
+        document.getElementById('sb-def-score').textContent = defScore;
+        document.getElementById('sb-atk-score').textContent = atkScore;
+        document.getElementById('sb-period').textContent =
+            `${new Date(data.period.from).toLocaleTimeString()} — ${new Date(data.period.to).toLocaleTimeString()} (${data.period.hours}h)`;
+
+        // Score cards
+        document.getElementById('sb-def-pct').textContent = data.defense.score.toFixed(1) + '%';
+        document.getElementById('sb-def-bar').style.width = data.defense.score + '%';
+        document.getElementById('sb-def-detail').textContent = `${data.defense.totalBlocked} blocked / ${data.defense.totalEvents} total`;
+
+        document.getElementById('sb-atk-pct').textContent = data.attack.score.toFixed(1) + '%';
+        document.getElementById('sb-atk-bar').style.width = data.attack.score + '%';
+        document.getElementById('sb-atk-detail').textContent = `${data.attack.totalSuccess} success / ${data.attack.totalRequests} total`;
+
+        document.getElementById('sb-threats').textContent = data.activeThreats;
+        document.getElementById('sb-top-attacker').textContent =
+            data.topAttackerIp ? `Top: ${data.topAttackerIp.substring(0, 12)}...` : 'No attackers';
+    }
+
+    function sbRenderLayers(data) {
+        const container = document.getElementById('sb-guards');
+        if (!data.layers || data.layers.length === 0) {
+            container.innerHTML = '<div class="sb-loading">No guard data available</div>';
+            return;
+        }
+        container.innerHTML = data.layers.map(layer => {
+            const color = SB_GUARD_COLORS[layer.name] || '#888';
+            return `
+                <div class="sb-guard-row">
+                    <span class="sb-guard-name">${layer.name}</span>
+                    <div class="sb-guard-bar-track">
+                        <div class="sb-guard-bar-fill" style="width:${layer.percentage}%;background:${color}"></div>
+                    </div>
+                    <span class="sb-guard-pct">${layer.percentage.toFixed(1)}%</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function sbRenderTimeline(data) {
+        const container = document.getElementById('sb-timeline');
+        if (!data.intervals || data.intervals.length === 0) {
+            container.innerHTML = '<div class="sb-loading" style="width:100%">No timeline data</div>';
+            return;
+        }
+        const maxTotal = Math.max(...data.intervals.map(i => i.total), 1);
+        container.innerHTML = data.intervals.map(interval => {
+            const bH = Math.max((interval.blocked / maxTotal) * 150, 1);
+            const sH = Math.max((interval.success / maxTotal) * 150, 1);
+            const time = new Date(interval.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return `
+                <div class="sb-timeline-bar" title="${time} — Blocked: ${interval.blocked}, Success: ${interval.success}">
+                    <div class="success" style="height:${sH}px"></div>
+                    <div class="blocked" style="height:${bH}px"></div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function sbRenderRecommendations(data) {
+        const container = document.getElementById('sb-recommendations');
+        let html = '';
+
+        if (data.defense && data.defense.length > 0) {
+            html += '<div class="sb-rec-section">';
+            html += '<div class="sb-rec-label defense">🛡️ Defense</div>';
+            data.defense.forEach(rec => {
+                html += `<div class="sb-rec-item"><span class="sb-rec-priority ${rec.priority}">${rec.priority}</span> ${rec.message}</div>`;
+            });
+            html += '</div>';
+        }
+
+        if (data.attack && data.attack.length > 0) {
+            html += '<div class="sb-rec-section">';
+            html += '<div class="sb-rec-label attack">⚔️ Attack</div>';
+            data.attack.forEach(rec => {
+                html += `<div class="sb-rec-item"><span class="sb-rec-priority ${rec.priority}">${rec.priority}</span> ${rec.message}</div>`;
+            });
+            html += '</div>';
+        }
+
+        if (!html) html = '<div class="sb-loading">No recommendations</div>';
+        container.innerHTML = html;
+    }
+
+    // Increment counters from WebSocket events (real-time)
+    function sbIncrementFromEvent(event) {
+        if (!sbData.totalEvents) return; // scoreboard not loaded yet
+        if (SB_BLOCK_TYPES.includes(event.eventType)) {
+            sbData.totalBlocked++;
+            sbData.totalEvents++;
+        } else {
+            sbData.totalSuccess++;
+            sbData.totalEvents++;
+        }
+        // Update the displayed numbers
+        const defScore = sbData.totalEvents > 0 ? (sbData.totalBlocked / sbData.totalEvents) * 100 : 0;
+        const atkScore = sbData.totalEvents > 0 ? (sbData.totalSuccess / sbData.totalEvents) * 100 : 0;
+
+        document.getElementById('sb-def-score').textContent = Math.round(defScore);
+        document.getElementById('sb-atk-score').textContent = Math.round(atkScore);
+        document.getElementById('sb-def-pct').textContent = defScore.toFixed(1) + '%';
+        document.getElementById('sb-atk-pct').textContent = atkScore.toFixed(1) + '%';
+        document.getElementById('sb-def-bar').style.width = defScore + '%';
+        document.getElementById('sb-atk-bar').style.width = atkScore + '%';
+        document.getElementById('sb-def-detail').textContent = `${sbData.totalBlocked} blocked / ${sbData.totalEvents} total`;
+        document.getElementById('sb-atk-detail').textContent = `${sbData.totalSuccess} success / ${sbData.totalEvents} total`;
     }
 </script>
 </body>

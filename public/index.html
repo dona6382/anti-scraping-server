@@ -1512,6 +1512,8 @@
                 // Auto-fill scoreboard token if exists
                 const sbToken = document.getElementById('sb-token');
                 if (sbToken) sbToken.value = adminToken;
+                // WebSocket 재연결 (admin 토큰으로)
+                connectWebSocket(adminToken);
             } else {
                 document.getElementById('auth-status').textContent = `❌ ${d.message || 'Login failed'}`;
                 document.getElementById('auth-status').style.color = 'var(--red)';
@@ -1624,29 +1626,41 @@
 
     // ═══ WebSocket Connection ═══
     let socket = null;
-    try {
-        socket = io('http://localhost:3000/security');
 
-        socket.on('connect', () => {
-            document.getElementById('ws-status').textContent = 'LIVE';
-            document.getElementById('ws-status').style.color = 'var(--green)';
-        });
+    function connectWebSocket(token) {
+        if (socket) { socket.disconnect(); socket = null; }
+        try {
+            socket = io('http://localhost:3000/security', {
+                auth: { token: token || '' },
+                transports: ['websocket', 'polling'],
+            });
 
-        socket.on('disconnect', () => {
-            document.getElementById('ws-status').textContent = 'OFFLINE';
-            document.getElementById('ws-status').style.color = 'var(--red)';
-        });
+            socket.on('connect', () => {
+                document.getElementById('ws-status').textContent = 'LIVE';
+                document.getElementById('ws-status').style.color = 'var(--green)';
+            });
 
-        socket.on('security-event', (event) => {
-            addLiveEvent(event);
-            sbIncrementFromEvent(event);
-        });
+            socket.on('disconnect', () => {
+                document.getElementById('ws-status').textContent = 'OFFLINE';
+                document.getElementById('ws-status').style.color = 'var(--red)';
+            });
 
-        socket.on('auto-block', (data) => {
-            addLiveEvent({ ...data, eventType: 'AUTO_BLOCKED', severity: 'HIGH' });
-            bumpBlock();
-        });
-    } catch(e) { console.log('WebSocket not available'); }
+            socket.on('security-event', (event) => {
+                addLiveEvent(event);
+                sbIncrementFromEvent(event);
+            });
+
+            socket.on('auto-block', (data) => {
+                addLiveEvent({ ...data, eventType: 'AUTO_BLOCKED', severity: 'HIGH' });
+                bumpBlock();
+            });
+        } catch(e) { console.log('WebSocket not available'); }
+    }
+
+    // 초기 연결 (토큰 없이 — 바로 disconnect 될 수 있음)
+    connectWebSocket(adminToken);
+
+    // Auth 로그인 시 WebSocket 재연결 (원래 doAdminLogin에서 호출)
 
     function addLiveEvent(event) {
         const feed = document.getElementById('live-feed');

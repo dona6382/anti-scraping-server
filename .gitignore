@@ -48,4 +48,4 @@ cleanup-backup-*/
 # Backup files
 *.backup.ts
 *.backup.js
-*.bak
+*.bak.superpowers/

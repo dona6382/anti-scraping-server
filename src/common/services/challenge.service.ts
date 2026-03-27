@@ -144,7 +144,7 @@ export class ChallengeService {
         .substring(0, 32); // 128-bit
       if (!this.safeCompare(signature, expectedSig)) return false;
 
-      // 만료 검증 (24h)
+      // 만료 검증 (1h)
       if (Date.now() - parseInt(timestamp) > COOKIE_TTL * 1000) return false;
 
       // 같은 /24 서브넷 검증

@@ -21,7 +21,7 @@
 - `honeypot.controller.spec.ts`: 5 tests
 - `request-logger.middleware.spec.ts`: 5 tests
 - getDifficulty 적응형 난이도: 6 tests
-- **Total: 162 unit (13 suites) + 28 e2e tests**
+- **Total: 174 unit (14 suites) + 28 e2e tests**
 
 ### Penetration Test Results
 - 공격자 관점 11개 시나리오 침투 테스트 → **100% 방어율 (10/10)**

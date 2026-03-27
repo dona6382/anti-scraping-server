@@ -5,11 +5,11 @@
 
 ## Overview (English)
 
-This project is a multi-layer bot detection and blocking server designed to defend web applications against scraping, credential stuffing, and automated abuse. Every incoming request passes through a 6-stage security guard chain — rate limiting, IP/CIDR blacklisting with automatic escalation, User-Agent pattern filtering, headless browser detection (9-signal weighted scoring for Puppeteer/Selenium/PhantomJS), a JavaScript Proof-of-Work challenge paired with browser fingerprinting, and finally the route handler itself. The system is built to stop not only naive bots but also sophisticated attackers who rotate proxies or spoof browser environments.
+This project is a multi-layer bot detection and blocking server designed to defend web applications against scraping, credential stuffing, and automated abuse. Every incoming request passes through a 7-stage security guard chain — rate limiting, IP/CIDR blacklisting with automatic escalation, User-Agent pattern filtering, headless browser detection (9-signal weighted scoring for Puppeteer/Selenium/PhantomJS), real-time behavioral analysis (CV-based bot detection), a JavaScript Proof-of-Work challenge paired with browser fingerprinting, and finally the route handler itself. The system is built to stop not only naive bots but also sophisticated attackers who rotate proxies or spoof browser environments.
 
 The architecture follows a strict layered design: a global Core module (config, cache, database), a shared Common module (guards, services, utilities), and isolated Feature modules (auth, admin, analysis, realtime, etc.). Redis serves as the primary cache with automatic in-memory fallback, and all guards follow a fail-open strategy — if an infrastructure dependency is down, requests are allowed through with full logging rather than causing an outage. JWT authentication supports access/refresh token rotation, RBAC, and account lockout. A real-time WebSocket dashboard streams security events to authenticated admins.
 
-Code quality was enforced through a **5-round agent security review process**: design review, pre-implementation security audit, TDD implementation, dual code review (type safety + security testing), and PM sign-off — with any issues cycling back through implementation. The test suite includes 135 unit tests across 10 suites and 28 end-to-end integration tests covering the full security chain.
+Code quality was enforced through a **5-round agent security review process**: design review, pre-implementation security audit, TDD implementation, dual code review (type safety + security testing), and PM sign-off — with any issues cycling back through implementation. The test suite includes 174 unit tests across 14 suites and 28 end-to-end integration tests covering the full security chain.
 
 ## Security Chain
 
@@ -101,7 +101,7 @@ docker-compose up -d
 ### Test
 
 ```bash
-npm test               # 162 unit tests (13 suites)
+npm test               # 174 unit tests (14 suites)
 npm run test:e2e       # 28 integration tests
 npm run test:cov       # Coverage report
 ```
@@ -127,7 +127,7 @@ NestJS + TypeScript + PostgreSQL + Redis 기반.
 | Validation | class-validator + class-transformer |
 | API Docs | Swagger (OpenAPI 3.0) |
 | Container | Docker Compose |
-| Test | Jest (162 unit + 28 e2e) |
+| Test | Jest (174 unit + 28 e2e) |
 
 ## 보안 체인 (7단계)
 
@@ -334,7 +334,7 @@ npm run start:dev      # 개발 서버 (watch 모드)
 npm run build          # 프로덕션 빌드
 npm run lint           # ESLint
 npm run format         # Prettier
-npm test               # Jest 단위 테스트 (13 suites, 162 tests)
+npm test               # Jest 단위 테스트 (14 suites, 174 tests)
 npm run test:e2e       # E2E 통합 테스트 (28 tests)
 npm run test:cov       # 커버리지 리포트
 ```

@@ -19,8 +19,10 @@ import {
 const SKIP_BEHAVIORAL_KEY = 'skipBehavioral';
 export const SkipBehavioral = () => SetMetadata(SKIP_BEHAVIORAL_KEY, true);
 
-/** CV threshold — 값이 낮을수록 기계적으로 일정한 간격 */
-const CV_THRESHOLD = 0.3;
+/** CV threshold — 0.5 이하면 봇 의심 (사람은 보통 0.7+) */
+const CV_THRESHOLD = 0.5;
+/** 분당 최대 요청 수 — 초과 시 봇 의심 */
+const MAX_RPM = 30;
 /** 분석에 필요한 최소 요청 수 */
 const MIN_REQUESTS = 10;
 
@@ -75,12 +77,16 @@ export class BehavioralGuard extends BaseSecurityGuard {
 
       const cv = this.calculateCV(intervals);
 
-      if (cv < CV_THRESHOLD) {
-        // BOT 패턴 탐지
-        this.logSecurityViolation(
-          request,
-          `Bot pattern detected: CV=${cv.toFixed(4)}, intervals=${intervals.length}`,
-        );
+      // 요청 빈도 체크 (RPM)
+      const windowMs = sorted[sorted.length - 1].t - sorted[0].t;
+      const rpm = windowMs > 0 ? (logs.length / windowMs) * 60000 : 0;
+      const isTooFast = rpm > MAX_RPM;
+
+      if (cv < CV_THRESHOLD || isTooFast) {
+        const reason = isTooFast
+          ? `High request rate: ${rpm.toFixed(1)} RPM (limit: ${MAX_RPM})`
+          : `Bot pattern detected: CV=${cv.toFixed(4)}, intervals=${intervals.length}`;
+        this.logSecurityViolation(request, reason);
 
         this.securityEventService.log({
           eventType: 'BOT_DETECTED',
@@ -89,9 +95,12 @@ export class BehavioralGuard extends BaseSecurityGuard {
           userAgent: request.headers['user-agent'] as string,
           endpoint: request.url,
           method: request.method,
-          description: `Behavioral analysis: mechanical request pattern (CV=${cv.toFixed(4)})`,
+          description: isTooFast
+            ? `Behavioral analysis: excessive request rate (${rpm.toFixed(1)} RPM)`
+            : `Behavioral analysis: mechanical request pattern (CV=${cv.toFixed(4)})`,
           eventData: {
             cv: parseFloat(cv.toFixed(4)),
+            rpm: parseFloat(rpm.toFixed(1)),
             intervalCount: intervals.length,
             requestCount: logs.length,
           },

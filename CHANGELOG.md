@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.5.1] - 2026-03-28
+
+### Security Hardening (공격 분석 기반)
+- **PoW 기본 난이도 5**: 봇 풀이 시간 5ms→50ms. 위협 시 6(500ms)→7(5s)
+- **Cookie TTL 15분**: 1시간→15분. 봇이 매 15분 PoW 재풀이 필요
+- **BehavioralGuard 강화**: CV 임계값 0.3→0.5 + RPM 30 초과 시 차단
+- **HTTP 헤더 순서 핑거프린팅**: host 위치 + accept/accept-encoding 조합 검증 (TLS 대안)
+- **PoW 풀이 속도 감시**: 100ms 미만 풀이 시 경고 로그
+
+### Context
+공격 레포(anti-scraping-attacker)의 Level 1~5 공격 결과 분석:
+- 공격 성공률 96.8% → Rate limit만이 실질 장벽이었음
+- PoW difficulty 4를 Node.js에서 5ms에 풀어 쿠키 즉시 획득
+- BehavioralGuard를 랜덤 딜레이(CV>0.3)로 우회
+- HTTP 클라이언트(axios)와 브라우저 구별 불가
+
+---
+
 ## [2.5.0] - 2026-03-27
 
 ### Features

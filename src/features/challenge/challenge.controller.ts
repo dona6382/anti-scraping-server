@@ -54,6 +54,16 @@ export class ChallengeController {
       throw new ForbiddenException('Challenge failed');
     }
 
+    // PoW 풀이 속도 체크 — 토큰 발급~검증 시간이 100ms 미만이면 봇 의심
+    try {
+      const decoded = Buffer.from(dto.token, 'base64').toString();
+      const tokenTimestamp = parseInt(decoded.split('|')[0]);
+      const solveTime = Date.now() - tokenTimestamp;
+      if (solveTime < 100) {
+        this.logger.warn(`Suspiciously fast PoW solve: ${solveTime}ms from IP: ${RequestUtils.hashIp(ip, 'log')}`);
+      }
+    } catch {}
+
     // 핑거프린트 저장 (추적용)
     await this.challengeService.storeFingerprint(dto.fingerprint, ip);
 

@@ -20,7 +20,7 @@ AI(Claude Code)를 5개 전문 에이전트로 활용하여 설계·구현·검�
 - **Database**: PostgreSQL (TypeORM)
 - **Cache**: Redis (ioredis) / In-Memory fallback
 - **Auth**: JWT (access 15m + refresh 7d) + bcrypt + RBAC + account lockout
-- **Security**: helmet, rate limiting, IP/CIDR blacklist, UA filtering, headless detection, JS challenge + fingerprint, threat scoring
+- **Security**: helmet, rate limiting, IP/CIDR blacklist, UA filtering, headless detection (11-signal), behavioral analysis (CV+RPM), JS challenge + PoW (difficulty 5~7) + fingerprint, header order fingerprinting, threat scoring
 - **Realtime**: WebSocket (Socket.io) — 보안 이벤트 실시간 스트림
 - **Validation**: class-validator + class-transformer (DTO 기반)
 - **API Docs**: Swagger (`/api-docs`)

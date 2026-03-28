@@ -13,7 +13,7 @@ const CHALLENGE_SECRET = process.env.CHALLENGE_SECRET || (() => {
   return fallback;
 })();
 const TOKEN_TTL = 30; // 30 seconds
-export const COOKIE_TTL = 3600; // 1시간 (봇이 자주 PoW를 다시 풀도록)
+export const COOKIE_TTL = 900; // 15분 (봇이 자주 PoW를 다시 풀도록)
 const PROXY_ROTATION_SUBNET_THRESHOLD = 3; // >3 unique subnets triggers alert
 
 export interface FingerprintData {
@@ -156,19 +156,19 @@ export class ChallengeService {
 
   /**
    * PoW 난이도 결정 — 위협 점수에 따라 적응형 조정
-   * 기본 4 (65K 해시, ~30ms), 위협 높을수록 5~6
-   * 브라우저: ~30ms(4), ~500ms(5), ~8s(6)
-   * Node.js: ~5ms(4), ~50ms(5), ~500ms(6)
+   * 기본 5 (1M 해시), 위협 높을수록 6~7
+   * 브라우저: ~500ms(5), ~8s(6), ~2min(7)
+   * Node.js: ~50ms(5), ~500ms(6), ~5s(7)
    */
   async getDifficulty(ip: string): Promise<number> {
     try {
       const score = await this.threatScoreService.getScore(ip);
       const totalScore = score?.totalScore ?? 0;
-      if (totalScore >= 50) return 6; // ~16M hashes — 봇에게 ~500ms, 브라우저 ~8s
-      if (totalScore >= 30) return 5; // ~1M hashes — 봇에게 ~50ms, 브라우저 ~500ms
-      return 4; // ~65K hashes — 봇에게 ~5ms, 브라우저 ~30ms (기본)
+      if (totalScore >= 50) return 7; // ~268M hashes — 봇에게 ~5s, 브라우저 ~2min
+      if (totalScore >= 30) return 6; // ~16M hashes — 봇에게 ~500ms, 브라우저 ~8s
+      return 5; // ~1M hashes — 봇에게 ~50ms, 브라우저 ~500ms (기본)
     } catch {
-      return 4;
+      return 5;
     }
   }
 

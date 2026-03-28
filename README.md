@@ -215,7 +215,10 @@ Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessB
 **보안 특성:**
 - HMAC-SHA256 토큰 서명 + `crypto.timingSafeEqual` (timing attack 방어)
 - Atomic `getAndDelete`로 토큰 일회용 보장 (TOCTOU 방지)
-- Cookie HMAC 128-bit + IP 서브넷 바인딩
+- Cookie HMAC 128-bit + IP 서브넷 바인딩 + **15분 TTL**
+- 적응형 PoW 난이도: 기본 5(~50ms) → 위협 시 6(~500ms) → 7(~5s)
+- PoW 풀이 속도 감시 (100ms 미만 = 봇 의심)
+- HTTP 헤더 순서 핑거프린팅 (TLS JA3 대안)
 - XSS 방어 (`JSON.stringify` + `\u003c` escape)
 - `CHALLENGE_SECRET` 프로덕션 필수 환경변수
 

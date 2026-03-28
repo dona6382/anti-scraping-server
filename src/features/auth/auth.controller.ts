@@ -13,6 +13,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { AuthDto, RegisterDto, ChangePasswordDto, RefreshTokenDto } from './dto/auth.dto';
 import { JwtAuthGuard, AuthenticatedRequest } from './guards/auth.guards';
+import { SkipBehavioral } from '../../common/guards/behavioral.guard';
 import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
 import { SkipUserAgent } from '../../common/guards/user-agent.guard';
 import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
@@ -28,6 +29,7 @@ export class AuthController {
   @SkipIpBlacklist()
   @SkipUserAgent()
   @SkipHeadlessBrowser()
+  @SkipBehavioral()
   @SkipChallenge()
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'User login' })
@@ -41,6 +43,7 @@ export class AuthController {
   @SkipIpBlacklist()
   @SkipUserAgent()
   @SkipHeadlessBrowser()
+  @SkipBehavioral()
   @SkipChallenge()
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: 'Refresh access token' })
@@ -54,6 +57,7 @@ export class AuthController {
   @SkipIpBlacklist()
   @SkipUserAgent()
   @SkipHeadlessBrowser()
+  @SkipBehavioral()
   @SkipChallenge()
   @Throttle({ default: { ttl: 300000, limit: 3 } })
   @ApiOperation({ summary: 'User registration' })

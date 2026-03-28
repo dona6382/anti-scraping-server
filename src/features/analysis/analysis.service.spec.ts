@@ -19,7 +19,8 @@ describe('AnalysisService', () => {
         getRawMany: jest.fn().mockResolvedValue([]),
       }),
     };
-    service = new AnalysisService(mockRepo as any);
+    const mockCache = { get: jest.fn().mockResolvedValue(null), set: jest.fn() };
+    service = new AnalysisService(mockRepo as any, mockCache as any);
   });
 
   describe('getRequestIntervalAnalysis', () => {

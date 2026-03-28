@@ -6,6 +6,7 @@ import { HealthService } from './health.service';
 import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
 import { SkipUserAgent } from '../../common/guards/user-agent.guard';
 import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
+import { SkipBehavioral } from '../../common/guards/behavioral.guard';
 import { SkipChallenge } from '../../common/guards/challenge.guard';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards/auth.guards';
 import { Roles } from '../auth/auth.decorators';
@@ -21,6 +22,7 @@ import { Roles } from '../auth/auth.decorators';
 @SkipThrottle()
 @SkipUserAgent()
 @SkipHeadlessBrowser()
+@SkipBehavioral()
 @SkipChallenge()
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}

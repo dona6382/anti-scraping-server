@@ -1,14 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
 import { SecurityEvent } from '../../core/database/entities';
 import { RequestUtils } from '../../common/utils/request.utils';
+import { ICacheService } from '../../core/cache/interfaces/cache.interface';
+import { RequestLogEntry, REQUEST_LOG_PREFIX } from '../../common/middleware/request-logger.middleware';
+import { FingerprintData } from '../../common/services/challenge.service';
 
 @Injectable()
 export class AnalysisService {
   constructor(
     @InjectRepository(SecurityEvent)
     private readonly eventRepo: Repository<SecurityEvent>,
+    @Inject('ICacheService') private readonly cache: ICacheService,
   ) {}
 
   /** 시간대별 차단 분포 */
@@ -193,6 +197,163 @@ export class AnalysisService {
         ip: s.ip ? RequestUtils.hashIp(s.ip, 'analysis') : 'unknown',
         count: parseInt(s.count),
       })),
+    };
+  }
+
+  // ========================================
+  // 실시간 행동 분석 (캐시 기반 — DB 쿼리 없음)
+  // ========================================
+
+  /**
+   * IP의 실시간 요청 로그 조회 (캐시)
+   */
+  async getRealtimeRequestLog(ip: string): Promise<{
+    ip: string;
+    totalRequests: number;
+    logs: RequestLogEntry[];
+  }> {
+    const normalizedIp = RequestUtils.normalizeIp(ip);
+    const logs = await this.cache.get<RequestLogEntry[]>(`${REQUEST_LOG_PREFIX}${normalizedIp}`) || [];
+    return {
+      ip: RequestUtils.hashIp(ip, 'analysis'),
+      totalRequests: logs.length,
+      logs,
+    };
+  }
+
+  /**
+   * IP의 실시간 행동 분석 — 요청 간격, 빈도, 엔드포인트 분포
+   */
+  async getRealtimeBehaviorAnalysis(ip: string): Promise<{
+    ip: string;
+    totalRequests: number;
+    windowMinutes: number;
+    requestsPerMinute: number;
+    intervalAnalysis: {
+      meanMs: number;
+      stdDevMs: number;
+      cv: number;
+      isRegular: boolean;
+    } | null;
+    endpointDistribution: Array<{ endpoint: string; count: number; percentage: number }>;
+    methodDistribution: Record<string, number>;
+    verdict: 'BOT_SUSPECTED' | 'INCONCLUSIVE' | 'LIKELY_HUMAN' | 'INSUFFICIENT_DATA';
+    confidence: number;
+  }> {
+    const normalizedIp = RequestUtils.normalizeIp(ip);
+    const logs = await this.cache.get<RequestLogEntry[]>(`${REQUEST_LOG_PREFIX}${normalizedIp}`) || [];
+
+    const result = {
+      ip: RequestUtils.hashIp(ip, 'analysis'),
+      totalRequests: logs.length,
+      windowMinutes: 0,
+      requestsPerMinute: 0,
+      intervalAnalysis: null as { meanMs: number; stdDevMs: number; cv: number; isRegular: boolean } | null,
+      endpointDistribution: [] as Array<{ endpoint: string; count: number; percentage: number }>,
+      methodDistribution: {} as Record<string, number>,
+      verdict: 'INSUFFICIENT_DATA' as 'BOT_SUSPECTED' | 'INCONCLUSIVE' | 'LIKELY_HUMAN' | 'INSUFFICIENT_DATA',
+      confidence: 0,
+    };
+
+    if (logs.length < 3) return result;
+
+    // 시간 윈도우
+    const firstTs = logs[0].t;
+    const lastTs = logs[logs.length - 1].t;
+    result.windowMinutes = Math.round((lastTs - firstTs) / 60000 * 10) / 10;
+    result.requestsPerMinute = result.windowMinutes > 0
+      ? Math.round(logs.length / result.windowMinutes * 10) / 10
+      : logs.length;
+
+    // 요청 간격 분석
+    const intervals: number[] = [];
+    for (let i = 1; i < logs.length; i++) {
+      intervals.push(logs[i].t - logs[i - 1].t);
+    }
+
+    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const variance = intervals.reduce((sum, v) => sum + (v - mean) ** 2, 0) / intervals.length;
+    const stdDev = Math.sqrt(variance);
+    const cv = mean > 0 ? stdDev / mean : 0;
+
+    result.intervalAnalysis = {
+      meanMs: Math.round(mean),
+      stdDevMs: Math.round(stdDev),
+      cv: Math.round(cv * 1000) / 1000,
+      isRegular: cv < 0.3,
+    };
+
+    // 엔드포인트 분포
+    const endpointCount: Record<string, number> = {};
+    for (const log of logs) {
+      endpointCount[log.e] = (endpointCount[log.e] || 0) + 1;
+    }
+    result.endpointDistribution = Object.entries(endpointCount)
+      .map(([endpoint, count]) => ({
+        endpoint,
+        count,
+        percentage: Math.round(count / logs.length * 1000) / 10,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // HTTP 메서드 분포
+    for (const log of logs) {
+      result.methodDistribution[log.m] = (result.methodDistribution[log.m] || 0) + 1;
+    }
+
+    // 판정
+    if (intervals.length >= 5) {
+      if (cv < 0.3) {
+        result.verdict = 'BOT_SUSPECTED';
+        result.confidence = Math.min(100, Math.round((1 - cv) * 100));
+      } else if (cv < 0.5) {
+        result.verdict = 'INCONCLUSIVE';
+        result.confidence = Math.round((1 - cv) * 50);
+      } else {
+        result.verdict = 'LIKELY_HUMAN';
+        result.confidence = Math.min(100, Math.round(cv * 80));
+      }
+    }
+
+    return result;
+  }
+
+  // ========================================
+  // 핑거프린트 크로스-IP 분석 (프록시 로테이션 탐지)
+  // ========================================
+
+  /**
+   * 특정 핑거프린트의 크로스-IP 분석
+   * 같은 핑거프린트가 여러 IP/서브넷에서 관측되면 프록시 로테이션 의심
+   */
+  async getFingerprintAnalysis(fingerprint: string): Promise<{
+    fingerprint: string;
+    uniqueIps: number;
+    uniqueSubnets: number;
+    totalRequests: number;
+    isSuspicious: boolean;
+    ips: Array<{ ip: string; count: number }>;
+  }> {
+    const data = await this.cache.get<FingerprintData>(`fp:${fingerprint}`);
+
+    if (!data) {
+      return {
+        fingerprint: fingerprint.substring(0, 16),
+        uniqueIps: 0,
+        uniqueSubnets: 0,
+        totalRequests: 0,
+        isSuspicious: false,
+        ips: [],
+      };
+    }
+
+    return {
+      fingerprint: fingerprint.substring(0, 16),
+      uniqueIps: data.ips.length,
+      uniqueSubnets: data.subnets.length,
+      totalRequests: data.count,
+      isSuspicious: data.subnets.length > 3,
+      ips: data.ips.map(hashedIp => ({ ip: hashedIp, count: 1 })),
     };
   }
 }

@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.5.0] - 2026-03-27
+
+### Features
+- **BehavioralGuard**: 실시간 요청 간격 CV 분석으로 기계적 패턴 자동 차단 (7단계 보안 체인)
+- **Honeypot 트랩**: /api/internal/users, /api/internal/config, /api/v2/data (ResponseBuilder 포맷 — 구별 불가)
+- **적응형 PoW 난이도**: 기본 4 (65K hashes), 위협 시 5→6 (1M→16M hashes)
+- **Fingerprint 크로스-IP 추적**: >3 서브넷에서 동일 FP → SUSPICIOUS_ACTIVITY + 전체 IP 위협 점수
+- **Request Logger Middleware**: 전 요청 행동 데이터 캐시 수집 (응답 상태 포함, health 제외)
+- **실시간 분석 API**: GET /admin/analysis/realtime/behavior/:ip, /realtime/log/:ip, /fingerprint/:hash
+
+### Security
+- **Swagger Basic Auth**: /api-docs + /api-docs-json 보호 (JWT_SECRET 파생 제거)
+- **PoW 기본 난이도 3→4**: 봇 풀이 시간 1ms → 15ms (30배 증가)
+- **Cookie TTL 24h→1h**: 봇이 매시간 PoW 재풀이 필요
+- **Analysis 입력 검증**: ParseIntPipe, validateIp, 상한 제한
+
+### Testing
+- `behavioral.guard.spec.ts`: 8 tests
+- `honeypot.controller.spec.ts`: 5 tests
+- `request-logger.middleware.spec.ts`: 5 tests
+- getDifficulty 적응형 난이도: 6 tests
+- **Total: 174 unit (14 suites) + 28 e2e tests**
+
+### Penetration Test Results
+- 공격자 관점 11개 시나리오 침투 테스트 → **100% 방어율 (10/10)**
+- 일반 사용자 7개 시나리오 테스트 → **0건 거짓 차단**
+- Security Researcher 최종 판정: **STRONG**
+
+---
+
 ## [2.4.0] - 2026-03-26
 
 ### Features

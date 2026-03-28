@@ -1,14 +1,14 @@
 # Anti-Scraping Server 리팩토링 히스토리
 
-> 2026-03-23 ~ 2026-03-26 진행된 전체 프로젝트 리팩토링 기록
+> 2026-03-23 ~ 2026-03-28 진행된 전체 프로젝트 리팩토링 기록
 
 ## 개요
 
-개인 포트폴리오 프로젝트를 프로덕션 수준으로 끌어올리기 위한 대규모 리팩토링.
-5개 에이전트(TS 코드 리뷰어, NestJS 백엔드 개발자, 보안 테스트 엔지니어, 보안 연구원, PM)가 반복적으로 분석/수정/검증하는 방식으로 진행.
+AI(Claude Code)를 5개 전문 에이전트 팀으로 구성하여 프로덕션 수준의 보안 서버를 설계·구현·검증한 과정.
+사람(설계자)이 아키텍처 판단과 최종 승인을 담당하고, AI가 구현·분석·테스트를 수행하는 협업 모델.
 
 **시작 상태**: v2.0.0 — 기본 구조만 있고, 인증 비활성화, 테스트 0개, 중복 코드 다수
-**최종 상태**: v2.4.0 — 133 unit + 26 e2e 테스트, 6단계 보안 체인 + JS Challenge + 위협 분석, Security Researcher 판정: STRONG
+**최종 상태**: v2.5.0 — 174 unit + 28 E2E 테스트, 7단계 보안 체인 + Scoreboard 심판 시스템, Security Researcher: STRONG, 침투 테스트 100%
 
 ---
 
@@ -271,9 +271,10 @@
 | 항목 | 결과 |
 |------|------|
 | TypeScript 빌드 | 0 에러 |
-| Unit Tests | 135 passing (10 suites) |
+| Unit Tests | 174 passing (14 suites) |
 | E2E Tests | 28 passing (1 suite) |
 | Playwright 실전 | 3 requests로 챌린지 통과 |
+| 침투 테스트 | 100% 방어율 (10/10) |
 | 보안 취약점 (C/H/M) | 0건 |
 | Security Researcher 판정 | **STRONG** |
 
@@ -283,12 +284,11 @@
 
 | 항목 | 현재 상태 | 이유 |
 |------|----------|------|
-| PoW 난이도 | 고정값 3 | ThreatScore 연동 구현 예정 (P1) |
 | IPv6 서브넷 | full IP fallback | /64 prefix 처리 개선 예정 |
 | Fail-open 전략 | Redis 장애 시 보안 우회 | 가용성 우선 설계 결정 |
 | process.env 직접 참조 | 일부 잔존 | AppConfigService 전면 통일은 P3 |
-| 봇 탐지 CV threshold | 0.3 고정 | 분석 API 전용, 자동 차단 미연동 |
 | auto-block 카운터 | 비원자적 | Redis INCR로 교체 시 해결 가능 |
+| CIDR 매칭 | O(N) per request | 대규모 CIDR 시 Trie 최적화 필요 |
 
 ---
 
@@ -301,3 +301,4 @@
 | 2.2.0 | 2026-03-24 | 자동 차단, GeoIP/VPN, E2E, reCAPTCHA 제거, UI 리디자인 |
 | 2.3.0 | 2026-03-24 | 위협 분석 시스템 (ThreatScore, PatternAnalysis, 사전 차단) |
 | 2.4.0 | 2026-03-26 | JS Challenge + Browser Fingerprint, 6단계 보안 체인, 보안 강화 (A+B그룹) |
+| 2.5.0 | 2026-03-28 | BehavioralGuard, Honeypot, Scoreboard, 적응형 PoW, 침투 테스트 100%, 174 unit + 28 E2E |

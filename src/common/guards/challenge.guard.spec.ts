@@ -71,7 +71,7 @@ describe('ChallengeGuard', () => {
     jest.clearAllMocks();
     mockReflector.getAllAndOverride.mockReturnValue(false);
     mockChallengeService.generateToken.mockResolvedValue('mock-token');
-    mockChallengeService.getDifficulty.mockReturnValue(4);
+    mockChallengeService.getDifficulty.mockResolvedValue(4);
     mockChallengeService.getChallengeHtml.mockReturnValue('<html>challenge</html>');
 
     guard = new ChallengeGuard(

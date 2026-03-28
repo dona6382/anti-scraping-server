@@ -1,6 +1,6 @@
 {
   "name": "anti-scraping-server",
-  "version": "2.0.0",
+  "version": "2.5.0",
   "description": "Anti-scraping protection server with multiple security layers",
   "author": "",
   "private": true,

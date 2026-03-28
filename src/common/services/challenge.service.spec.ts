@@ -1,9 +1,11 @@
-import { createHash, createHmac } from 'crypto';
+import { createHash } from 'crypto';
 import { ChallengeService, COOKIE_TTL } from './challenge.service';
 
 describe('ChallengeService', () => {
   let service: ChallengeService;
   let mockCache: Record<string, jest.Mock>;
+  let mockSecurityEvent: Record<string, jest.Mock>;
+  let mockThreatScore: Record<string, jest.Mock>;
 
   const TEST_IP = '192.168.1.100';
   const SAME_SUBNET_IP = '192.168.1.200';
@@ -29,9 +31,14 @@ describe('ChallengeService', () => {
       keys: jest.fn(),
     };
 
-    // Re-import the service fresh is not feasible since CHALLENGE_SECRET is captured at module load.
-    // We construct the service directly.
-    service = new ChallengeService(mockCache as any);
+    mockThreatScore = {
+      getScore: jest.fn().mockResolvedValue(null),
+      recordViolation: jest.fn().mockResolvedValue({}),
+    };
+    mockSecurityEvent = {
+      log: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new ChallengeService(mockCache as any, mockThreatScore as any, mockSecurityEvent as any);
     jest.clearAllMocks();
   });
 
@@ -39,8 +46,8 @@ describe('ChallengeService', () => {
     jest.restoreAllMocks();
   });
 
-  // Helper: solve PoW for a given token with difficulty 3
-  function solvePoW(token: string, difficulty = 3): string {
+  // Helper: solve PoW for a given token with difficulty 4 (default)
+  function solvePoW(token: string, difficulty = 4): string {
     const prefix = '0'.repeat(difficulty);
     let nonce = 0;
     while (true) {
@@ -251,7 +258,7 @@ describe('ChallengeService', () => {
   });
 
   describe('storeFingerprint()', () => {
-    it('새 핑거프린트 저장 확인', async () => {
+    it('새 핑거프린트 저장 확인 (subnets, rawIps 포함)', async () => {
       mockCache.get.mockResolvedValue(null);
 
       await service.storeFingerprint(TEST_FINGERPRINT, TEST_IP);
@@ -260,6 +267,8 @@ describe('ChallengeService', () => {
         `fp:${TEST_FINGERPRINT}`,
         expect.objectContaining({
           ips: expect.any(Array),
+          subnets: expect.any(Array),
+          rawIps: expect.any(Array),
           count: 1,
         }),
         COOKIE_TTL,
@@ -267,12 +276,18 @@ describe('ChallengeService', () => {
 
       const savedData = mockCache.set.mock.calls[0][1];
       expect(savedData.ips).toHaveLength(1);
+      expect(savedData.subnets).toHaveLength(1);
+      expect(savedData.subnets[0]).toBe('192.168.1');
+      expect(savedData.rawIps).toHaveLength(1);
+      expect(savedData.rawIps[0]).toBe(TEST_IP);
     });
 
-    it('같은 핑거프린트 + 다른 IP -> IP 추가', async () => {
+    it('같은 핑거프린트 + 다른 IP -> IP 및 서브넷 추가', async () => {
       const existingHashedIp = 'existing-hashed-ip';
       mockCache.get.mockResolvedValue({
         ips: [existingHashedIp],
+        subnets: ['192.168.1'],
+        rawIps: ['192.168.1.100'],
         count: 1,
       });
 
@@ -282,6 +297,7 @@ describe('ChallengeService', () => {
         `fp:${TEST_FINGERPRINT}`,
         expect.objectContaining({
           ips: expect.arrayContaining([existingHashedIp]),
+          subnets: expect.arrayContaining(['192.168.1', '10.0.0']),
           count: 2,
         }),
         COOKIE_TTL,
@@ -289,6 +305,65 @@ describe('ChallengeService', () => {
 
       const savedData = mockCache.set.mock.calls[0][1];
       expect(savedData.ips).toHaveLength(2);
+      expect(savedData.subnets).toHaveLength(2);
+    });
+
+    it('3개 이하 서브넷 -> 이벤트 기록하지 않음', async () => {
+      mockCache.get.mockResolvedValue({
+        ips: ['hash1', 'hash2'],
+        subnets: ['10.0.0', '10.0.1'],
+        rawIps: ['10.0.0.1', '10.0.1.1'],
+        count: 2,
+      });
+
+      await service.storeFingerprint(TEST_FINGERPRINT, '10.0.2.1');
+
+      // 3 subnets (including the new one) is NOT > 3, so no event
+      expect(mockSecurityEvent.log).not.toHaveBeenCalled();
+      expect(mockThreatScore.recordViolation).not.toHaveBeenCalled();
+    });
+
+    it('4개 이상 서브넷 -> SUSPICIOUS_ACTIVITY 이벤트 + 위협 점수 기록', async () => {
+      mockCache.get.mockResolvedValue({
+        ips: ['hash1', 'hash2', 'hash3'],
+        subnets: ['10.0.0', '10.0.1', '10.0.2'],
+        rawIps: ['10.0.0.1', '10.0.1.1', '10.0.2.1'],
+        count: 3,
+      });
+
+      await service.storeFingerprint(TEST_FINGERPRINT, '172.16.0.1');
+
+      // 4 subnets > 3 -> should log event
+      expect(mockSecurityEvent.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'SUSPICIOUS_ACTIVITY',
+          severity: 'HIGH',
+          description: 'Same fingerprint from multiple subnets',
+        }),
+      );
+
+      // Should record violation for all associated IPs
+      expect(mockThreatScore.recordViolation).toHaveBeenCalledTimes(4);
+      expect(mockThreatScore.recordViolation).toHaveBeenCalledWith(
+        '10.0.0.1', 'SUSPICIOUS_ACTIVITY', 'HIGH',
+      );
+      expect(mockThreatScore.recordViolation).toHaveBeenCalledWith(
+        '172.16.0.1', 'SUSPICIOUS_ACTIVITY', 'HIGH',
+      );
+    });
+
+    it('기존 데이터에 subnets/rawIps 없으면 빈 배열로 폴백', async () => {
+      // Legacy data without subnets/rawIps fields
+      mockCache.get.mockResolvedValue({
+        ips: ['hash1'],
+        count: 1,
+      });
+
+      await service.storeFingerprint(TEST_FINGERPRINT, TEST_IP);
+
+      const savedData = mockCache.set.mock.calls[0][1];
+      expect(savedData.subnets).toHaveLength(1);
+      expect(savedData.rawIps).toHaveLength(1);
     });
   });
 
@@ -311,6 +386,50 @@ describe('ChallengeService', () => {
       // The token should be JSON.stringify'd and </ should be escaped to \u003c
       expect(html).not.toContain('</script><script>');
       expect(html).toContain('\\u003c');
+    });
+  });
+
+  describe('getDifficulty()', () => {
+    it('위협 점수 없음 (null) → 난이도 4 (기본)', async () => {
+      mockThreatScore.getScore.mockResolvedValue(null);
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(4);
+    });
+
+    it('위협 점수 20 → 난이도 4 (30 미만)', async () => {
+      mockThreatScore.getScore.mockResolvedValue({ totalScore: 20 });
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(4);
+    });
+
+    it('위협 점수 30 → 난이도 5', async () => {
+      mockThreatScore.getScore.mockResolvedValue({ totalScore: 30 });
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(5);
+    });
+
+    it('위협 점수 50 → 난이도 6', async () => {
+      mockThreatScore.getScore.mockResolvedValue({ totalScore: 50 });
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(6);
+    });
+
+    it('위협 점수 80 → 난이도 6', async () => {
+      mockThreatScore.getScore.mockResolvedValue({ totalScore: 80 });
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(6);
+    });
+
+    it('ThreatScore 에러 시 → 난이도 4 (fallback)', async () => {
+      mockThreatScore.getScore.mockRejectedValue(new Error('Redis connection failed'));
+
+      const difficulty = await service.getDifficulty(TEST_IP);
+      expect(difficulty).toBe(4);
     });
   });
 });

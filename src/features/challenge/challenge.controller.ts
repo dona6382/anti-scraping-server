@@ -10,6 +10,7 @@ import {
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
+import { SkipBehavioral } from '../../common/guards/behavioral.guard';
 import { SkipChallenge } from '../../common/guards/challenge.guard';
 import { SkipUserAgent } from '../../common/guards/user-agent.guard';
 import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
@@ -27,6 +28,7 @@ import { VerifyChallengeDto } from './dto/verify-challenge.dto';
 @SkipChallenge()
 @SkipUserAgent()
 @SkipHeadlessBrowser()
+@SkipBehavioral()
 export class ChallengeController {
   private readonly logger = new Logger(ChallengeController.name);
 

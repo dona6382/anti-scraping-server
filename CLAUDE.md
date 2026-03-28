@@ -12,7 +12,7 @@
 
 ## 프로젝트 개요
 웹 스크래핑/봇을 탐지하고 차단하는 다층 보안 서버. NestJS 기반 TypeScript 프로젝트.
-개인 포트폴리오 프로젝트로, 코드 품질과 아키텍처 완성도가 중요함.
+AI(Claude Code)를 5개 전문 에이전트로 활용하여 설계·구현·검증한 프로젝트.
 
 ## 기술 스택
 - **Framework**: NestJS 10 (Express)
@@ -25,13 +25,13 @@
 - **Validation**: class-validator + class-transformer (DTO 기반)
 - **API Docs**: Swagger (`/api-docs`)
 - **Container**: Docker Compose (app + postgres + redis)
-- **Test**: Jest (135 unit + 28 e2e)
+- **Test**: Jest (174 unit + 28 e2e)
 
 ## 프로젝트 구조
 ```
 src/
 ├── main.ts                  # 부트스트랩 (helmet, body limit, graceful shutdown)
-├── app.module.ts            # 루트 모듈 (전역 Guard 5개 + Filter 등록)
+├── app.module.ts            # 루트 모듈 (전역 Guard 6개 + Filter 등록)
 ├── app.controller.ts        # 루트 엔드포인트
 ├── core/                    # 인프라 계층 (@Global)
 │   ├── config/              # ConfigModule, AppConfigService
@@ -62,7 +62,7 @@ src/
 
 ## 전역 보안 체인
 ```
-모든 요청 → ThrottlerGuard → IpBlacklistGuard (+ CIDR + 위협 점수) → UserAgentGuard → HeadlessBrowserGuard → ChallengeGuard → Route Handler
+모든 요청 → ThrottlerGuard → IpBlacklistGuard (+ CIDR + 위협 점수) → UserAgentGuard → HeadlessBrowserGuard → BehavioralGuard → ChallengeGuard → Route Handler
 ```
 
 ## 개발 프로세스
@@ -129,7 +129,7 @@ src/
 ```bash
 npm run start:dev      # 개발 서버 (watch)
 npm run build          # 빌드
-npm test               # Jest 테스트 (135 tests)
+npm test               # Jest 테스트 (174 tests, 14 suites)
 npm run test:e2e       # E2E 테스트 (28 tests)
 npm run lint           # ESLint
 docker-compose up -d   # Docker 실행
@@ -145,6 +145,6 @@ DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_DATABASE  # PostgreSQL
 ## 주의사항
 - Redis 미설정 시 In-Memory 캐시로 자동 fallback
 - DB_SYNCHRONIZE=true는 개발 환경에서만 사용
-- 전역 Guard 5개: ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → ChallengeGuard
+- 전역 Guard 6개: ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → BehavioralGuard → ChallengeGuard
 - Health/Root 엔드포인트는 모든 Guard Skip (모니터링 프로브용)
 - Testing 모듈은 프로덕션에서 자동 비활성화

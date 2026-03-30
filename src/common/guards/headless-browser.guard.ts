@@ -174,6 +174,23 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
       }
     }
 
+    // 10. HTTP 헤더 순서 핑거프린팅 (TLS 대안)
+    // 실제 브라우저: host가 첫 번째 또는 두 번째 헤더
+    // HTTP 클라이언트(axios, node-fetch): host 위치가 불규칙하거나 커스텀 헤더가 먼저
+    const headerKeys = Object.keys(request.headers);
+    const hostIndex = headerKeys.indexOf('host');
+    if (hostIndex > 3 && headerKeys.length > 5) {
+      // host가 4번째 이후 = HTTP 클라이언트 패턴
+      factors.push('Suspicious header order (host not in first positions)');
+      confidenceScore += 15;
+    }
+
+    // 11. 비정상적 헤더 조합 — accept 있는데 accept-encoding 없으면 의심
+    if (this.getHeader(request, 'accept') && !this.getHeader(request, 'accept-encoding') && !userAgent.includes('curl')) {
+      factors.push('Incomplete header set (accept without accept-encoding)');
+      confidenceScore += 10;
+    }
+
     const isHeadless = confidenceScore >= HEADLESS_SCORES.THRESHOLD;
 
     if (factors.length > 0) {

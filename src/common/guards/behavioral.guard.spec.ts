@@ -175,6 +175,40 @@ describe('BehavioralGuard', () => {
     });
   });
 
+  describe('RPM 초과 탐지', () => {
+    it('RPM 30 초과 시 → BOT_DETECTED (일정 간격 불필요)', async () => {
+      // 11개 로그를 짧은 시간 안에 생성 — 불규칙 간격이지만 RPM이 30 초과
+      // 총 시간 = ~10초 → RPM = 11/10s * 60 = 66 RPM > 30
+      const logs: RequestLogEntry[] = [
+        { t: 1000000, e: '/api/public/data', m: 'GET', s: 200 },
+        { t: 1000800, e: '/api/public/data', m: 'GET', s: 200 },
+        { t: 1001900, e: '/api/public/data', m: 'GET', s: 200 },
+        { t: 1002500, e: '/api/public/data', m: 'GET', s: 200 },
+        { t: 1003700, e: '/api/public/data', m: 'GET', s: 200 },
+        { t: 1004200, e: '/api/public/data', m: 'GET', s: 200 },
+        { t: 1005600, e: '/api/public/data', m: 'GET', s: 200 },
+        { t: 1006300, e: '/api/public/data', m: 'GET', s: 200 },
+        { t: 1007800, e: '/api/public/data', m: 'GET', s: 200 },
+        { t: 1008500, e: '/api/public/data', m: 'GET', s: 200 },
+        { t: 1010000, e: '/api/public/data', m: 'GET', s: 200 },
+      ];
+      mockCache.get.mockResolvedValue(logs);
+      const context = createMockContext();
+
+      await expect(guard.canActivate(context)).rejects.toThrow(
+        SecurityException,
+      );
+
+      expect(mockSecurityEvent.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'BOT_DETECTED',
+          severity: 'HIGH',
+          description: expect.stringContaining('excessive request rate'),
+        }),
+      );
+    });
+  });
+
   describe('Fail-open', () => {
     it('캐시 에러 시 → true 반환', async () => {
       mockCache.get.mockRejectedValue(new Error('Redis connection failed'));

@@ -9,6 +9,7 @@ import { Reflector } from '@nestjs/core';
 import { timingSafeEqual } from 'crypto';
 import { BaseSecurityGuard } from './base-security.guard';
 import { ChallengeService } from '../services/challenge.service';
+import { PuzzleCaptchaService } from '../services/puzzle-captcha.service';
 import { ExtendedRequest } from '../../core/types';
 
 /**
@@ -31,6 +32,7 @@ export const SkipChallenge = () => SetMetadata(SKIP_CHALLENGE_KEY, true);
 export class ChallengeGuard extends BaseSecurityGuard {
   constructor(
     private readonly challengeService: ChallengeService,
+    private readonly puzzleCaptchaService: PuzzleCaptchaService,
     private readonly reflector: Reflector,
   ) {
     super();
@@ -82,6 +84,18 @@ export class ChallengeGuard extends BaseSecurityGuard {
       const challengeToken = await this.challengeService.generateToken(ip);
       const difficulty = await this.challengeService.getDifficulty(ip);
 
+      // Puzzle CAPTCHA for suspicious users (threat score >= 30)
+      let puzzleData: { id: string; gridImage: string; options: string[] } | undefined;
+      try {
+        const needsPuzzle = await this.puzzleCaptchaService.shouldShowPuzzle(ip);
+        if (needsPuzzle) {
+          puzzleData = await this.puzzleCaptchaService.generatePuzzle(ip);
+        }
+      } catch (puzzleError) {
+        // fail-open: if puzzle generation fails, proceed without puzzle
+        this.logger.error('Puzzle CAPTCHA generation failed, proceeding without puzzle', puzzleError);
+      }
+
       this.logSecurityViolation(request, 'Challenge required - no valid cookie');
 
       // CHALLENGE_REQUIRED 타입의 HttpException을 던짐
@@ -92,6 +106,7 @@ export class ChallengeGuard extends BaseSecurityGuard {
           html: this.challengeService.getChallengeHtml(
             challengeToken,
             difficulty,
+            puzzleData,
           ),
         },
         HttpStatus.FORBIDDEN,

@@ -12,8 +12,10 @@ const CHALLENGE_SECRET = process.env.CHALLENGE_SECRET || (() => {
   }
   return fallback;
 })();
+// 쿠키 서명에는 별도 파생 키 사용 (키 분리 원칙)
+const COOKIE_SIGN_KEY = createHmac('sha256', CHALLENGE_SECRET).update('cookie-signing-key').digest('hex');
 const TOKEN_TTL = 30; // 30 seconds
-export const COOKIE_TTL = 3600; // 1시간 (봇이 자주 PoW를 다시 풀도록)
+export const COOKIE_TTL = 900; // 15분 (봇이 자주 PoW를 다시 풀도록)
 const PROXY_ROTATION_SUBNET_THRESHOLD = 3; // >3 unique subnets triggers alert
 
 export interface FingerprintData {
@@ -112,12 +114,12 @@ export class ChallengeService {
    */
   generateCookie(ip: string, fingerprint: string): string {
     const subnet = this.getSubnet(ip);
+    // 쿠키 크기 최적화: 64자 → 32자 (verifyCookie에서도 동일하게 비교하므로 안전)
     const fpTruncated = fingerprint.substring(0, 32);
     const data = `${Date.now()}:${subnet}:${fpTruncated}`;
-    const signature = createHmac('sha256', CHALLENGE_SECRET)
+    const signature = createHmac('sha256', COOKIE_SIGN_KEY)
       .update(data)
-      .digest('hex')
-      .substring(0, 32); // 128-bit (32 hex chars)
+      .digest('hex');
     return `${data}:${signature}`;
   }
 
@@ -127,21 +129,15 @@ export class ChallengeService {
   verifyCookie(cookieValue: string, ip: string): boolean {
     try {
       const parts = cookieValue.split(':');
-      if (parts.length < 4) return false;
+      if (parts.length !== 4) return false;
 
-      const [timestamp, subnet, fp, signature] = [
-        parts[0],
-        parts[1],
-        parts[2],
-        parts[3],
-      ];
+      const [timestamp, subnet, fp, signature] = parts;
 
-      // 서명 검증 (timing-safe)
+      // 서명 검증 (timing-safe, 쿠키 전용 파생 키 사용)
       const data = `${timestamp}:${subnet}:${fp}`;
-      const expectedSig = createHmac('sha256', CHALLENGE_SECRET)
+      const expectedSig = createHmac('sha256', COOKIE_SIGN_KEY)
         .update(data)
-        .digest('hex')
-        .substring(0, 32); // 128-bit
+        .digest('hex');
       if (!this.safeCompare(signature, expectedSig)) return false;
 
       // 만료 검증 (1h)
@@ -155,21 +151,12 @@ export class ChallengeService {
   }
 
   /**
-   * PoW 난이도 결정 — 위협 점수에 따라 적응형 조정
-   * 기본 4 (65K 해시, ~30ms), 위협 높을수록 5~6
-   * 브라우저: ~30ms(4), ~500ms(5), ~8s(6)
-   * Node.js: ~5ms(4), ~50ms(5), ~500ms(6)
+   * PoW 난이도 결정
+   * 일률적으로 4 (65K 해시, 브라우저 ~30ms)
+   * 위협 점수 높을 때는 PoW가 아닌 퍼즐 캡챠가 핵심 방어
    */
-  async getDifficulty(ip: string): Promise<number> {
-    try {
-      const score = await this.threatScoreService.getScore(ip);
-      const totalScore = score?.totalScore ?? 0;
-      if (totalScore >= 50) return 6; // ~16M hashes — 봇에게 ~500ms, 브라우저 ~8s
-      if (totalScore >= 30) return 5; // ~1M hashes — 봇에게 ~50ms, 브라우저 ~500ms
-      return 4; // ~65K hashes — 봇에게 ~5ms, 브라우저 ~30ms (기본)
-    } catch {
-      return 4;
-    }
+  async getDifficulty(_ip: string): Promise<number> {
+    return 4; // ~65K hashes — 브라우저 ~30ms
   }
 
   /**
@@ -227,53 +214,155 @@ export class ChallengeService {
 
   /**
    * 챌린지 HTML 페이지 생성
+   * puzzleData가 제공되면 PoW 이후 퍼즐 CAPTCHA를 표시
    */
-  getChallengeHtml(token: string, difficulty: number): string {
+  getChallengeHtml(
+    token: string,
+    difficulty: number,
+    puzzleData?: { id: string; gridImage: string; options: string[] },
+  ): string {
+    const hasPuzzle = !!puzzleData;
+    const puzzleJson = hasPuzzle
+      ? JSON.stringify(puzzleData).replace(/</g, '\\u003c')
+      : 'null';
+
     return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Security Check</title>
 <style>
   body { background: #0a0e17; color: #e4e8f1; font-family: -apple-system, sans-serif;
          display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-  .box { text-align: center; }
+  .box { text-align: center; max-width: 500px; }
   .spinner { width: 40px; height: 40px; border: 3px solid #2a3a4e; border-top-color: #00ff88;
              border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   h2 { color: #00ff88; font-size: 1.2rem; }
   p { color: #8892a4; font-size: 0.9rem; }
+  .puzzle-container { display: none; }
+  .puzzle-grid { margin: 16px auto; }
+  .puzzle-options { display: flex; gap: 12px; justify-content: center; margin: 16px 0; }
+  .puzzle-option { cursor: pointer; border: 3px solid transparent; border-radius: 8px;
+                   padding: 4px; transition: border-color 0.2s, transform 0.1s; background: #1a1a2e; }
+  .puzzle-option:hover { border-color: #00ff88; transform: scale(1.05); }
+  .puzzle-option.selected { border-color: #00ff88; }
+  .timer { color: #f39c12; font-size: 1.5rem; font-weight: bold; margin: 8px 0; }
+  .timer.urgent { color: #e74c3c; }
 </style></head>
 <body><div class="box">
-  <div class="spinner"></div>
-  <h2>Checking your browser...</h2>
-  <p>This will only take a moment.</p>
+  <div id="pow-section">
+    <div class="spinner"></div>
+    <h2>Checking your browser...</h2>
+    <p>This will only take a moment.</p>
+  </div>
+  <div id="puzzle-section" class="puzzle-container">
+    <h2>One more step</h2>
+    <p>Type the characters you see below.</p>
+    <div class="timer" id="timer">10</div>
+    <div id="grid-container" class="puzzle-grid"></div>
+    <div id="options-container" class="puzzle-options"></div>
+  </div>
 </div>
 <script>
 (async function() {
   var token = ${JSON.stringify(token).replace(/</g, '\\u003c')};
   var difficulty = ${Number(difficulty)};
+  var puzzleData = ${puzzleJson};
 
-  // 1. 브라우저 핑거프린트 생성
+  // 1. Browser fingerprint
   var fp = await generateFingerprint();
 
-  // 2. PoW 풀기
+  // 2. Solve PoW
   var nonce = await solvePoW(token, difficulty);
 
-  // 3. Hidden form으로 제출 (Set-Cookie가 확실히 적용되도록 form submit + 서버 redirect)
-  var form = document.createElement('form');
-  form.method = 'POST';
-  form.action = '/challenge/verify';
-  function addField(name, value) {
-    var input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = name;
-    input.value = value;
-    form.appendChild(input);
+  // 3. If puzzle required, show it; otherwise submit directly
+  if (puzzleData) {
+    showPuzzle(token, nonce, fp, puzzleData);
+  } else {
+    submitForm(token, nonce, fp, null, null);
   }
-  addField('token', token);
-  addField('nonce', nonce.toString());
-  addField('fingerprint', fp);
-  addField('returnUrl', window.location.href);
-  document.body.appendChild(form);
-  form.submit();
+
+  function showPuzzle(token, nonce, fp, puzzle) {
+    document.getElementById('pow-section').style.display = 'none';
+    var puzzleSection = document.getElementById('puzzle-section');
+    puzzleSection.style.display = 'block';
+
+    // Render captcha image (safe DOM construction — no innerHTML)
+    var gridContainer = document.getElementById('grid-container');
+    var img = document.createElement('img');
+    img.src = puzzle.gridImage;
+    img.alt = 'captcha';
+    img.style.cssText = 'border-radius:8px;';
+    img.draggable = false;
+    img.oncontextmenu = function() { return false; };
+    gridContainer.appendChild(img);
+
+    // Text input mode (no click options)
+    var optionsContainer = document.getElementById('options-container');
+    optionsContainer.innerHTML = '';
+    var inputWrap = document.createElement('div');
+    inputWrap.style.cssText = 'display:flex;gap:8px;justify-content:center;align-items:center;margin-top:12px;';
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 6;
+    input.placeholder = 'Enter text...';
+    input.autocomplete = 'off';
+    input.style.cssText = 'width:160px;padding:10px 16px;background:#0d1520;border:2px solid #2a3a4e;border-radius:8px;color:#e4e8f1;font-family:monospace;font-size:1.1rem;text-align:center;letter-spacing:4px;';
+    input.autofocus = true;
+    var btn = document.createElement('button');
+    btn.textContent = 'Verify';
+    btn.style.cssText = 'padding:10px 20px;background:#00ff88;color:#0a0e17;border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-size:0.9rem;';
+    btn.onclick = function() {
+      if (input.value.length > 0) submitForm(token, nonce, fp, puzzle.id, input.value);
+    };
+    input.onkeydown = function(e) {
+      if (e.key === 'Enter' && input.value.length > 0) submitForm(token, nonce, fp, puzzle.id, input.value);
+    };
+    inputWrap.appendChild(input);
+    inputWrap.appendChild(btn);
+    optionsContainer.appendChild(inputWrap);
+    var hint = document.createElement('p');
+    hint.textContent = 'Case-insensitive';
+    hint.style.cssText = 'color:#8892a4;font-size:0.7rem;margin-top:6px;';
+    optionsContainer.appendChild(hint);
+    setTimeout(function() { input.focus(); }, 100);
+
+    // Countdown timer
+    var remaining = 10;
+    var timerEl = document.getElementById('timer');
+    var interval = setInterval(function() {
+      remaining--;
+      timerEl.textContent = remaining;
+      if (remaining <= 3) timerEl.className = 'timer urgent';
+      if (remaining <= 0) {
+        clearInterval(interval);
+        timerEl.textContent = 'Time expired';
+        setTimeout(function() { window.location.reload(); }, 500);
+      }
+    }, 1000);
+  }
+
+  function submitForm(token, nonce, fp, puzzleId, puzzleAnswer) {
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/challenge/verify';
+    function addField(name, value) {
+      if (value === null || value === undefined) return;
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    }
+    addField('token', token);
+    addField('nonce', nonce.toString());
+    addField('fingerprint', fp);
+    addField('returnUrl', window.location.href);
+    if (puzzleId !== null) {
+      addField('puzzleId', puzzleId);
+      addField('puzzleAnswer', puzzleAnswer.toString());
+    }
+    document.body.appendChild(form);
+    form.submit();
+  }
 
   async function generateFingerprint() {
     var canvas = document.createElement('canvas');
@@ -336,7 +425,14 @@ export class ChallengeService {
    * Timing-safe 문자열 비교 (side-channel 방어)
    */
   private safeCompare(a: string, b: string): boolean {
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+    // 고정 길이 해시끼리 비교하므로 길이 불일치 시에도 constant-time 유지
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+      // 길이 다르면 dummy 비교로 타이밍 일정하게 유지
+      timingSafeEqual(bufA, bufA);
+      return false;
+    }
+    return timingSafeEqual(bufA, bufB);
   }
 }

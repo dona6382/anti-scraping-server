@@ -2,12 +2,14 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
+# canvas 네이티브 빌드 의존성
+RUN apk add --no-cache build-base g++ cairo-dev pango-dev libjpeg-turbo-dev giflib-dev librsvg-dev pixman-dev python3
+
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && \
-    npm cache clean --force
+# Install ALL dependencies (devDeps needed for nest build)
+RUN npm ci && npm cache clean --force
 
 # Copy source code
 COPY . .
@@ -20,8 +22,8 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# canvas 런타임 의존성 + dumb-init
+RUN apk add --no-cache dumb-init cairo pango libjpeg-turbo giflib librsvg pixman
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \

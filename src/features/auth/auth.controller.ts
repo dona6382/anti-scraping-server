@@ -68,6 +68,7 @@ export class AuthController {
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { ttl: 3600000, limit: 3 } }) // 시간당 3회
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Change password' })
   async changePassword(

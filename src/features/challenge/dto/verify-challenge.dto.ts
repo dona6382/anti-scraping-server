@@ -25,4 +25,16 @@ export class VerifyChallengeDto {
   @IsString()
   @MaxLength(2048)
   returnUrl?: string;
+
+  @ApiProperty({ description: 'Puzzle CAPTCHA ID (when puzzle is required)', required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  puzzleId?: string;
+
+  @ApiProperty({ description: 'CAPTCHA answer text', required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  puzzleAnswer?: string;
 }

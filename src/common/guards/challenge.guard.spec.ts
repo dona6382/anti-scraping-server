@@ -1,6 +1,7 @@
 import { ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
 import { ChallengeGuard } from './challenge.guard';
 import { ChallengeService } from '../services/challenge.service';
+import { PuzzleCaptchaService } from '../services/puzzle-captcha.service';
 import { Reflector } from '@nestjs/core';
 
 describe('ChallengeGuard', () => {
@@ -11,6 +12,12 @@ describe('ChallengeGuard', () => {
     generateToken: jest.fn(),
     getDifficulty: jest.fn(),
     getChallengeHtml: jest.fn(),
+  };
+
+  const mockPuzzleCaptchaService = {
+    shouldShowPuzzle: jest.fn(),
+    generatePuzzle: jest.fn(),
+    verifyPuzzle: jest.fn(),
   };
 
   const mockReflector = {
@@ -73,9 +80,11 @@ describe('ChallengeGuard', () => {
     mockChallengeService.generateToken.mockResolvedValue('mock-token');
     mockChallengeService.getDifficulty.mockResolvedValue(4);
     mockChallengeService.getChallengeHtml.mockReturnValue('<html>challenge</html>');
+    mockPuzzleCaptchaService.shouldShowPuzzle.mockResolvedValue(false);
 
     guard = new ChallengeGuard(
       mockChallengeService as unknown as ChallengeService,
+      mockPuzzleCaptchaService as unknown as PuzzleCaptchaService,
       mockReflector as unknown as Reflector,
     );
   });

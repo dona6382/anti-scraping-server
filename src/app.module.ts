@@ -18,6 +18,7 @@ import { IpBlacklistGuard } from './common/guards/ip-blacklist.guard';
 import { UserAgentGuard } from './common/guards/user-agent.guard';
 import { HeadlessBrowserGuard } from './common/guards/headless-browser.guard';
 import { BehavioralGuard } from './common/guards/behavioral.guard';
+import { TlsFingerprintGuard } from './common/guards/tls-fingerprint.guard';
 import { ChallengeGuard } from './common/guards/challenge.guard';
 
 import { AppController } from './app.controller';
@@ -62,6 +63,10 @@ import { AppController } from './app.controller';
     {
       provide: APP_GUARD,
       useClass: BehavioralGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: TlsFingerprintGuard,
     },
     {
       provide: APP_GUARD,

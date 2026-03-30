@@ -31,12 +31,12 @@ const EXCLUDED_PATHS = ['/health', '/health/live', '/health/ready', '/favicon.ic
  * 모든 요청의 IP+timestamp+endpoint+status를 캐시에 경량 저장
  * → 정상 요청의 행동 패턴 분석 (간격, 빈도, 엔드포인트 분포)에 활용
  *
- * 주의: cache read-modify-write는 비원자적 (동시 요청 시 일부 유실 가능)
- * → 분석 정확도에 미미한 영향, 보안/성능 트레이드오프로 허용
+ * 동시성: IP별 뮤텍스로 read-modify-write 직렬화 (동일 IP 동시 요청 시 유실 방지)
  */
 @Injectable()
 export class RequestLoggerMiddleware implements NestMiddleware {
   private readonly logger = new Logger(RequestLoggerMiddleware.name);
+  private readonly ipLocks = new Map<string, Promise<void>>();
 
   constructor(
     @Inject('ICacheService') private readonly cache: ICacheService,
@@ -64,6 +64,21 @@ export class RequestLoggerMiddleware implements NestMiddleware {
   private async logRequest(req: Request, statusCode: number): Promise<void> {
     const ip = RequestUtils.extractClientIp(req as ExtendedRequest);
     const normalizedIp = RequestUtils.normalizeIp(ip);
+
+    // IP별 직렬화: 동일 IP의 동시 read-modify-write 방지
+    const prev = this.ipLocks.get(normalizedIp) || Promise.resolve();
+    const current = prev.then(async () => {
+      try {
+        await this.doLogRequest(normalizedIp, req, statusCode);
+      } finally {
+        this.ipLocks.delete(normalizedIp);
+      }
+    });
+    this.ipLocks.set(normalizedIp, current.catch(() => {}));
+    await current;
+  }
+
+  private async doLogRequest(normalizedIp: string, req: Request, statusCode: number): Promise<void> {
     const key = `${REQUEST_LOG_PREFIX}${normalizedIp}`;
 
     const entry: RequestLogEntry = {

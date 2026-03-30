@@ -41,32 +41,62 @@ export interface AppConfig {
   };
 }
 
+/** Parse integer from env with validation */
+function safeParseInt(value: string | undefined, fallback: number, name: string, min?: number, max?: number): number {
+  if (!value) return fallback;
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error(`Invalid integer for ${name}: "${value}"`);
+  }
+  if (min !== undefined && parsed < min) {
+    throw new Error(`${name} must be >= ${min}, got ${parsed}`);
+  }
+  if (max !== undefined && parsed > max) {
+    throw new Error(`${name} must be <= ${max}, got ${parsed}`);
+  }
+  return parsed;
+}
+
 // Basic validation function (without Joi for now)
 export function validateConfig(): AppConfig {
   const config = process.env;
-  
+
   // Basic validation
   if (config.NODE_ENV && !['development', 'production', 'test'].includes(config.NODE_ENV)) {
     throw new Error(`Invalid NODE_ENV: ${config.NODE_ENV}`);
   }
+
+  // Production-only: require secrets
+  if (config.NODE_ENV === 'production') {
+    if (!config.JWT_SECRET) throw new Error('JWT_SECRET is required in production');
+    if (!config.CHALLENGE_SECRET) throw new Error('CHALLENGE_SECRET is required in production');
+    if (!config.PUZZLE_SECRET) throw new Error('PUZZLE_SECRET is required in production');
+  }
+
+  // Validate integer env vars early (with range checks for ports)
+  safeParseInt(config.PORT, 3000, 'PORT', 1, 65535);
+  safeParseInt(config.REDIS_PORT, 6379, 'REDIS_PORT', 1, 65535);
+  safeParseInt(config.DB_PORT, 5432, 'DB_PORT', 1, 65535);
+  safeParseInt(config.THROTTLE_TTL, 60, 'THROTTLE_TTL', 1);
+  safeParseInt(config.THROTTLE_LIMIT, 20, 'THROTTLE_LIMIT', 1);
 
   return configFactory();
 }
 
 export const configFactory = (): AppConfig => ({
   server: {
-    port: parseInt(process.env.PORT || '3000', 10),
+    port: safeParseInt(process.env.PORT, 3000, 'PORT', 1, 65535),
     nodeEnv: (process.env.NODE_ENV as 'development' | 'production' | 'test') || 'development',
-    corsOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+    corsOrigins: process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()) || ['http://localhost:3000'],
   },
   security: {
     strictMode: process.env.SECURITY_STRICT_MODE === 'true',
     rateLimit: {
-      ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
-      limit: parseInt(process.env.THROTTLE_LIMIT || '20', 10),
+      ttl: safeParseInt(process.env.THROTTLE_TTL, 60, 'THROTTLE_TTL'),
+      limit: safeParseInt(process.env.THROTTLE_LIMIT, 20, 'THROTTLE_LIMIT'),
     },
     ipBlacklist: {
-      ttl: parseInt(process.env.IP_BLACKLIST_TTL || '86400', 10),
+      ttl: safeParseInt(process.env.IP_BLACKLIST_TTL, 86400, 'IP_BLACKLIST_TTL'),
       enabled: process.env.IP_BLACKLIST_ENABLED !== 'false',
     },
     userAgent: {
@@ -81,13 +111,13 @@ export const configFactory = (): AppConfig => ({
   },
   redis: {
     host: process.env.REDIS_HOST || '',
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    port: safeParseInt(process.env.REDIS_PORT, 6379, 'REDIS_PORT', 1, 65535),
     password: process.env.REDIS_PASSWORD,
-    db: parseInt(process.env.REDIS_DB || '0', 10),
+    db: safeParseInt(process.env.REDIS_DB, 0, 'REDIS_DB'),
   },
   database: {
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
+    port: safeParseInt(process.env.DB_PORT, 5432, 'DB_PORT', 1, 65535),
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_DATABASE || 'anti_scraping',

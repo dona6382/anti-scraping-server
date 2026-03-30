@@ -144,11 +144,11 @@ export class RedisCacheService implements ICacheService, OnModuleInit, OnModuleD
       if (!value) return null;
       return JSON.parse(value);
     } catch {
-      // GETDEL 미지원 시 fallback (pipeline으로 최소화)
+      // GETDEL 미지원 시 fallback — MULTI/EXEC (atomic transaction)
       try {
-        const value = await this.client.get(key);
-        if (!value) return null;
-        await this.client.del(key);
+        const results = await this.client.multi().get(key).del(key).exec();
+        if (!results || !results[0] || !results[0][1]) return null;
+        const value = results[0][1] as string;
         return JSON.parse(value);
       } catch (error) {
         this.logger.error(`Redis GETDEL error for key ${key}: ${error instanceof Error ? error.message : String(error)}`);

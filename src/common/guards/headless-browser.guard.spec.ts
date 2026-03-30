@@ -105,6 +105,50 @@ describe('HeadlessBrowserGuard', () => {
     await expect(guard.canActivate(context)).rejects.toThrow(HeadlessBrowserException);
   });
 
+  it('host 헤더가 4번째 이후 → score 증가 (header order fingerprinting)', async () => {
+    // Object.keys preserves insertion order. Place host after 4+ other headers.
+    // Use a normal browser UA but arrange headers so host is late.
+    const headers: Record<string, string> = {
+      'x-custom-1': 'val',
+      'x-custom-2': 'val',
+      'x-custom-3': 'val',
+      'x-custom-4': 'val',
+      'host': 'example.com',
+      'x-custom-5': 'val',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'accept': 'text/html,application/xhtml+xml',
+      'accept-language': 'ko-KR,ko;q=0.9',
+      'accept-encoding': 'gzip, deflate, br',
+      'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+      'sec-fetch-site': 'none',
+    };
+    const context = createMockContext(headers);
+
+    // hostIndex = 4 (0-based), which is > 3 and headerKeys.length > 5
+    // This adds +15 to confidence score. Combined with other signals or alone,
+    // it may or may not cross the threshold (50). We just verify the factor is detected.
+    // With these complete headers the only extra score is +15 for header order,
+    // which is below threshold (50), so it should still pass.
+    expect(await guard.canActivate(context)).toBe(true);
+
+    // But if combined with missing sec-fetch + generic accept → should cross threshold
+    const suspiciousHeaders: Record<string, string> = {
+      'x-custom-1': 'val',
+      'x-custom-2': 'val',
+      'x-custom-3': 'val',
+      'x-custom-4': 'val',
+      'host': 'example.com',
+      'x-custom-5': 'val',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'accept': '*/*',
+      'accept-language': 'ko-KR,ko;q=0.9',
+      'accept-encoding': 'gzip, deflate, br',
+      // missing sec-ch-ua → +25, missing sec-fetch-site → +20, generic accept → +10, header order → +15 = 70
+    };
+    const context2 = createMockContext(suspiciousHeaders);
+    await expect(guard.canActivate(context2)).rejects.toThrow(HeadlessBrowserException);
+  });
+
   it('@SkipHeadlessBrowser 데코레이터 있으면 건너뜀', async () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(true);
     const context = createMockContext({

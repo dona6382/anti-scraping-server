@@ -147,9 +147,9 @@ export class AuthService {
       return null;
     }
 
-    // Check if account is locked
+    // Check if account is locked (동일 메시지로 사용자명 열거 방지)
     if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
-      throw new UnauthorizedException('Account temporarily locked. Please try again later.');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     if (await bcrypt.compare(password, user.password)) {

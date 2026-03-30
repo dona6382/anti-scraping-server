@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as express from 'express';
 import helmet from 'helmet';
+import { timingSafeEqual } from 'crypto';
 import { AppModule } from './app.module';
 
 /**
@@ -188,14 +189,24 @@ function setupStaticFiles(app: NestExpressApplication): void {
 function setupSwagger(app: NestExpressApplication): void {
   // Swagger Basic Auth 보호 (공격자가 API 스키마를 열람하지 못하도록)
   const swaggerUser = process.env.SWAGGER_USER || 'admin';
-  const swaggerPass = process.env.SWAGGER_PASSWORD || 'changeme';
+  const swaggerPass = process.env.SWAGGER_PASSWORD;
+  if (!swaggerPass || swaggerPass === 'changeme') {
+    if (process.env.NODE_ENV === 'production') {
+      Logger.warn('Swagger disabled in production: SWAGGER_PASSWORD not set or is default', 'Swagger');
+      return; // 프로덕션에서 기본 비밀번호면 Swagger 비활성화
+    }
+  }
+  const finalPass = swaggerPass || 'changeme';
   const swaggerAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const auth = req.headers.authorization;
     if (auth) {
       const [, encoded] = auth.split(' ');
       const decoded = Buffer.from(encoded || '', 'base64').toString();
       const [user, pass] = decoded.split(':');
-      if (user === swaggerUser && pass === swaggerPass) {
+      // timing-safe comparison
+      const userMatch = user.length === swaggerUser.length && timingSafeEqual(Buffer.from(user), Buffer.from(swaggerUser));
+      const passMatch = pass && pass.length === finalPass.length && timingSafeEqual(Buffer.from(pass), Buffer.from(finalPass));
+      if (userMatch && passMatch) {
         return next();
       }
     }

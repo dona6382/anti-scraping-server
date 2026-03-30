@@ -302,3 +302,4 @@ AI(Claude Code)를 5개 전문 에이전트 팀으로 구성하여 프로덕션 
 | 2.3.0 | 2026-03-24 | 위협 분석 시스템 (ThreatScore, PatternAnalysis, 사전 차단) |
 | 2.4.0 | 2026-03-26 | JS Challenge + Browser Fingerprint, 6단계 보안 체인, 보안 강화 (A+B그룹) |
 | 2.5.0 | 2026-03-28 | BehavioralGuard, Honeypot, Scoreboard, 적응형 PoW, 침투 테스트 100%, 174 unit + 28 E2E |
+| 2.5.1 | 2026-03-28 | 공격 분석 기반 강화: PoW 5~7, Cookie 15min, CV 0.5+RPM, 헤더 핑거프린팅 |

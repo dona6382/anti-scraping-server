@@ -15,6 +15,7 @@ import { SkipChallenge } from '../../common/guards/challenge.guard';
 import { SkipUserAgent } from '../../common/guards/user-agent.guard';
 import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
 import { ChallengeService, COOKIE_TTL } from '../../common/services/challenge.service';
+import { PuzzleCaptchaService } from '../../common/services/puzzle-captcha.service';
 import { ExtendedRequest } from '../../core/types';
 import { RequestUtils } from '../../common/utils/request.utils';
 import { VerifyChallengeDto } from './dto/verify-challenge.dto';
@@ -32,7 +33,10 @@ import { VerifyChallengeDto } from './dto/verify-challenge.dto';
 export class ChallengeController {
   private readonly logger = new Logger(ChallengeController.name);
 
-  constructor(private readonly challengeService: ChallengeService) {}
+  constructor(
+    private readonly challengeService: ChallengeService,
+    private readonly puzzleCaptchaService: PuzzleCaptchaService,
+  ) {}
 
   @Post('verify')
   @Throttle({ default: { ttl: 60000, limit: 10 } })
@@ -54,6 +58,19 @@ export class ChallengeController {
       throw new ForbiddenException('Challenge failed');
     }
 
+    // Puzzle CAPTCHA verification (if puzzle fields are present)
+    if (dto.puzzleId !== undefined && dto.puzzleAnswer !== undefined) {
+      const puzzleValid = await this.puzzleCaptchaService.verifyPuzzle(
+        dto.puzzleId,
+        dto.puzzleAnswer,
+        ip,
+      );
+      if (!puzzleValid) {
+        this.logger.warn(`Puzzle CAPTCHA verification failed for IP: ${RequestUtils.hashIp(ip, 'log')}`);
+        throw new ForbiddenException('Puzzle CAPTCHA failed');
+      }
+    }
+
     // PoW 풀이 속도 체크 — 토큰 발급~검증 시간이 100ms 미만이면 봇 의심
     try {
       const decoded = Buffer.from(dto.token, 'base64').toString();
@@ -62,7 +79,9 @@ export class ChallengeController {
       if (solveTime < 100) {
         this.logger.warn(`Suspiciously fast PoW solve: ${solveTime}ms from IP: ${RequestUtils.hashIp(ip, 'log')}`);
       }
-    } catch {}
+    } catch {
+      // token decode failure — non-critical, log at debug level
+    }
 
     // 핑거프린트 저장 (추적용)
     await this.challengeService.storeFingerprint(dto.fingerprint, ip);
@@ -80,12 +99,15 @@ export class ChallengeController {
       path: '/',
     });
 
-    // returnUrl에서 원래 URL 추출 (open redirect 방지: 같은 origin의 path만 허용)
+    // returnUrl에서 원래 URL 추출 (open redirect 방지: 상대 경로만 허용, javascript: 등 차단)
     let redirectPath = '/';
     if (dto.returnUrl) {
       try {
-        const url = new URL(dto.returnUrl);
-        redirectPath = url.pathname + url.search;
+        const url = new URL(dto.returnUrl, 'http://localhost');
+        // 상대 경로만 허용 (javascript:, data: 등 차단)
+        if (url.pathname.startsWith('/')) {
+          redirectPath = url.pathname + url.search;
+        }
       } catch {
         redirectPath = '/';
       }
@@ -94,7 +116,9 @@ export class ChallengeController {
     // Set-Cookie가 확실히 적용되도록 HTML 페이지로 응답 (303 redirect는 일부 브라우저에서 Set-Cookie 무시)
     this.logger.log(`Challenge verified, setting cookie and redirecting to ${redirectPath}`);
     const safeRedirect = JSON.stringify(redirectPath).replace(/</g, '\\u003c');
+    // noscript href도 encodeURIComponent로 속성 인젝션 방지
+    const safeHref = encodeURIComponent(redirectPath);
     res.setHeader('Content-Type', 'text/html');
-    return res.send(`<!DOCTYPE html><html><head></head><body><script>window.location.href=${safeRedirect}</script><noscript><a href="${encodeURI(redirectPath)}">Click here to continue</a></noscript></body></html>`);
+    return res.send(`<!DOCTYPE html><html><head></head><body><script>window.location.href=${safeRedirect}</script><noscript><a href="${safeHref}">Click here to continue</a></noscript></body></html>`);
   }
 }

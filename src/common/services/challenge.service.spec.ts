@@ -46,8 +46,8 @@ describe('ChallengeService', () => {
     jest.restoreAllMocks();
   });
 
-  // Helper: solve PoW for a given token with difficulty 5 (default)
-  function solvePoW(token: string, difficulty = 5): string {
+  // Helper: solve PoW for a given token with difficulty 4 (default)
+  function solvePoW(token: string, difficulty = 4): string {
     const prefix = '0'.repeat(difficulty);
     let nonce = 0;
     while (true) {
@@ -229,12 +229,12 @@ describe('ChallengeService', () => {
       expect(result).toBe(false);
     });
 
-    it('HMAC 길이 = 32 hex chars 확인', () => {
+    it('HMAC 길이 = 64 hex chars 확인 (full SHA-256)', () => {
       const cookie = service.generateCookie(TEST_IP, TEST_FINGERPRINT);
       const parts = cookie.split(':');
       const signature = parts[3];
 
-      expect(signature).toMatch(/^[0-9a-f]{32}$/);
+      expect(signature).toMatch(/^[0-9a-f]{64}$/);
     });
   });
 
@@ -390,46 +390,9 @@ describe('ChallengeService', () => {
   });
 
   describe('getDifficulty()', () => {
-    it('위협 점수 없음 (null) → 난이도 5 (기본)', async () => {
-      mockThreatScore.getScore.mockResolvedValue(null);
-
+    it('항상 난이도 4 (퍼즐 캡챠가 핵심 방어)', async () => {
       const difficulty = await service.getDifficulty(TEST_IP);
-      expect(difficulty).toBe(5);
-    });
-
-    it('위협 점수 20 → 난이도 5 (30 미만)', async () => {
-      mockThreatScore.getScore.mockResolvedValue({ totalScore: 20 });
-
-      const difficulty = await service.getDifficulty(TEST_IP);
-      expect(difficulty).toBe(5);
-    });
-
-    it('위협 점수 30 → 난이도 6', async () => {
-      mockThreatScore.getScore.mockResolvedValue({ totalScore: 30 });
-
-      const difficulty = await service.getDifficulty(TEST_IP);
-      expect(difficulty).toBe(6);
-    });
-
-    it('위협 점수 50 → 난이도 7', async () => {
-      mockThreatScore.getScore.mockResolvedValue({ totalScore: 50 });
-
-      const difficulty = await service.getDifficulty(TEST_IP);
-      expect(difficulty).toBe(7);
-    });
-
-    it('위협 점수 80 → 난이도 7', async () => {
-      mockThreatScore.getScore.mockResolvedValue({ totalScore: 80 });
-
-      const difficulty = await service.getDifficulty(TEST_IP);
-      expect(difficulty).toBe(7);
-    });
-
-    it('ThreatScore 에러 시 → 난이도 5 (fallback)', async () => {
-      mockThreatScore.getScore.mockRejectedValue(new Error('Redis connection failed'));
-
-      const difficulty = await service.getDifficulty(TEST_IP);
-      expect(difficulty).toBe(5);
+      expect(difficulty).toBe(4);
     });
   });
 });

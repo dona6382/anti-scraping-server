@@ -25,13 +25,13 @@ AI(Claude Code)를 5개 전문 에이전트로 활용하여 설계·구현·검�
 - **Validation**: class-validator + class-transformer (DTO 기반)
 - **API Docs**: Swagger (`/api-docs`)
 - **Container**: Docker Compose (app + postgres + redis)
-- **Test**: Jest (174 unit + 28 e2e)
+- **Test**: Jest (186 unit + 28 e2e)
 
 ## 프로젝트 구조
 ```
 src/
 ├── main.ts                  # 부트스트랩 (helmet, body limit, graceful shutdown)
-├── app.module.ts            # 루트 모듈 (전역 Guard 6개 + Filter 등록)
+├── app.module.ts            # 루트 모듈 (전역 Guard 7개 + Filter 등록)
 ├── app.controller.ts        # 루트 엔드포인트
 ├── core/                    # 인프라 계층 (@Global)
 │   ├── config/              # ConfigModule, AppConfigService
@@ -62,7 +62,7 @@ src/
 
 ## 전역 보안 체인
 ```
-모든 요청 → ThrottlerGuard → IpBlacklistGuard (+ CIDR + 위협 점수) → UserAgentGuard → HeadlessBrowserGuard → BehavioralGuard → ChallengeGuard → Route Handler
+모든 요청 → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → BehavioralGuard → TlsFingerprintGuard → ChallengeGuard(+CAPTCHA) → Route Handler
 ```
 
 ## 개발 프로세스
@@ -129,7 +129,7 @@ src/
 ```bash
 npm run start:dev      # 개발 서버 (watch)
 npm run build          # 빌드
-npm test               # Jest 테스트 (174 tests, 14 suites)
+npm test               # Jest 테스트 (186 tests, 16 suites)
 npm run test:e2e       # E2E 테스트 (28 tests)
 npm run lint           # ESLint
 docker-compose up -d   # Docker 실행
@@ -138,6 +138,8 @@ docker-compose up -d   # Docker 실행
 ## 환경변수 (필수)
 ```
 JWT_SECRET=            # JWT 서명 키 (필수, 없으면 부팅 실패)
+CHALLENGE_SECRET=      # Challenge HMAC 키 (프로덕션 필수)
+PUZZLE_SECRET=         # CAPTCHA HMAC 키 (프로덕션 필수)
 IP_HASH_SALT=          # IP 해시 솔트 (없으면 랜덤 생성)
 DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_DATABASE  # PostgreSQL
 ```
@@ -145,6 +147,6 @@ DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_DATABASE  # PostgreSQL
 ## 주의사항
 - Redis 미설정 시 In-Memory 캐시로 자동 fallback
 - DB_SYNCHRONIZE=true는 개발 환경에서만 사용
-- 전역 Guard 6개: ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → BehavioralGuard → ChallengeGuard
+- 전역 Guard 7개: ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → BehavioralGuard → TlsFingerprintGuard → ChallengeGuard
 - Health/Root 엔드포인트는 모든 Guard Skip (모니터링 프로브용)
 - Testing 모듈은 프로덕션에서 자동 비활성화

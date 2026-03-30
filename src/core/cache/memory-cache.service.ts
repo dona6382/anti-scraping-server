@@ -5,11 +5,15 @@ import { ICacheService } from './interfaces/cache.interface';
  * Memory Cache Service
  * In-Memory 캐시 (Redis 미설정 시 fallback)
  */
+/** 최대 캐시 엔트리 수 — 초과 시 만료된 항목 정리 후 가장 오래된 항목 삭제 */
+const MAX_CACHE_SIZE = 50_000;
+
 @Injectable()
 export class MemoryCacheService implements ICacheService, OnModuleDestroy {
   private readonly logger = new Logger(MemoryCacheService.name);
   private readonly cache = new Map<string, { value: unknown; expiresAt?: number }>();
   private readonly cleanupInterval: NodeJS.Timeout;
+  private isEvicting = false;
 
   constructor() {
     // 5분마다 만료된 항목 정리
@@ -38,11 +42,30 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
 
   async set<T>(key: string, value: T, ttl?: number): Promise<void> {
     const expiresAt = ttl ? Date.now() + (ttl * 1000) : undefined;
-    
+
     this.cache.set(key, {
       value,
       expiresAt,
     });
+
+    // 크기 제한 — 초과 시 만료 항목 정리 후 가장 오래된 항목 삭제
+    if (this.cache.size > MAX_CACHE_SIZE && !this.isEvicting) {
+      this.isEvicting = true;
+      try {
+        this.cleanupExpiredEntries();
+        if (this.cache.size > MAX_CACHE_SIZE) {
+          const overflow = this.cache.size - MAX_CACHE_SIZE;
+          const keys = this.cache.keys();
+          for (let i = 0; i < overflow; i++) {
+            const oldest = keys.next().value;
+            if (oldest) this.cache.delete(oldest);
+          }
+          this.logger.warn(`Cache evicted ${overflow} entries (size limit: ${MAX_CACHE_SIZE})`);
+        }
+      } finally {
+        this.isEvicting = false;
+      }
+    }
   }
 
   async delete(key: string): Promise<void> {
@@ -112,13 +135,18 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
 
   async keys(pattern: string): Promise<string[]> {
     const allKeys = Array.from(this.cache.keys());
-    
-    // 패턴 매칭 (*, ? 지원) — 메타문자 이스케이프 후 glob 변환
+
+    // 최적화: prefix* 패턴은 정규식 없이 startsWith로 처리 (ReDoS 방지)
+    if (pattern.endsWith('*') && !pattern.includes('?') && pattern.indexOf('*') === pattern.length - 1) {
+      const prefix = pattern.slice(0, -1);
+      return allKeys.filter(key => key.startsWith(prefix));
+    }
+
+    // 일반 glob 패턴 — 메타문자 이스케이프 후 변환
     const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(
-      '^' + escaped.replace(/\*/g, '.*').replace(/\?/g, '.') + '$',
-    );
-    
+    const regexStr = '^' + escaped.replace(/\*/g, '[^:]*').replace(/\?/g, '.') + '$';
+    const regex = new RegExp(regexStr);
+
     return allKeys.filter(key => regex.test(key));
   }
 

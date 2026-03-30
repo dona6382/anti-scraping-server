@@ -109,6 +109,15 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
       };
     }
 
+    // PayloadTooLargeError → 413 (스택 트레이스 노출 방지)
+    if (exception instanceof Error && exception.message?.includes('request entity too large')) {
+      return {
+        statusCode: HttpStatus.PAYLOAD_TOO_LARGE,
+        message: 'Request body too large',
+        error: 'Payload Too Large',
+      };
+    }
+
     // 일반 Error 처리
     if (exception instanceof Error) {
       return {

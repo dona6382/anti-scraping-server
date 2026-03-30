@@ -4,6 +4,7 @@ import { SkipChallenge } from '../../common/guards/challenge.guard';
 import { SkipUserAgent } from '../../common/guards/user-agent.guard';
 import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
 import { SkipBehavioral } from '../../common/guards/behavioral.guard';
+import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
 import { SecurityEventService } from '../../common/services/security-event.service';
 import { ThreatScoreService } from '../../common/services/threat-score.service';
 import { RequestUtils } from '../../common/utils/request.utils';
@@ -24,6 +25,7 @@ import { ExtendedRequest } from '../../core/types';
 @SkipUserAgent()
 @SkipHeadlessBrowser()
 @SkipBehavioral()
+@SkipIpBlacklist()
 export class HoneypotController {
   private readonly logger = new Logger(HoneypotController.name);
 

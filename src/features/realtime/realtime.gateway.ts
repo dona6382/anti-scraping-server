@@ -8,6 +8,7 @@ import {
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
+import { RequestUtils } from '../../common/utils/request.utils';
 
 @WebSocketGateway({
   cors: { origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'] },
@@ -60,7 +61,7 @@ export class RealtimeGateway
     );
   }
 
-  /** Broadcast security event to all connected clients */
+  /** Broadcast security event to authenticated clients only, with IP hashed */
   broadcastSecurityEvent(event: {
     eventType: string;
     severity: string;
@@ -68,10 +69,17 @@ export class RealtimeGateway
     description: string;
     timestamp: string;
   }) {
-    this.server.emit('security-event', event);
+    const sanitized = {
+      ...event,
+      ip: event.ip ? RequestUtils.hashIp(event.ip, 'ws') : undefined,
+    };
+    // 인증된 클라이언트에만 전송
+    for (const clientId of this.authenticatedClients) {
+      this.server.to(clientId).emit('security-event', sanitized);
+    }
   }
 
-  /** Broadcast auto-block notification */
+  /** Broadcast auto-block notification to authenticated clients only, with IP hashed */
   broadcastAutoBlock(data: {
     ip: string;
     reason: string;
@@ -79,6 +87,12 @@ export class RealtimeGateway
     violations: number;
     timestamp: string;
   }) {
-    this.server.emit('auto-block', data);
+    const sanitized = {
+      ...data,
+      ip: RequestUtils.hashIp(data.ip, 'ws'),
+    };
+    for (const clientId of this.authenticatedClients) {
+      this.server.to(clientId).emit('auto-block', sanitized);
+    }
   }
 }

@@ -77,9 +77,10 @@ export class BehavioralGuard extends BaseSecurityGuard {
 
       const cv = this.calculateCV(intervals);
 
-      // 요청 빈도 체크 (RPM)
+      // 요청 빈도 체크 (RPM) — windowMs=0이면 분석 불가 (동일 ms에 도착)
       const windowMs = sorted[sorted.length - 1].t - sorted[0].t;
-      const rpm = windowMs > 0 ? (logs.length / windowMs) * 60000 : 0;
+      if (windowMs <= 0) return true;
+      const rpm = (logs.length / windowMs) * 60000;
       const isTooFast = rpm > MAX_RPM;
 
       if (cv < CV_THRESHOLD || isTooFast) {
@@ -106,7 +107,8 @@ export class BehavioralGuard extends BaseSecurityGuard {
           },
         });
 
-        this.threatScoreService.recordViolation(ip, 'BOT_DETECTED', 'HIGH').catch(() => {});
+        this.threatScoreService.recordViolation(ip, 'BOT_DETECTED', 'HIGH')
+          .catch(err => this.logger.error('Failed to record bot threat violation', err?.message));
 
         throw new SecurityException(
           ErrorCodes.BOT_DETECTED,

@@ -9,11 +9,13 @@ import { IpBlacklistService } from './services/ip-blacklist.service';
 import { SecurityEventService } from './services/security-event.service';
 import { ThreatScoreService } from './services/threat-score.service';
 import { ChallengeService } from './services/challenge.service';
+import { PuzzleCaptchaService } from './services/puzzle-captcha.service';
 
 import { UserAgentGuard } from './guards/user-agent.guard';
 import { IpBlacklistGuard } from './guards/ip-blacklist.guard';
 import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
 import { BehavioralGuard } from './guards/behavioral.guard';
+import { TlsFingerprintGuard } from './guards/tls-fingerprint.guard';
 import { ChallengeGuard } from './guards/challenge.guard';
 
 /**
@@ -42,10 +44,12 @@ import { ChallengeGuard } from './guards/challenge.guard';
     SecurityEventService,
     ThreatScoreService,
     ChallengeService,
+    PuzzleCaptchaService,
     UserAgentGuard,
     IpBlacklistGuard,
     HeadlessBrowserGuard,
     BehavioralGuard,
+    TlsFingerprintGuard,
     ChallengeGuard,
   ],
   exports: [
@@ -53,10 +57,12 @@ import { ChallengeGuard } from './guards/challenge.guard';
     SecurityEventService,
     ThreatScoreService,
     ChallengeService,
+    PuzzleCaptchaService,
     UserAgentGuard,
     IpBlacklistGuard,
     HeadlessBrowserGuard,
     BehavioralGuard,
+    TlsFingerprintGuard,
     ChallengeGuard,
     ThrottlerModule,
   ],

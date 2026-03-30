@@ -24,7 +24,8 @@ export type SecurityReason =
   | 'SUSPICIOUS_BEHAVIOR'
   | 'HONEYPOT_TRIGGERED'
   | 'INVALID_USER_AGENT'
-  | 'HEADLESS_BROWSER_DETECTED';
+  | 'HEADLESS_BROWSER_DETECTED'
+  | 'CAPTCHA_FAILURES';
 
 export interface BlacklistEntry {
   ip: string;

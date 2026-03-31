@@ -14,19 +14,22 @@ export class SecurityEvent {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'enum', enum: [
-    'IP_BLOCKED',
-    'IP_UNBLOCKED', 
-    'BOT_DETECTED',
-    'RATE_LIMITED',
-    'HONEYPOT_TRIGGERED',
-    'USER_AGENT_BLOCKED',
-    'HEADLESS_BROWSER_DETECTED',
-    'SUSPICIOUS_ACTIVITY',
-    'ADMIN_ACTION',
-    'SYSTEM_ALERT',
-    'AUTO_BLOCKED'
-  ]})
+  @Column({
+    type: 'enum',
+    enum: [
+      'IP_BLOCKED',
+      'IP_UNBLOCKED',
+      'BOT_DETECTED',
+      'RATE_LIMITED',
+      'HONEYPOT_TRIGGERED',
+      'USER_AGENT_BLOCKED',
+      'HEADLESS_BROWSER_DETECTED',
+      'SUSPICIOUS_ACTIVITY',
+      'ADMIN_ACTION',
+      'SYSTEM_ALERT',
+      'AUTO_BLOCKED',
+    ],
+  })
   eventType: string;
 
   @Column({ type: 'enum', enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], default: 'MEDIUM' })

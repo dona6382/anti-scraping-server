@@ -1,3 +1,4 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsIP,
   IsEnum,
@@ -8,7 +9,6 @@ import {
   Min,
   Max,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 const SECURITY_REASONS = [
   'MANUAL_ADMIN_ACTION',

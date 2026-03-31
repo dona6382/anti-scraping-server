@@ -1,72 +1,15 @@
 # Anti-Scraping Server
 
-> Production-grade web scraping defense system with 7-layer security chain.
+> Production-grade web scraping defense system with 8-layer security guard chain.
 > Built with NestJS + TypeScript + PostgreSQL + Redis.
->
-> **Built with AI** — Claude Code를 시니어 개발팀처럼 활용하여 설계·구현·검증한 프로젝트.
-
-## How This Project Was Built
-
-이 프로젝트는 **AI를 도구로 활용**하여 프로덕션 수준의 보안 시스템을 설계하고 구현한 과정을 담고 있습니다.
-
-### AI 활용 전략
-
-단순히 "코드 생성"이 아니라, **5개 전문 에이전트를 시니어 개발팀처럼 구성**하고 각자의 관점에서 반복 검증하는 프로세스를 설계했습니다:
-
-| 에이전트 | 역할 | 기여 |
-|----------|------|------|
-| **TS Code Reviewer** | 타입 안전성, 코드 일관성, dead code | 매 기능 구현 후 3-pass 심층분석 |
-| **NestJS Backend Dev** | 아키텍처, DI, Guard 체인, 성능 | 모듈 설계 + 구현 |
-| **Security Researcher** | 공격 벡터, 암호화, timing attack, XSS | 취약점 발견 → 수정 → 재검증 |
-| **Security Test Engineer** | 테스트 커버리지, 회귀 방지 | 174 unit + 28 E2E 작성 |
-| **Project Manager** | 우선순위, 기능 갭, 종합 판정 | REJECT → APPROVE 사이클 관리 |
-
-### 사람이 한 것 vs AI가 한 것
-
-| 사람 (나) | AI (Claude Code) |
-|-----------|-----------------|
-| 보안 아키텍처 설계 판단 | 코드 구현 + 테스트 작성 |
-| 에이전트 역할/프로세스 설계 | 5개 관점에서 반복 심층분석 |
-| 기능 우선순위 결정 | 취약점 발견 + 수정 제안 |
-| 실 브라우저 테스트로 런타임 버그 5건 발견 | 버그 원인 분석 + 수정 |
-| 최종 승인/거부 판단 | PR 수준의 코드 리뷰 리포트 |
-
-### 품질 관리: REJECT → APPROVE 사이클
-
-모든 주요 기능은 아래 사이클을 거쳤습니다:
-
-```
-설계 → 보안 사전 리뷰 → 구현 → 4개 에이전트 심층분석 → 이슈 발견 → 수정 → 재분석 → PM 승인
-```
-
-예시 — JS Challenge 시스템:
-- **1차 분석**: CRITICAL 2건 + HIGH 4건 발견 → **REJECT**
-- **2차 (A그룹 수정 후)**: 7건 해결 확인 → **CONDITIONAL**
-- **3차 (B그룹 + 테스트)**: 전부 해결, 47개 테스트 → **APPROVE**
-- **4차 (실전 브라우저 테스트)**: 런타임 버그 5건 추가 발견 → 수정 → **APPROVE**
-- **5차 (최종)**: Security Researcher 판정 **STRONG**
-
-### AI가 못 찾고 사람이 찾은 버그
-
-Playwright 실전 테스트에서 **AI 에이전트의 단위 테스트가 잡지 못한 런타임 버그 5건**을 발견:
-
-1. IPv6 `::1` 토큰 파싱 — 구분자 `:` 충돌
-2. Rate limit 충돌 — 글로벌 ThrottlerGuard가 Challenge verify 차단
-3. Cookie URL-encoding — 브라우저가 `:`를 `%3A`로 인코딩
-4. fetch() Set-Cookie — 브라우저 보안 정책으로 쿠키 미적용
-5. returnUrl null — form hidden field 누락
-
-→ 이 경험은 "AI가 만든 코드도 반드시 실 환경에서 검증해야 한다"는 교훈을 보여줍니다.
-
----
 
 ## Overview
 
-This project is a multi-layer bot detection and blocking server designed to defend web applications against scraping, credential stuffing, and automated abuse. Every incoming request passes through a 7-stage security guard chain — rate limiting, IP/CIDR blacklisting with automatic escalation, User-Agent pattern filtering, headless browser detection (9-signal weighted scoring), real-time behavioral analysis (CV-based bot detection), a JavaScript Proof-of-Work challenge paired with browser fingerprinting, and finally the route handler itself.
+This project is a multi-layer bot detection and blocking server designed to defend web applications against scraping, credential stuffing, and automated abuse. Every incoming request passes through an 8-stage security guard chain — rate limiting, IP/CIDR blacklisting with automatic escalation, User-Agent pattern filtering, headless browser detection (11-signal weighted scoring), real-time behavioral analysis (CV-based bot detection), TLS fingerprinting, a JavaScript Proof-of-Work challenge with Canvas CAPTCHA, and finally the route handler itself.
 
 The architecture follows a strict layered design: a global Core module (config, cache, database), a shared Common module (guards, services, utilities), and isolated Feature modules (auth, admin, analysis, realtime, etc.). All guards follow a fail-open strategy — if an infrastructure dependency is down, requests pass through with full logging rather than causing an outage.
 
-**Test results:** 174 unit tests (14 suites) + 28 E2E tests. Penetration test: 100% defense rate (10/10 scenarios). Normal user test: 0 false positives (7/7 scenarios).
+**Test results:** 187 unit tests (16 suites). 8+ rounds of penetration testing with 34 security fixes. Final assessment: CRITICAL 0 / HIGH 0.
 
 ## Security Chain
 
@@ -95,17 +38,21 @@ Request
 └─────────┬───────────┘
           ▼
 ┌─────────────────────┐
-│ 6. JS Challenge      │  Proof-of-Work + browser fingerprint (defeats proxy rotation)
+│ 6. TLS Fingerprint   │  Nginx X-TLS-Fingerprint header analysis (signal-only, raises threat score)
 └─────────┬───────────┘
           ▼
 ┌─────────────────────┐
-│ 7. Route Handler     │  Business logic (JWT/RBAC auth applied per-route)
+│ 7. JS Challenge      │  Proof-of-Work + Canvas CAPTCHA (6-char PNG, 10s TTL, 5-fail blacklist)
+└─────────┬───────────┘
+          ▼
+┌─────────────────────┐
+│ 8. Route Handler     │  Business logic (JWT/RBAC auth applied per-route)
 └─────────────────────┘
 ```
 
 ## Key Features
 
-- **7-Layer Guard Chain** — Every request passes through six global security guards before reaching any route handler, all registered as `APP_GUARD` for zero-config coverage.
+- **8-Layer Guard Chain** — Every request passes through seven global security guards before reaching any route handler, all registered as `APP_GUARD` for zero-config coverage.
 - **JS Challenge with Proof-of-Work** — Clients must solve a SHA-256 PoW puzzle and submit a canvas/navigator fingerprint; cookies are HMAC-signed, one-time-use, and subnet-bound.
 - **Threat Scoring Engine** — Per-IP threat scores with weighted violations (LOW=5 to CRITICAL=50), 1-hour TTL decay, and automatic pre-blocking at score 70+.
 - **Automatic IP Ban Escalation** — 10 violations in 15 min = 30-min ban; 20 = 1 hour; 50 = 24 hours. Supports manual IP/CIDR management via admin API.
@@ -117,6 +64,20 @@ Request
 - **Cache-First Architecture** — Redis primary with automatic in-memory fallback via factory pattern; no configuration change needed.
 - **AI-Driven Multi-Agent Review** — 5 specialized AI agents (code reviewer, backend dev, security researcher, test engineer, PM) independently analyze every feature through REJECT→APPROVE cycles.
 - **Scoreboard (Judge System)** — Real-time attack vs defense scoring dashboard with Guard-layer contribution analysis and improvement recommendations for both sides.
+
+## Demo Access
+
+프로젝트 구경용 데모 계정입니다.
+
+| 항목 | 값 |
+|------|-----|
+| **Admin ID** | `sb2_1774587761` |
+| **Admin PW** | `Admin@12345` |
+| **Swagger** | `/api-docs` (Basic Auth: `admin` / env `SWAGGER_PASSWORD`) |
+
+> Admin 로그인 후 JWT 토큰으로 `/admin/*`, `/admin/scoreboard/*`, `/a dmin/analysis/*` 등 관리 API에 접근할 수 있습니다.
+
+---
 
 ## Quick Start
 
@@ -159,7 +120,7 @@ docker-compose up -d
 ### Test
 
 ```bash
-npm test               # 174 unit tests (14 suites)
+npm test               # 187 unit tests (16 suites)
 npm run test:e2e       # 28 integration tests
 npm run test:cov       # Coverage report
 ```
@@ -168,9 +129,8 @@ npm run test:cov       # Coverage report
 
 ## 한국어 문서 (Korean Documentation)
 
-7단계 보안 체인을 갖춘 웹 스크래핑/봇 탐지 및 차단 서버.
+8단계 보안 체인을 갖춘 웹 스크래핑/봇 탐지 및 차단 서버.
 NestJS + TypeScript + PostgreSQL + Redis 기반.
-**AI(Claude Code)를 5개 전문 에이전트로 활용**하여 설계·구현·검증.
 
 ## 기술 스택
 
@@ -186,12 +146,12 @@ NestJS + TypeScript + PostgreSQL + Redis 기반.
 | Validation | class-validator + class-transformer |
 | API Docs | Swagger (OpenAPI 3.0) |
 | Container | Docker Compose |
-| Test | Jest (174 unit + 28 e2e) |
+| Test | Jest (187 unit + 16 suites) |
 
-## 보안 체인 (7단계)
+## 보안 체인 (8단계)
 
 ```
-Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → BehavioralGuard → ChallengeGuard → Route Handler
+Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessBrowserGuard → BehavioralGuard → TlsFingerprintGuard → ChallengeGuard(+CAPTCHA) → Route Handler
 ```
 
 | # | 레이어 | 설명 | 적용 범위 |
@@ -199,10 +159,11 @@ Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessB
 | 1 | **Rate Limiting** | IP별 요청 속도 제한 (configurable) | 전역 (APP_GUARD) |
 | 2 | **IP Blacklist** | 동적 IP/CIDR 차단 + 자동 차단 + 위협 점수 사전 차단 | 전역 (APP_GUARD) |
 | 3 | **User-Agent Filter** | 봇/스크래퍼 UA 패턴 매칭 + Googlebot 허용 | 전역 (APP_GUARD) |
-| 4 | **Headless Detection** | 9개 시그널 가중치 점수제 (Puppeteer, Selenium, PhantomJS 등) | 전역 (APP_GUARD) |
+| 4 | **Headless Detection** | 11개 시그널 가중치 점수제 (Puppeteer, Selenium, PhantomJS 등) | 전역 (APP_GUARD) |
 | 5 | **Behavioral Guard** | 실시간 요청 간격 CV 분석 — 기계적 패턴 자동 차단 | 전역 (APP_GUARD) |
-| 6 | **JS Challenge** | Proof-of-Work + Browser Fingerprint (프록시 회전 방어) | 전역 (APP_GUARD) |
-| 7 | **Route Handler** | 비즈니스 로직 (JWT/RBAC 인증은 라우트별) | 라우트별 |
+| 6 | **TLS Fingerprint** | Nginx X-TLS-Fingerprint 분석 (signal-only, 위협 점수 반영) | 전역 (APP_GUARD) |
+| 7 | **JS Challenge + CAPTCHA** | PoW + Canvas PNG 텍스트 CAPTCHA (6글자, 10초, 5회 실패 블랙리스트) | 전역 (APP_GUARD) |
+| 8 | **Route Handler** | 비즈니스 로직 (JWT/RBAC 인증은 라우트별) | 라우트별 |
 
 ### JS Challenge + Browser Fingerprint (v2.4.0)
 프록시만 바꿔서 IP 기반 차단을 우회하는 공격에 대응:
@@ -215,8 +176,8 @@ Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessB
 **보안 특성:**
 - HMAC-SHA256 토큰 서명 + `crypto.timingSafeEqual` (timing attack 방어)
 - Atomic `getAndDelete`로 토큰 일회용 보장 (TOCTOU 방지)
-- Cookie HMAC 128-bit + IP 서브넷 바인딩 + **15분 TTL**
-- 적응형 PoW 난이도: 기본 5(~50ms) → 위협 시 6(~500ms) → 7(~5s)
+- Cookie HMAC 256-bit (full SHA-256) + IP 서브넷 바인딩 + **15분 TTL**
+- PoW 난이도 4 (브라우저 ~30ms) + Canvas CAPTCHA가 핵심 방어
 - PoW 풀이 속도 감시 (100ms 미만 = 봇 의심)
 - HTTP 헤더 순서 핑거프린팅 (TLS JA3 대안)
 - XSS 방어 (`JSON.stringify` + `\u003c` escape)
@@ -228,6 +189,16 @@ Request → ThrottlerGuard → IpBlacklistGuard → UserAgentGuard → HeadlessB
 - **GeoIP / VPN / Tor 탐지**: 데이터센터 IP 대역 (AWS, GCP, DO 등), VPN 서비스 대역 자동 탐지
 - **요청 패턴 분석**: 요청 간격 변동계수(CV) 기반 봇 탐지, 공격 패턴 클러스터링, 유사 패턴 IP 매칭
 - **실시간 대시보드**: WebSocket으로 보안 이벤트 실시간 스트림 (JWT+admin 인증)
+
+## 데모 계정
+
+| 항목 | 값 |
+|------|-----|
+| **Admin ID** | `sb2_1774587761` |
+| **Admin PW** | `Admin@12345` |
+| **Swagger** | `/api-docs` (Basic Auth: `admin` / env `SWAGGER_PASSWORD`) |
+
+---
 
 ## 빠른 시작
 
@@ -396,8 +367,8 @@ npm run start:dev      # 개발 서버 (watch 모드)
 npm run build          # 프로덕션 빌드
 npm run lint           # ESLint
 npm run format         # Prettier
-npm test               # Jest 단위 테스트 (14 suites, 174 tests)
-npm run test:e2e       # E2E 통합 테스트 (28 tests)
+npm test               # Jest 단위 테스트 (16 suites, 187 tests)
+npm run test:e2e       # E2E 통합 테스트
 npm run test:cov       # 커버리지 리포트
 ```
 
@@ -425,6 +396,24 @@ Guard 위반 탐지 → SecurityEventService.log() → PostgreSQL 저장 (비동
 CacheFactory → REDIS_HOST 설정됨? → RedisCacheService
                                   → MemoryCacheService (fallback)
 ```
+
+---
+
+## AI-Assisted Development
+
+이 프로젝트는 **Claude Code를 5개 전문 에이전트로 구성**하여 설계·구현·검증한 프로젝트입니다.
+
+| 사람 (나) | AI (Claude Code) |
+|-----------|-----------------|
+| 보안 아키텍처 설계 판단 | 코드 구현 + 테스트 작성 |
+| 에이전트 역할/프로세스 설계 | 5개 관점에서 반복 심층분석 |
+| 기능 우선순위 결정 | 취약점 발견 + 수정 제안 |
+| 실 브라우저 테스트로 런타임 버그 5건 발견 | 버그 원인 분석 + 수정 |
+| 최종 승인/거부 판단 | PR 수준의 코드 리뷰 리포트 |
+
+8+ 라운드의 공격자/방어자 반복 분석을 통해 **34건의 보안 이슈**를 발견·수정. 최종 평가: CRITICAL 0 / HIGH 0.
+
+자세한 내용: [AI Usage Report](docs/AI_USAGE_REPORT.md) | [Security Hardening](docs/SECURITY_HARDENING.md)
 
 ## 라이선스
 

@@ -1,8 +1,9 @@
 import { Injectable, NestMiddleware, Inject, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
+
 import { ICacheService } from '../../core/cache/interfaces/cache.interface';
-import { RequestUtils } from '../utils/request.utils';
 import { ExtendedRequest } from '../../core/types';
+import { RequestUtils } from '../utils/request.utils';
 
 /**
  * 요청 행동 로그 항목
@@ -38,9 +39,7 @@ export class RequestLoggerMiddleware implements NestMiddleware {
   private readonly logger = new Logger(RequestLoggerMiddleware.name);
   private readonly ipLocks = new Map<string, Promise<void>>();
 
-  constructor(
-    @Inject('ICacheService') private readonly cache: ICacheService,
-  ) {}
+  constructor(@Inject('ICacheService') private readonly cache: ICacheService) {}
 
   use(req: Request, res: Response, next: NextFunction): void {
     const path = req.path;
@@ -53,7 +52,7 @@ export class RequestLoggerMiddleware implements NestMiddleware {
 
     // 응답 완료 후 상태 코드 포함하여 로깅
     res.on('finish', () => {
-      this.logRequest(req, res.statusCode).catch(err =>
+      this.logRequest(req, res.statusCode).catch((err) =>
         this.logger.debug(`Request log failed: ${err.message}`),
       );
     });
@@ -65,7 +64,12 @@ export class RequestLoggerMiddleware implements NestMiddleware {
     const ip = RequestUtils.extractClientIp(req as ExtendedRequest);
     const normalizedIp = RequestUtils.normalizeIp(ip);
 
-    // IP별 직렬화: 동일 IP의 동시 read-modify-write 방지
+    // IP별 직렬화: 동일 IP의 동시 read-modify-write 방지 (크기 제한으로 메모리 보호)
+    if (this.ipLocks.size > 5000) {
+      // 과도한 IP 유입 시 직렬화 없이 바로 실행 (DoS 방어)
+      await this.doLogRequest(normalizedIp, req, statusCode);
+      return;
+    }
     const prev = this.ipLocks.get(normalizedIp) || Promise.resolve();
     const current = prev.then(async () => {
       try {
@@ -74,11 +78,18 @@ export class RequestLoggerMiddleware implements NestMiddleware {
         this.ipLocks.delete(normalizedIp);
       }
     });
-    this.ipLocks.set(normalizedIp, current.catch(() => {}));
+    this.ipLocks.set(
+      normalizedIp,
+      current.catch(() => {}),
+    );
     await current;
   }
 
-  private async doLogRequest(normalizedIp: string, req: Request, statusCode: number): Promise<void> {
+  private async doLogRequest(
+    normalizedIp: string,
+    req: Request,
+    statusCode: number,
+  ): Promise<void> {
     const key = `${REQUEST_LOG_PREFIX}${normalizedIp}`;
 
     const entry: RequestLogEntry = {
@@ -100,9 +111,11 @@ export class RequestLoggerMiddleware implements NestMiddleware {
 
     await this.cache.set(key, logs, REQUEST_LOG_TTL);
 
-    // 활성 IP 목록 업데이트 (scoreboard에서 cache.keys 대신 사용)
-    const activeIps = await this.cache.get<string[]>(ACTIVE_IPS_KEY) || [];
-    if (!activeIps.includes(normalizedIp)) {
+    // 활성 IP 목록 업데이트 — Set 기반 O(1) lookup (Array.includes O(N) DoS 방지)
+    const activeIps: string[] = (await this.cache.get<string[]>(ACTIVE_IPS_KEY)) || [];
+    const activeSet = new Set(activeIps);
+    if (!activeSet.has(normalizedIp) && activeSet.size < 10000) {
+      // 상한 10K
       activeIps.push(normalizedIp);
       await this.cache.set(ACTIVE_IPS_KEY, activeIps, REQUEST_LOG_TTL);
     }

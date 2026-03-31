@@ -5,18 +5,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { SecurityEvent } from '../core/database/entities';
 
+import { BehavioralGuard } from './guards/behavioral.guard';
+import { ChallengeGuard } from './guards/challenge.guard';
+import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
+import { IpBlacklistGuard } from './guards/ip-blacklist.guard';
+import { TlsFingerprintGuard } from './guards/tls-fingerprint.guard';
+import { UserAgentGuard } from './guards/user-agent.guard';
+import { ChallengeService } from './services/challenge.service';
 import { IpBlacklistService } from './services/ip-blacklist.service';
+import { PuzzleCaptchaService } from './services/puzzle-captcha.service';
 import { SecurityEventService } from './services/security-event.service';
 import { ThreatScoreService } from './services/threat-score.service';
-import { ChallengeService } from './services/challenge.service';
-import { PuzzleCaptchaService } from './services/puzzle-captcha.service';
-
-import { UserAgentGuard } from './guards/user-agent.guard';
-import { IpBlacklistGuard } from './guards/ip-blacklist.guard';
-import { HeadlessBrowserGuard } from './guards/headless-browser.guard';
-import { BehavioralGuard } from './guards/behavioral.guard';
-import { TlsFingerprintGuard } from './guards/tls-fingerprint.guard';
-import { ChallengeGuard } from './guards/challenge.guard';
 
 /**
  * Common Module

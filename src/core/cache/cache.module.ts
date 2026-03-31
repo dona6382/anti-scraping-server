@@ -1,11 +1,12 @@
 import { Module, Global } from '@nestjs/common';
-import { RedisCacheService } from './redis-cache.service';
+
 import { CacheFactory } from './cache.factory';
 import { MemoryCacheService } from './memory-cache.service';
+import { RedisCacheService } from './redis-cache.service';
 
 /**
  * Core Cache Module
- * 
+ *
  * Redis 또는 Memory 캐시를 환경에 따라 자동 선택하는 모듈
  */
 @Global()
@@ -22,10 +23,6 @@ import { MemoryCacheService } from './memory-cache.service';
       inject: [CacheFactory],
     },
   ],
-  exports: [
-    'ICacheService',
-    CacheFactory,
-    RedisCacheService,
-  ],
+  exports: ['ICacheService', CacheFactory, RedisCacheService],
 })
 export class CoreCacheModule {}

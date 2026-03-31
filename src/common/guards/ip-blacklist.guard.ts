@@ -1,13 +1,16 @@
+import { randomUUID } from 'crypto';
+
 import { Injectable, Logger, ExecutionContext, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { randomUUID } from 'crypto';
-import { BaseSecurityGuard } from './base-security.guard';
-import { RequestUtils } from '../utils/request.utils';
-import { IpBlacklistService } from '../services/ip-blacklist.service';
-import { SecurityEventService } from '../services/security-event.service';
+
 import { ExtendedRequest } from '../../core/types';
 import { IpBlockedException } from '../exceptions/application.exception';
+import { IpBlacklistService } from '../services/ip-blacklist.service';
+import { SecurityEventService } from '../services/security-event.service';
 import { ThreatScoreService } from '../services/threat-score.service';
+import { RequestUtils } from '../utils/request.utils';
+
+import { BaseSecurityGuard } from './base-security.guard';
 
 /**
  * IP Blacklist 체크를 건너뛰는 데코레이터
@@ -46,10 +49,10 @@ export class IpBlacklistGuard extends BaseSecurityGuard {
     }
     const request = context.switchToHttp().getRequest<ExtendedRequest>();
     const ip = this.getClientIp(request);
-    
+
     try {
       const isBlocked = await this.ipBlacklistService.isBlocked(ip);
-      
+
       if (isBlocked) {
         // 차단 이유는 로깅만 하고 클라이언트에는 노출하지 않음
         const reason = await this.ipBlacklistService.getBlockReason(ip);
@@ -115,7 +118,7 @@ export class IpBlacklistGuard extends BaseSecurityGuard {
       if (error instanceof IpBlockedException) {
         throw error;
       }
-      
+
       // 서비스 에러 시 fail-open (서비스 장애가 전체 서비스 중단으로 이어지지 않도록)
       this.logger.error(`IP blacklist check failed - allowing request (fail-open)`, {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -136,8 +139,6 @@ export class IpBlacklistGuard extends BaseSecurityGuard {
   private sanitizeUserAgent(request: ExtendedRequest): string {
     const userAgent = this.getUserAgent(request);
     // 버전 정보 제거
-    return userAgent
-      .replace(/\/[\d.]+/g, '/x.x')
-      .substring(0, 100);
+    return userAgent.replace(/\/[\d.]+/g, '/x.x').substring(0, 100);
   }
 }

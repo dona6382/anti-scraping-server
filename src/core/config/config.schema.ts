@@ -42,8 +42,16 @@ export interface AppConfig {
 }
 
 /** Parse integer from env with validation */
-function safeParseInt(value: string | undefined, fallback: number, name: string, min?: number, max?: number): number {
-  if (!value) return fallback;
+function safeParseInt(
+  value: string | undefined,
+  fallback: number,
+  name: string,
+  min?: number,
+  max?: number,
+): number {
+  if (!value) {
+    return fallback;
+  }
   const parsed = parseInt(value, 10);
   if (isNaN(parsed)) {
     throw new Error(`Invalid integer for ${name}: "${value}"`);
@@ -68,9 +76,15 @@ export function validateConfig(): AppConfig {
 
   // Production-only: require secrets
   if (config.NODE_ENV === 'production') {
-    if (!config.JWT_SECRET) throw new Error('JWT_SECRET is required in production');
-    if (!config.CHALLENGE_SECRET) throw new Error('CHALLENGE_SECRET is required in production');
-    if (!config.PUZZLE_SECRET) throw new Error('PUZZLE_SECRET is required in production');
+    if (!config.JWT_SECRET) {
+      throw new Error('JWT_SECRET is required in production');
+    }
+    if (!config.CHALLENGE_SECRET) {
+      throw new Error('CHALLENGE_SECRET is required in production');
+    }
+    if (!config.PUZZLE_SECRET) {
+      throw new Error('PUZZLE_SECRET is required in production');
+    }
   }
 
   // Validate integer env vars early (with range checks for ports)
@@ -87,7 +101,9 @@ export const configFactory = (): AppConfig => ({
   server: {
     port: safeParseInt(process.env.PORT, 3000, 'PORT', 1, 65535),
     nodeEnv: (process.env.NODE_ENV as 'development' | 'production' | 'test') || 'development',
-    corsOrigins: process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()) || ['http://localhost:3000'],
+    corsOrigins: process.env.ALLOWED_ORIGINS?.split(',').map((s) => s.trim()) || [
+      'http://localhost:3000',
+    ],
   },
   security: {
     strictMode: process.env.SECURITY_STRICT_MODE === 'true',
@@ -100,8 +116,12 @@ export const configFactory = (): AppConfig => ({
       enabled: process.env.IP_BLACKLIST_ENABLED !== 'false',
     },
     userAgent: {
-      blockedAgents: process.env.BLOCKED_USER_AGENTS?.split(',') ||
-        ['scrapy', 'python-requests', 'go-http-client', 'httpclient'],
+      blockedAgents: process.env.BLOCKED_USER_AGENTS?.split(',') || [
+        'scrapy',
+        'python-requests',
+        'go-http-client',
+        'httpclient',
+      ],
       strictMode: process.env.USER_AGENT_STRICT_MODE === 'true',
     },
     honeypot: {

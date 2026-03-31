@@ -1,9 +1,11 @@
 import { Injectable, ExecutionContext, SetMetadata, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { BaseSecurityGuard } from './base-security.guard';
+
+import { ExtendedRequest } from '../../core/types';
 import { SecurityEventService } from '../services/security-event.service';
 import { ThreatScoreService } from '../services/threat-score.service';
-import { ExtendedRequest } from '../../core/types';
+
+import { BaseSecurityGuard } from './base-security.guard';
 
 const SKIP_TLS_KEY = 'skipTlsFingerprint';
 export const SkipTlsFingerprint = () => SetMetadata(SKIP_TLS_KEY, true);
@@ -64,7 +66,9 @@ export class TlsFingerprintGuard extends BaseSecurityGuard {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (skip) return true;
+    if (skip) {
+      return true;
+    }
 
     const request = context.switchToHttp().getRequest<ExtendedRequest>();
 
@@ -72,7 +76,9 @@ export class TlsFingerprintGuard extends BaseSecurityGuard {
       const tlsFingerprint = request.headers['x-tls-fingerprint'] as string;
 
       // Nginx를 거치지 않은 직접 접속 → 헤더 없음 → pass (fail-open)
-      if (!tlsFingerprint) return true;
+      if (!tlsFingerprint) {
+        return true;
+      }
 
       const tlsVersion = request.headers['x-tls-version'] as string;
       const tlsCipher = request.headers['x-tls-cipher'] as string;
@@ -83,17 +89,14 @@ export class TlsFingerprintGuard extends BaseSecurityGuard {
       }
 
       // 의심스러운 핑거프린트 확인
-      const isSuspicious = SUSPICIOUS_FINGERPRINTS.some(fp =>
-        tlsFingerprint.includes(fp) || (tlsCipher && fp.includes(tlsCipher)),
+      const isSuspicious = SUSPICIOUS_FINGERPRINTS.some(
+        (fp) => tlsFingerprint.includes(fp) || (tlsCipher && fp.includes(tlsCipher)),
       );
 
       if (isSuspicious) {
         const ip = this.getClientIp(request);
 
-        this.logSecurityViolation(
-          request,
-          `Suspicious TLS fingerprint: ${tlsFingerprint}`,
-        );
+        this.logSecurityViolation(request, `Suspicious TLS fingerprint: ${tlsFingerprint}`);
 
         this.securityEventService.log({
           eventType: 'SUSPICIOUS_ACTIVITY',
@@ -110,9 +113,9 @@ export class TlsFingerprintGuard extends BaseSecurityGuard {
           },
         });
 
-        this.threatScoreService.recordViolation(
-          ip, 'SUSPICIOUS_ACTIVITY', 'MEDIUM',
-        ).catch(err => this.logger.error('Failed to record TLS threat violation', err?.message));
+        this.threatScoreService
+          .recordViolation(ip, 'SUSPICIOUS_ACTIVITY', 'MEDIUM')
+          .catch((err) => this.logger.error('Failed to record TLS threat violation', err?.message));
 
         // 차단하지 않고 위협 점수만 올림 (다른 Guard와 조합)
         // 단독으로 차단하면 TLS 설정이 다른 정상 클라이언트도 차단될 수 있음

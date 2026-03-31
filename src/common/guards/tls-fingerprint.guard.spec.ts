@@ -1,7 +1,9 @@
 import { ExecutionContext } from '@nestjs/common';
-import { TlsFingerprintGuard } from './tls-fingerprint.guard';
+
 import { SecurityEventService } from '../services/security-event.service';
 import { ThreatScoreService } from '../services/threat-score.service';
+
+import { TlsFingerprintGuard } from './tls-fingerprint.guard';
 
 describe('TlsFingerprintGuard', () => {
   let guard: TlsFingerprintGuard;

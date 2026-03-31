@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'crypto';
+
 import {
   Injectable,
   ExecutionContext,
@@ -6,11 +8,12 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { timingSafeEqual } from 'crypto';
-import { BaseSecurityGuard } from './base-security.guard';
+
+import { ExtendedRequest } from '../../core/types';
 import { ChallengeService } from '../services/challenge.service';
 import { PuzzleCaptchaService } from '../services/puzzle-captcha.service';
-import { ExtendedRequest } from '../../core/types';
+
+import { BaseSecurityGuard } from './base-security.guard';
 
 /**
  * Challenge 체크를 건너뛰는 데코레이터
@@ -44,15 +47,21 @@ export class ChallengeGuard extends BaseSecurityGuard {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (skip) return true;
+    if (skip) {
+      return true;
+    }
 
     const request = context.switchToHttp().getRequest<ExtendedRequest>();
 
     // API key bypass (검증된 키만 허용, timing-safe)
     const validApiKey = process.env.API_KEY;
     const requestApiKey = request.headers['x-api-key'];
-    if (validApiKey && typeof requestApiKey === 'string' && requestApiKey.length === validApiKey.length
-        && timingSafeEqual(Buffer.from(requestApiKey), Buffer.from(validApiKey))) {
+    if (
+      validApiKey &&
+      typeof requestApiKey === 'string' &&
+      requestApiKey.length === validApiKey.length &&
+      timingSafeEqual(Buffer.from(requestApiKey), Buffer.from(validApiKey))
+    ) {
       return true;
     }
 
@@ -60,9 +69,7 @@ export class ChallengeGuard extends BaseSecurityGuard {
 
     // __challenge 쿠키 검증
     const cookieHeader = request.headers.cookie;
-    const cookieStr = Array.isArray(cookieHeader)
-      ? cookieHeader[0]
-      : cookieHeader;
+    const cookieStr = Array.isArray(cookieHeader) ? cookieHeader[0] : cookieHeader;
 
     if (cookieStr) {
       const challengeCookie = cookieStr
@@ -89,11 +96,16 @@ export class ChallengeGuard extends BaseSecurityGuard {
       try {
         const needsPuzzle = await this.puzzleCaptchaService.shouldShowPuzzle(ip);
         if (needsPuzzle) {
-          puzzleData = await this.puzzleCaptchaService.generatePuzzle(ip);
+          const puzzle = await this.puzzleCaptchaService.generatePuzzle(ip);
+          // 빈 puzzle (렌더링 한도 초과 시) → undefined 처리 (bypass 방지)
+          puzzleData = puzzle?.id ? puzzle : undefined;
         }
       } catch (puzzleError) {
         // fail-open: if puzzle generation fails, proceed without puzzle
-        this.logger.error('Puzzle CAPTCHA generation failed, proceeding without puzzle', puzzleError);
+        this.logger.error(
+          'Puzzle CAPTCHA generation failed, proceeding without puzzle',
+          puzzleError,
+        );
       }
 
       this.logSecurityViolation(request, 'Challenge required - no valid cookie');
@@ -103,11 +115,7 @@ export class ChallengeGuard extends BaseSecurityGuard {
       throw new HttpException(
         {
           type: 'CHALLENGE_REQUIRED',
-          html: this.challengeService.getChallengeHtml(
-            challengeToken,
-            difficulty,
-            puzzleData,
-          ),
+          html: this.challengeService.getChallengeHtml(challengeToken, difficulty, puzzleData),
         },
         HttpStatus.FORBIDDEN,
       );

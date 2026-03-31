@@ -1,10 +1,12 @@
 import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { IpBlacklistGuard } from './ip-blacklist.guard';
+
+import { IpBlockedException } from '../exceptions/application.exception';
 import { IpBlacklistService } from '../services/ip-blacklist.service';
 import { SecurityEventService } from '../services/security-event.service';
 import { ThreatScoreService } from '../services/threat-score.service';
-import { IpBlockedException } from '../exceptions/application.exception';
+
+import { IpBlacklistGuard } from './ip-blacklist.guard';
 
 describe('IpBlacklistGuard', () => {
   let guard: IpBlacklistGuard;

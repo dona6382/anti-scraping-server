@@ -1,15 +1,23 @@
-import { Controller, Get, HttpCode, HttpStatus, ServiceUnavailableException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  ServiceUnavailableException,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 
-import { HealthService } from './health.service';
-import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
-import { SkipUserAgent } from '../../common/guards/user-agent.guard';
-import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
 import { SkipBehavioral } from '../../common/guards/behavioral.guard';
 import { SkipChallenge } from '../../common/guards/challenge.guard';
-import { JwtAuthGuard, RolesGuard } from '../auth/guards/auth.guards';
+import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
+import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
+import { SkipUserAgent } from '../../common/guards/user-agent.guard';
 import { Roles } from '../auth/auth.decorators';
+import { JwtAuthGuard, RolesGuard } from '../auth/guards/auth.guards';
+
+import { HealthService } from './health.service';
 
 /**
  * Health Check Controller
@@ -35,7 +43,7 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'System is healthy' })
   async getHealth() {
     const health = await this.healthService.getOverallHealth();
-    
+
     return {
       status: health.healthy ? 'ok' : 'error',
       timestamp: health.timestamp.toISOString(),
@@ -76,11 +84,11 @@ export class HealthController {
   @ApiOperation({ summary: 'Readiness probe' })
   async getReadiness() {
     const ready = await this.healthService.isReady();
-    
+
     if (!ready) {
       throw new ServiceUnavailableException('System not ready');
     }
-    
+
     return { status: 'ready' };
   }
 }

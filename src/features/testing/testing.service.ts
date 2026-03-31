@@ -1,14 +1,13 @@
 import { Injectable } from '@nestjs/common';
 
-import { ExtendedRequest } from '../../core/types';
 import { RequestUtils } from '../../common/utils/request.utils';
 import { ResponseBuilder } from '../../common/utils/response.builder';
+import { ExtendedRequest } from '../../core/types';
 
 export interface TestRequestData {
   name?: string;
   email?: string;
   message?: string;
-
 }
 
 interface TestResult {
@@ -47,8 +46,8 @@ export class TestingService {
     // Rate limiting test
     tests.push(this.testRateLimit(request));
 
-    const passed = tests.filter(t => t.status === 'passed').length;
-    const failed = tests.filter(t => t.status === 'failed').length;
+    const passed = tests.filter((t) => t.status === 'passed').length;
+    const failed = tests.filter((t) => t.status === 'failed').length;
 
     return {
       overall: failed === 0 ? 'passed' : 'failed',
@@ -56,19 +55,19 @@ export class TestingService {
       summary: {
         passed,
         failed,
-        total: tests.length
-      }
+        total: tests.length,
+      },
     };
   }
 
   private testUserAgent(request: ExtendedRequest): TestResult {
     const userAgent = RequestUtils.extractUserAgent(request);
-    
+
     if (!userAgent) {
       return {
         test: 'User-Agent',
         status: 'failed',
-        message: 'Missing User-Agent header'
+        message: 'Missing User-Agent header',
       };
     }
 
@@ -78,18 +77,18 @@ export class TestingService {
       test: 'User-Agent',
       status: isSuspicious ? 'failed' : 'passed',
       message: isSuspicious ? 'Suspicious User-Agent detected' : 'Valid User-Agent',
-      details: { userAgent }
+      details: { userAgent },
     };
   }
 
   private testIpValidation(request: ExtendedRequest): TestResult {
     const ip = RequestUtils.extractClientIp(request);
-    
+
     return {
       test: 'IP Validation',
       status: 'passed',
       message: 'IP extracted successfully',
-      details: { ipHash: RequestUtils.hashIp(ip, 'test') }
+      details: { ipHash: RequestUtils.hashIp(ip, 'test') },
     };
   }
 
@@ -101,14 +100,14 @@ export class TestingService {
       return {
         test: 'Honeypot',
         status: 'failed',
-        message: 'Bot detected - honeypot field filled'
+        message: 'Bot detected - honeypot field filled',
       };
     }
 
     return {
       test: 'Honeypot',
       status: 'passed',
-      message: 'No bot activity detected'
+      message: 'No bot activity detected',
     };
   }
 
@@ -118,8 +117,8 @@ export class TestingService {
       status: 'passed',
       message: 'Rate limit check passed',
       details: {
-        note: 'Rate limiting is handled by guards'
-      }
+        note: 'Rate limiting is handled by guards',
+      },
     };
   }
 

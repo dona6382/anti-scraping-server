@@ -1,17 +1,16 @@
 import { Injectable, Inject, ExecutionContext, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { BaseSecurityGuard } from './base-security.guard';
+
+import { ICacheService } from '../../core/cache/interfaces/cache.interface';
+import { ExtendedRequest } from '../../core/types';
+import { ErrorCodes } from '../constants/error.constants';
+import { SecurityException } from '../exceptions/application.exception';
+import { REQUEST_LOG_PREFIX, RequestLogEntry } from '../middleware/request-logger.middleware';
 import { SecurityEventService } from '../services/security-event.service';
 import { ThreatScoreService } from '../services/threat-score.service';
-import { ICacheService } from '../../core/cache/interfaces/cache.interface';
 import { RequestUtils } from '../utils/request.utils';
-import { ExtendedRequest } from '../../core/types';
-import { SecurityException } from '../exceptions/application.exception';
-import { ErrorCodes } from '../constants/error.constants';
-import {
-  REQUEST_LOG_PREFIX,
-  RequestLogEntry,
-} from '../middleware/request-logger.middleware';
+
+import { BaseSecurityGuard } from './base-security.guard';
 
 /**
  * Behavioral Analysis를 건너뛰는 데코레이터
@@ -23,8 +22,8 @@ export const SkipBehavioral = () => SetMetadata(SKIP_BEHAVIORAL_KEY, true);
 const CV_THRESHOLD = 0.5;
 /** 분당 최대 요청 수 — 초과 시 봇 의심 */
 const MAX_RPM = 30;
-/** 분석에 필요한 최소 요청 수 */
-const MIN_REQUESTS = 10;
+/** 분석에 필요한 최소 요청 수 (낮을수록 빠른 탐지, IP 로테이션 회피 방지) */
+const MIN_REQUESTS = 5;
 
 /**
  * Behavioral Analysis Guard
@@ -47,10 +46,10 @@ export class BehavioralGuard extends BaseSecurityGuard {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // @SkipBehavioral() 데코레이터가 있으면 건너뜀
-    const skipCheck = this.reflector.getAllAndOverride<boolean>(
-      SKIP_BEHAVIORAL_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const skipCheck = this.reflector.getAllAndOverride<boolean>(SKIP_BEHAVIORAL_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     if (skipCheck) {
       return true;
     }
@@ -79,7 +78,9 @@ export class BehavioralGuard extends BaseSecurityGuard {
 
       // 요청 빈도 체크 (RPM) — windowMs=0이면 분석 불가 (동일 ms에 도착)
       const windowMs = sorted[sorted.length - 1].t - sorted[0].t;
-      if (windowMs <= 0) return true;
+      if (windowMs <= 0) {
+        return true;
+      }
       const rpm = (logs.length / windowMs) * 60000;
       const isTooFast = rpm > MAX_RPM;
 
@@ -107,14 +108,13 @@ export class BehavioralGuard extends BaseSecurityGuard {
           },
         });
 
-        this.threatScoreService.recordViolation(ip, 'BOT_DETECTED', 'HIGH')
-          .catch(err => this.logger.error('Failed to record bot threat violation', err?.message));
+        this.threatScoreService
+          .recordViolation(ip, 'BOT_DETECTED', 'HIGH')
+          .catch((err) => this.logger.error('Failed to record bot threat violation', err?.message));
 
-        throw new SecurityException(
-          ErrorCodes.BOT_DETECTED,
-          undefined,
-          { cv: parseFloat(cv.toFixed(4)) },
-        );
+        throw new SecurityException(ErrorCodes.BOT_DETECTED, undefined, {
+          cv: parseFloat(cv.toFixed(4)),
+        });
       }
 
       return true;
@@ -143,8 +143,7 @@ export class BehavioralGuard extends BaseSecurityGuard {
       return 0;
     }
 
-    const variance =
-      values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n;
+    const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n;
     const stddev = Math.sqrt(variance);
 
     return stddev / mean;

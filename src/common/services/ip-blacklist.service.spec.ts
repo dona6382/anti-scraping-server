@@ -1,4 +1,5 @@
 import { AppConfigService } from '../../core/config/config.service';
+
 import { IpBlacklistService } from './ip-blacklist.service';
 
 describe('IpBlacklistService', () => {
@@ -23,10 +24,7 @@ describe('IpBlacklistService', () => {
       },
     };
 
-    service = new IpBlacklistService(
-      mockCache,
-      mockConfig as unknown as AppConfigService,
-    );
+    service = new IpBlacklistService(mockCache, mockConfig as unknown as AppConfigService);
   });
 
   afterEach(() => {
@@ -71,11 +69,7 @@ describe('IpBlacklistService', () => {
 
       await service.blockIp('10.0.0.1', 'MANUAL_ADMIN_ACTION', 7200);
 
-      expect(mockCache.set).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(Object),
-        7200,
-      );
+      expect(mockCache.set).toHaveBeenCalledWith(expect.any(String), expect.any(Object), 7200);
     });
   });
 
@@ -99,9 +93,7 @@ describe('IpBlacklistService', () => {
     it('IP 차단 해제', async () => {
       await service.unblockIp('192.168.1.100');
 
-      expect(mockCache.delete).toHaveBeenCalledWith(
-        expect.stringContaining('192.168.1.100'),
-      );
+      expect(mockCache.delete).toHaveBeenCalledWith(expect.stringContaining('192.168.1.100'));
     });
   });
 
@@ -116,9 +108,10 @@ describe('IpBlacklistService', () => {
       const result = await service.getBlocklist();
 
       expect(result).toHaveLength(2);
-      expect(mockCache.getMany).toHaveBeenCalledWith(
-        ['ip_blacklist:1.1.1.1', 'ip_blacklist:2.2.2.2'],
-      );
+      expect(mockCache.getMany).toHaveBeenCalledWith([
+        'ip_blacklist:1.1.1.1',
+        'ip_blacklist:2.2.2.2',
+      ]);
     });
 
     it('빈 목록은 빈 배열 반환', async () => {

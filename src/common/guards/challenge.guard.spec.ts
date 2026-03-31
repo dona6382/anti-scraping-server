@@ -1,8 +1,10 @@
 import { ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
-import { ChallengeGuard } from './challenge.guard';
+import { Reflector } from '@nestjs/core';
+
 import { ChallengeService } from '../services/challenge.service';
 import { PuzzleCaptchaService } from '../services/puzzle-captcha.service';
-import { Reflector } from '@nestjs/core';
+
+import { ChallengeGuard } from './challenge.guard';
 
 describe('ChallengeGuard', () => {
   let guard: ChallengeGuard;
@@ -214,9 +216,7 @@ describe('ChallengeGuard', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(HttpException);
         const response = (error as HttpException).getResponse();
-        expect(response).toEqual(
-          expect.objectContaining({ type: 'CHALLENGE_REQUIRED' }),
-        );
+        expect(response).toEqual(expect.objectContaining({ type: 'CHALLENGE_REQUIRED' }));
       }
     });
 
@@ -228,18 +228,14 @@ describe('ChallengeGuard', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(HttpException);
         const response = (error as HttpException).getResponse();
-        expect(response).toEqual(
-          expect.objectContaining({ html: '<html>challenge</html>' }),
-        );
+        expect(response).toEqual(expect.objectContaining({ html: '<html>challenge</html>' }));
       }
     });
   });
 
   describe('Fail-open', () => {
     it('ChallengeService 예외 시 → true 반환 (fail-open)', async () => {
-      mockChallengeService.generateToken.mockRejectedValue(
-        new Error('Redis connection failed'),
-      );
+      mockChallengeService.generateToken.mockRejectedValue(new Error('Redis connection failed'));
       const context = createMockContext();
       expect(await guard.canActivate(context)).toBe(true);
     });

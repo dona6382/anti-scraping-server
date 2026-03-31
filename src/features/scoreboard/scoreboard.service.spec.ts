@@ -1,5 +1,6 @@
-import { ScoreboardService } from './scoreboard.service';
 import { RequestUtils } from '../../common/utils/request.utils';
+
+import { ScoreboardService } from './scoreboard.service';
 
 describe('ScoreboardService', () => {
   let service: ScoreboardService;
@@ -36,11 +37,7 @@ describe('ScoreboardService', () => {
       getScore: jest.fn().mockResolvedValue(null),
     };
 
-    service = new ScoreboardService(
-      mockRepo as any,
-      mockCache as any,
-      mockThreatScore as any,
-    );
+    service = new ScoreboardService(mockRepo as any, mockCache as any, mockThreatScore as any);
   });
 
   // ========================================
@@ -52,7 +49,7 @@ describe('ScoreboardService', () => {
       mockRepo.count.mockResolvedValue(0);
       mockCache.get.mockResolvedValue(null);
 
-      const result = await service.getSummary(1) as any;
+      const result = (await service.getSummary(1)) as any;
 
       expect(result.defense.score).toBe(0);
       // attackScore = 100 - defenseScore = 100 when no events
@@ -66,7 +63,7 @@ describe('ScoreboardService', () => {
       // No active IPs → successCount = 0
       mockCache.get.mockResolvedValue(null);
 
-      const result = await service.getSummary(1) as any;
+      const result = (await service.getSummary(1)) as any;
 
       expect(result.defense.score).toBe(100);
       expect(result.defense.totalBlocked).toBe(10);
@@ -123,7 +120,7 @@ describe('ScoreboardService', () => {
         return localQb;
       });
 
-      const result = await service.getSummary(1) as any;
+      const result = (await service.getSummary(1)) as any;
 
       const expectedHash = RequestUtils.hashIp(rawIp, 'scoreboard');
       expect(result.topAttackerIp).toBe(expectedHash);
@@ -148,15 +145,15 @@ describe('ScoreboardService', () => {
 
       expect(result.totalBlocked).toBe(20);
 
-      const rateLayer = result.layers.find(l => l.name === 'Rate Limiting');
+      const rateLayer = result.layers.find((l) => l.name === 'Rate Limiting');
       expect(rateLayer!.blocked).toBe(10);
       expect(rateLayer!.percentage).toBe(50);
 
-      const ipLayer = result.layers.find(l => l.name === 'IP Blacklist');
+      const ipLayer = result.layers.find((l) => l.name === 'IP Blacklist');
       expect(ipLayer!.blocked).toBe(8); // IP_BLOCKED(5) + AUTO_BLOCKED(3)
       expect(ipLayer!.percentage).toBe(40);
 
-      const honeypotLayer = result.layers.find(l => l.name === 'Honeypot');
+      const honeypotLayer = result.layers.find((l) => l.name === 'Honeypot');
       expect(honeypotLayer!.blocked).toBe(2);
       expect(honeypotLayer!.percentage).toBe(10);
     });
@@ -213,9 +210,7 @@ describe('ScoreboardService', () => {
   describe('getRecommendations()', () => {
     it('차단율 0% Guard → HIGH 방어 추천', async () => {
       // getLayers returns layers where some guards have 0 blocks
-      qb.getRawMany.mockResolvedValue([
-        { eventType: 'RATE_LIMITED', count: '10' },
-      ]);
+      qb.getRawMany.mockResolvedValue([{ eventType: 'RATE_LIMITED', count: '10' }]);
       // count for countSuccessRequests: total > 0 needed
       mockRepo.count.mockResolvedValue(0);
       // ACTIVE_IPS_KEY returns IPs with success logs
@@ -235,7 +230,7 @@ describe('ScoreboardService', () => {
 
       // Guards with 0 blocks should generate HIGH defense recommendations
       const zeroBlockRecs = result.defense.filter(
-        r => r.metric === 'guardBlockRate' && r.priority === 'HIGH',
+        (r) => r.metric === 'guardBlockRate' && r.priority === 'HIGH',
       );
       // Multiple guards have 0 blocks (IP Blacklist, User-Agent, Headless, Behavioral, Honeypot)
       expect(zeroBlockRecs.length).toBeGreaterThan(0);
@@ -244,9 +239,7 @@ describe('ScoreboardService', () => {
 
     it('공격 성공률 >80% → HIGH 공격 추천', async () => {
       // Very few blocks, many successes → blockRate > 80 triggers attack recommendation
-      qb.getRawMany.mockResolvedValue([
-        { eventType: 'RATE_LIMITED', count: '1' },
-      ]);
+      qb.getRawMany.mockResolvedValue([{ eventType: 'RATE_LIMITED', count: '1' }]);
       // For getTopIpBlockRate call
       mockRepo.count.mockResolvedValue(1);
 
@@ -272,7 +265,7 @@ describe('ScoreboardService', () => {
       // blockRate = 1/10 = 10%, so attack "most requests blocked" won't fire
       // But attackSuccessRate = 90% > 20% → HIGH defense rec
       const highAttackSuccessRec = result.defense.filter(
-        r => r.metric === 'attackSuccessRate' && r.priority === 'HIGH',
+        (r) => r.metric === 'attackSuccessRate' && r.priority === 'HIGH',
       );
       expect(highAttackSuccessRec.length).toBe(1);
       expect(highAttackSuccessRec[0].value).toBeGreaterThan(80);
@@ -280,17 +273,13 @@ describe('ScoreboardService', () => {
 
     it('Honeypot 미트리거 → 방어 추천', async () => {
       // Some blocks exist but honeypot has 0
-      qb.getRawMany.mockResolvedValue([
-        { eventType: 'RATE_LIMITED', count: '10' },
-      ]);
+      qb.getRawMany.mockResolvedValue([{ eventType: 'RATE_LIMITED', count: '10' }]);
       mockRepo.count.mockResolvedValue(0);
       mockCache.get.mockResolvedValue(null);
 
       const result = await service.getRecommendations(1);
 
-      const honeypotRec = result.defense.find(
-        r => r.metric === 'honeypotTriggerRate',
-      );
+      const honeypotRec = result.defense.find((r) => r.metric === 'honeypotTriggerRate');
       expect(honeypotRec).toBeDefined();
       expect(honeypotRec!.priority).toBe('MEDIUM');
       expect(honeypotRec!.message).toContain('honeypot');

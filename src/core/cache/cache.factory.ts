@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+
 import { AppConfigService } from '../config/config.service';
-import { RedisCacheService } from './redis-cache.service';
-import { MemoryCacheService } from './memory-cache.service';
+
 import { ICacheService } from './interfaces/cache.interface';
+import { MemoryCacheService } from './memory-cache.service';
+import { RedisCacheService } from './redis-cache.service';
 
 /**
  * Cache Factory
@@ -23,16 +25,15 @@ export class CacheFactory {
    */
   createCacheService(): ICacheService {
     const redisConfig = this.configService.redisConfig;
-    
+
     // Redis 설정이 있으면 Redis 사용
     if (redisConfig.host) {
       this.logger.log('Using Redis cache service');
       return this.redisCacheService;
     }
-    
+
     // 없으면 Memory cache 사용
     this.logger.log('Using Memory cache service (Redis not configured)');
     return this.memoryCacheService;
   }
-
 }

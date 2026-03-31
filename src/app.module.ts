@@ -1,27 +1,27 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 
-// Core modules
-import { CoreModule } from './core/core.module';
-
-// Common modules
+import { ApiModule } from './api/api.module';
+import { AppController } from './app.controller';
 import { CommonModule } from './common/common.module';
 
+// Core modules
+
+// Common modules
+
 // API modules
-import { ApiModule } from './api/api.module';
 
 // Global filter & guards
 import { UnifiedExceptionFilter } from './common/filters/global-exception.filter';
-import { IpBlacklistGuard } from './common/guards/ip-blacklist.guard';
-import { UserAgentGuard } from './common/guards/user-agent.guard';
-import { HeadlessBrowserGuard } from './common/guards/headless-browser.guard';
 import { BehavioralGuard } from './common/guards/behavioral.guard';
-import { TlsFingerprintGuard } from './common/guards/tls-fingerprint.guard';
 import { ChallengeGuard } from './common/guards/challenge.guard';
-
-import { AppController } from './app.controller';
+import { HeadlessBrowserGuard } from './common/guards/headless-browser.guard';
+import { IpBlacklistGuard } from './common/guards/ip-blacklist.guard';
+import { TlsFingerprintGuard } from './common/guards/tls-fingerprint.guard';
+import { UserAgentGuard } from './common/guards/user-agent.guard';
+import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
+import { CoreModule } from './core/core.module';
 
 /**
  * Root Application Module
@@ -34,14 +34,8 @@ import { AppController } from './app.controller';
  * 전역 보안 체인: ThrottlerGuard → IpBlacklistGuard → Route Guards
  */
 @Module({
-  imports: [
-    CoreModule,
-    CommonModule,
-    ApiModule,
-  ],
-  controllers: [
-    AppController,
-  ],
+  imports: [CoreModule, CommonModule, ApiModule],
+  controllers: [AppController],
   providers: [
     // Global guards (실행 순서: 등록 순서대로)
     {

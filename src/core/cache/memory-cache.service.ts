@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+
 import { ICacheService } from './interfaces/cache.interface';
 
 /**
@@ -17,16 +18,19 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
 
   constructor() {
     // 5분마다 만료된 항목 정리
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupExpiredEntries();
-    }, 5 * 60 * 1000);
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanupExpiredEntries();
+      },
+      5 * 60 * 1000,
+    );
 
     this.logger.log('Memory cache service initialized');
   }
 
   async get<T>(key: string): Promise<T | null> {
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       return null;
     }
@@ -41,7 +45,7 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
   }
 
   async set<T>(key: string, value: T, ttl?: number): Promise<void> {
-    const expiresAt = ttl ? Date.now() + (ttl * 1000) : undefined;
+    const expiresAt = ttl ? Date.now() + ttl * 1000 : undefined;
 
     this.cache.set(key, {
       value,
@@ -58,7 +62,9 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
           const keys = this.cache.keys();
           for (let i = 0; i < overflow; i++) {
             const oldest = keys.next().value;
-            if (oldest) this.cache.delete(oldest);
+            if (oldest) {
+              this.cache.delete(oldest);
+            }
           }
           this.logger.warn(`Cache evicted ${overflow} entries (size limit: ${MAX_CACHE_SIZE})`);
         }
@@ -82,7 +88,7 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
 
   async exists(key: string): Promise<boolean> {
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       return false;
     }
@@ -102,11 +108,11 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
 
   async getMany<T>(keys: string[]): Promise<(T | null)[]> {
     const results: (T | null)[] = [];
-    
+
     for (const key of keys) {
       results.push(await this.get<T>(key));
     }
-    
+
     return results;
   }
 
@@ -124,7 +130,7 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
 
   async getTtl(key: string): Promise<number> {
     const entry = this.cache.get(key);
-    
+
     if (!entry || !entry.expiresAt) {
       return -1;
     }
@@ -137,9 +143,13 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
     const allKeys = Array.from(this.cache.keys());
 
     // 최적화: prefix* 패턴은 정규식 없이 startsWith로 처리 (ReDoS 방지)
-    if (pattern.endsWith('*') && !pattern.includes('?') && pattern.indexOf('*') === pattern.length - 1) {
+    if (
+      pattern.endsWith('*') &&
+      !pattern.includes('?') &&
+      pattern.indexOf('*') === pattern.length - 1
+    ) {
       const prefix = pattern.slice(0, -1);
-      return allKeys.filter(key => key.startsWith(prefix));
+      return allKeys.filter((key) => key.startsWith(prefix));
     }
 
     // 일반 glob 패턴 — 메타문자 이스케이프 후 변환
@@ -147,7 +157,7 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
     const regexStr = '^' + escaped.replace(/\*/g, '[^:]*').replace(/\?/g, '.') + '$';
     const regex = new RegExp(regexStr);
 
-    return allKeys.filter(key => regex.test(key));
+    return allKeys.filter((key) => regex.test(key));
   }
 
   /**
@@ -156,14 +166,14 @@ export class MemoryCacheService implements ICacheService, OnModuleDestroy {
   private cleanupExpiredEntries(): void {
     const now = Date.now();
     let cleanedCount = 0;
-    
+
     for (const [key, entry] of this.cache.entries()) {
       if (entry.expiresAt && now > entry.expiresAt) {
         this.cache.delete(key);
         cleanedCount++;
       }
     }
-    
+
     if (cleanedCount > 0) {
       this.logger.log(`Cleaned up ${cleanedCount} expired cache entries`);
     }

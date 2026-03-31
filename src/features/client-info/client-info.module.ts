@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 
+import { AuthModule } from '../auth/auth.module';
+
 import { ClientInfoController } from './client-info.controller';
 import { ClientInfoService } from './client-info.service';
-import { AuthModule } from '../auth/auth.module';
 
 /**
  * Client Info Feature Module

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -5,18 +6,16 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
-import { AuthService } from '../auth/auth.service';
+
 import { RequestUtils } from '../../common/utils/request.utils';
+import { AuthService } from '../auth/auth.service';
 
 @WebSocketGateway({
   cors: { origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'] },
   namespace: '/security',
 })
-export class RealtimeGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-{
+export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(RealtimeGateway.name);
   private connectedClients = 0;
@@ -30,7 +29,9 @@ export class RealtimeGateway
 
   async handleConnection(client: Socket) {
     try {
-      const token = client.handshake?.auth?.token || client.handshake?.headers?.authorization?.replace('Bearer ', '');
+      const token =
+        client.handshake?.auth?.token ||
+        client.handshake?.headers?.authorization?.replace('Bearer ', '');
       if (!token) {
         client.emit('error', { message: 'Authentication required' });
         client.disconnect();
@@ -56,9 +57,7 @@ export class RealtimeGateway
       this.authenticatedClients.delete(client.id);
       this.connectedClients--;
     }
-    this.logger.log(
-      `Client disconnected: ${client.id} (total: ${this.connectedClients})`,
-    );
+    this.logger.log(`Client disconnected: ${client.id} (total: ${this.connectedClients})`);
   }
 
   /** Broadcast security event to authenticated clients only, with IP hashed */

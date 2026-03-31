@@ -18,11 +18,7 @@ describe('ThreatScoreService', () => {
   describe('recordViolation', () => {
     it('첫 위반 기록 시 점수 증가', async () => {
       mockCache.get.mockResolvedValue(null);
-      const result = await service.recordViolation(
-        '1.2.3.4',
-        'USER_AGENT_BLOCKED',
-        'MEDIUM',
-      );
+      const result = await service.recordViolation('1.2.3.4', 'USER_AGENT_BLOCKED', 'MEDIUM');
       expect(result.totalScore).toBe(15);
       expect(result.violations).toBe(1);
       expect(mockCache.set).toHaveBeenCalled();
@@ -30,21 +26,13 @@ describe('ThreatScoreService', () => {
 
     it('HIGH 심각도는 30점', async () => {
       mockCache.get.mockResolvedValue(null);
-      const result = await service.recordViolation(
-        '1.2.3.4',
-        'HEADLESS_BROWSER_DETECTED',
-        'HIGH',
-      );
+      const result = await service.recordViolation('1.2.3.4', 'HEADLESS_BROWSER_DETECTED', 'HIGH');
       expect(result.totalScore).toBe(30);
     });
 
     it('CRITICAL 심각도는 50점', async () => {
       mockCache.get.mockResolvedValue(null);
-      const result = await service.recordViolation(
-        '1.2.3.4',
-        'SUSPICIOUS_ACTIVITY',
-        'CRITICAL',
-      );
+      const result = await service.recordViolation('1.2.3.4', 'SUSPICIOUS_ACTIVITY', 'CRITICAL');
       expect(result.totalScore).toBe(50);
     });
 
@@ -54,22 +42,14 @@ describe('ThreatScoreService', () => {
         violations: 2,
         eventTypes: { BOT_DETECTED: 2 },
       });
-      const result = await service.recordViolation(
-        '1.2.3.4',
-        'USER_AGENT_BLOCKED',
-        'MEDIUM',
-      );
+      const result = await service.recordViolation('1.2.3.4', 'USER_AGENT_BLOCKED', 'MEDIUM');
       expect(result.totalScore).toBe(45);
       expect(result.violations).toBe(3);
     });
 
     it('이벤트 타입별 카운트 추적', async () => {
       mockCache.get.mockResolvedValue(null);
-      const result = await service.recordViolation(
-        '1.2.3.4',
-        'USER_AGENT_BLOCKED',
-        'MEDIUM',
-      );
+      const result = await service.recordViolation('1.2.3.4', 'USER_AGENT_BLOCKED', 'MEDIUM');
       expect(result.eventTypes['USER_AGENT_BLOCKED']).toBe(1);
     });
   });

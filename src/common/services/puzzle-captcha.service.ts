@@ -1,19 +1,24 @@
-import { Injectable, Inject, Logger, forwardRef } from '@nestjs/common';
 import { createHmac, randomBytes } from 'crypto';
+
+import { Injectable, Inject, Logger, forwardRef } from '@nestjs/common';
 import { createCanvas } from 'canvas';
+
 import { ICacheService } from '../../core/cache/interfaces/cache.interface';
-import { ThreatScoreService } from './threat-score.service';
-import { IpBlacklistService } from './ip-blacklist.service';
-import { SecurityEventService } from './security-event.service';
 import { RequestUtils } from '../utils/request.utils';
 
-const PUZZLE_SECRET = process.env.PUZZLE_SECRET || (() => {
-  const fallback = randomBytes(32).toString('hex');
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('PUZZLE_SECRET environment variable is required in production');
-  }
-  return fallback;
-})();
+import { IpBlacklistService } from './ip-blacklist.service';
+import { SecurityEventService } from './security-event.service';
+import { ThreatScoreService } from './threat-score.service';
+
+const PUZZLE_SECRET =
+  process.env.PUZZLE_SECRET ||
+  (() => {
+    const fallback = randomBytes(32).toString('hex');
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('PUZZLE_SECRET environment variable is required in production');
+    }
+    return fallback;
+  })();
 
 const PUZZLE_TTL = 10; // 10 seconds
 const PUZZLE_THRESHOLD = 0; // 모든 첫 방문자에게 CAPTCHA 표시
@@ -36,15 +41,20 @@ interface CaptchaCacheData {
  * 봇: OCR 또는 Vision AI 필요 (비용 + 시간)
  * 사람: 5글자 읽고 입력 (10초 여유)
  */
+const MAX_CONCURRENT_RENDERS = 20; // Canvas CPU 고갈 방지
+
 @Injectable()
 export class PuzzleCaptchaService {
   private readonly logger = new Logger(PuzzleCaptchaService.name);
+  private activeRenders = 0;
 
   constructor(
     @Inject('ICacheService') private readonly cache: ICacheService,
     private readonly threatScoreService: ThreatScoreService,
-    @Inject(forwardRef(() => IpBlacklistService)) private readonly ipBlacklistService: IpBlacklistService,
-    @Inject(forwardRef(() => SecurityEventService)) private readonly securityEventService: SecurityEventService,
+    @Inject(forwardRef(() => IpBlacklistService))
+    private readonly ipBlacklistService: IpBlacklistService,
+    @Inject(forwardRef(() => SecurityEventService))
+    private readonly securityEventService: SecurityEventService,
   ) {}
 
   async shouldShowPuzzle(ip: string): Promise<boolean> {
@@ -65,48 +75,53 @@ export class PuzzleCaptchaService {
     gridImage: string;
     options: string[];
   }> {
-    // Generate random text
-    const answer = this.generateRandomText();
+    // Canvas CPU 고갈 방지 — 동시 렌더링 제한
+    if (this.activeRenders >= MAX_CONCURRENT_RENDERS) {
+      this.logger.warn('CAPTCHA render limit reached, skipping puzzle');
+      return { id: '', gridImage: '', options: [] };
+    }
+    this.activeRenders++;
 
-    // Generate HMAC-signed token
-    const random = randomBytes(16).toString('hex');
-    const timestamp = Date.now().toString();
-    const data = `${timestamp}|${ip}|${random}`;
-    const signature = createHmac('sha256', PUZZLE_SECRET)
-      .update(data)
-      .digest('hex');
-    const id = Buffer.from(`${data}|${signature}`).toString('base64');
+    try {
+      // Generate random text
+      const answer = this.generateRandomText();
 
-    // Store answer in cache (10s TTL, one-time use)
-    const cacheKey = `captcha:${signature}`;
-    const cacheData: CaptchaCacheData = {
-      answer: answer.toLowerCase(),
-      ip,
-      createdAt: Date.now(),
-    };
-    await this.cache.set(cacheKey, cacheData, PUZZLE_TTL);
+      // Generate HMAC-signed token
+      const random = randomBytes(16).toString('hex');
+      const timestamp = Date.now().toString();
+      const data = `${timestamp}|${ip}|${random}`;
+      const signature = createHmac('sha256', PUZZLE_SECRET).update(data).digest('hex');
+      const id = Buffer.from(`${data}|${signature}`).toString('base64');
 
-    // Render captcha image as base64 PNG
-    const imageBase64 = this.renderCaptchaImage(answer);
+      // Store answer in cache (10s TTL, one-time use)
+      const cacheKey = `captcha:${signature}`;
+      const cacheData: CaptchaCacheData = {
+        answer: answer.toLowerCase(),
+        ip,
+        createdAt: Date.now(),
+      };
+      await this.cache.set(cacheKey, cacheData, PUZZLE_TTL);
 
-    // Return as gridImage (reusing existing interface)
-    // options is empty — text input instead of click selection
-    return {
-      id,
-      gridImage: `data:image/png;base64,${imageBase64}`,
-      options: [], // empty — text input mode
-    };
+      // Render captcha image as base64 PNG
+      const imageBase64 = this.renderCaptchaImage(answer);
+
+      // Return as gridImage (reusing existing interface)
+      // options is empty — text input instead of click selection
+      return {
+        id,
+        gridImage: `data:image/png;base64,${imageBase64}`,
+        options: [], // empty — text input mode
+      };
+    } finally {
+      this.activeRenders--;
+    }
   }
 
   /**
    * Verify captcha answer. Case-insensitive, one-time use.
    * 5번 틀리면 IP 블랙리스트.
    */
-  async verifyPuzzle(
-    id: string,
-    selectedIndex: number | string,
-    ip: string,
-  ): Promise<boolean> {
+  async verifyPuzzle(id: string, selectedIndex: number | string, ip: string): Promise<boolean> {
     try {
       const decoded = Buffer.from(id, 'base64').toString();
       const parts = decoded.split('|');
@@ -163,15 +178,20 @@ export class PuzzleCaptchaService {
 
         await this.ipBlacklistService.blockIp(ip, 'CAPTCHA_FAILURES', 3600);
 
-        this.securityEventService.log({
-          eventType: 'AUTO_BLOCKED',
-          severity: 'HIGH',
-          ip,
-          description: `Auto-blocked: ${newCount} CAPTCHA failures in ${FAILURE_TTL / 60} minutes`,
-        }).catch(err => this.logger.error('Failed to log CAPTCHA block event', err?.message));
+        this.securityEventService
+          .log({
+            eventType: 'AUTO_BLOCKED',
+            severity: 'HIGH',
+            ip,
+            description: `Auto-blocked: ${newCount} CAPTCHA failures in ${FAILURE_TTL / 60} minutes`,
+          })
+          .catch((err) => this.logger.error('Failed to log CAPTCHA block event', err?.message));
 
-        this.threatScoreService.recordViolation(ip, 'SUSPICIOUS_ACTIVITY', 'CRITICAL')
-          .catch(err => this.logger.error('Failed to record CAPTCHA threat violation', err?.message));
+        this.threatScoreService
+          .recordViolation(ip, 'SUSPICIOUS_ACTIVITY', 'CRITICAL')
+          .catch((err) =>
+            this.logger.error('Failed to record CAPTCHA threat violation', err?.message),
+          );
       }
     } catch (err) {
       this.logger.error('Failed to record CAPTCHA failure', err);
@@ -215,7 +235,8 @@ export class PuzzleCaptchaService {
         Math.random() * width,
         Math.random() * height,
         Math.random() * 3 + 0.5,
-        0, Math.PI * 2,
+        0,
+        Math.PI * 2,
       );
       ctx.fill();
     }
@@ -233,9 +254,12 @@ export class PuzzleCaptchaService {
         // 곡선
         ctx.moveTo(Math.random() * width, Math.random() * height);
         ctx.bezierCurveTo(
-          Math.random() * width, Math.random() * height,
-          Math.random() * width, Math.random() * height,
-          Math.random() * width, Math.random() * height,
+          Math.random() * width,
+          Math.random() * height,
+          Math.random() * width,
+          Math.random() * height,
+          Math.random() * width,
+          Math.random() * height,
         );
       }
       ctx.stroke();
@@ -244,7 +268,12 @@ export class PuzzleCaptchaService {
     // 글자 렌더링
     const charWidth = width / (text.length + 1);
     const neonColors = ['#00ff88', '#00d4ff', '#ff9f43', '#ff4757', '#a55eea', '#e4e8f1'];
-    const fonts = ['bold {size}px monospace', 'bold {size}px serif', 'bold {size}px sans-serif', 'italic bold {size}px Georgia'];
+    const fonts = [
+      'bold {size}px monospace',
+      'bold {size}px serif',
+      'bold {size}px sans-serif',
+      'italic bold {size}px Georgia',
+    ];
 
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
@@ -260,7 +289,10 @@ export class PuzzleCaptchaService {
       // 글자 색상 (네온)
       const color = neonColors[Math.floor(Math.random() * neonColors.length)];
       ctx.fillStyle = color;
-      const font = fonts[Math.floor(Math.random() * fonts.length)].replace('{size}', fontSize.toString());
+      const font = fonts[Math.floor(Math.random() * fonts.length)].replace(
+        '{size}',
+        fontSize.toString(),
+      );
       ctx.font = font;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -281,9 +313,12 @@ export class PuzzleCaptchaService {
       ctx.beginPath();
       ctx.moveTo(Math.random() * width, Math.random() * height);
       ctx.bezierCurveTo(
-        Math.random() * width, Math.random() * height,
-        Math.random() * width, Math.random() * height,
-        Math.random() * width, Math.random() * height,
+        Math.random() * width,
+        Math.random() * height,
+        Math.random() * width,
+        Math.random() * height,
+        Math.random() * width,
+        Math.random() * height,
       );
       ctx.stroke();
     }
@@ -296,11 +331,11 @@ export class PuzzleCaptchaService {
    */
   private randomNeonColor(opacity: number): string {
     const colors = [
-      [0, 255, 136],   // green
-      [0, 212, 255],   // cyan
-      [255, 159, 67],  // amber
-      [255, 71, 87],   // red
-      [165, 94, 234],  // purple
+      [0, 255, 136], // green
+      [0, 212, 255], // cyan
+      [255, 159, 67], // amber
+      [255, 71, 87], // red
+      [165, 94, 234], // purple
       [228, 232, 241], // white
     ];
     const [r, g, b] = colors[Math.floor(Math.random() * colors.length)];

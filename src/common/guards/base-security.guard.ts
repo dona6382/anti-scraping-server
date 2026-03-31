@@ -1,4 +1,5 @@
 import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/common';
+
 import { ExtendedRequest } from '../../core/types';
 import { RequestUtils } from '../utils/request.utils';
 

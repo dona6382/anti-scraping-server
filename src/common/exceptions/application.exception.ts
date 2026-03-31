@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
+
 import {
   ErrorCategory,
   ErrorSeverity,
@@ -17,7 +18,7 @@ export abstract class BaseApplicationException extends HttpException {
   public readonly severity: ErrorSeverity;
   public readonly timestamp: Date;
   public readonly internalDetails?: InternalErrorDetails;
-  
+
   private readonly logger = new Logger(this.constructor.name);
 
   constructor(
@@ -26,13 +27,13 @@ export abstract class BaseApplicationException extends HttpException {
     severity: ErrorSeverity,
     httpStatus: HttpStatus,
     internalDetails?: InternalErrorDetails,
-    customMessage?: string
+    customMessage?: string,
   ) {
     // 사용자에게 노출할 안전한 메시지
     const userMessage = customMessage || UserFriendlyMessages[errorCode] || 'An error occurred';
-    
+
     super(userMessage, httpStatus);
-    
+
     this.errorCode = errorCode;
     this.category = category;
     this.severity = severity;
@@ -41,7 +42,7 @@ export abstract class BaseApplicationException extends HttpException {
     if (internalDetails !== undefined) {
       this.internalDetails = internalDetails;
     }
-    
+
     // 내부 로깅
     this.logError();
   }
@@ -75,7 +76,6 @@ export abstract class BaseApplicationException extends HttpException {
         break;
     }
   }
-
 }
 
 /**
@@ -94,7 +94,7 @@ export class SecurityException extends BaseApplicationException {
     guardName?: string,
     reason?: string,
     ip?: string,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ) {
     super(
       errorCode,
@@ -106,9 +106,9 @@ export class SecurityException extends BaseApplicationException {
         severity: ErrorSeverity.HIGH,
         context: { ...context, guardName, reason, ip, metadata },
       },
-      message
+      message,
     );
-    
+
     this.guardName = guardName;
     this.reason = reason;
     this.ip = ip;
@@ -121,15 +121,11 @@ export class SecurityException extends BaseApplicationException {
  */
 export class IpBlockedException extends SecurityException {
   constructor(ip: string, reason?: string) {
-    super(
-      ErrorCodes.IP_BLOCKED,
-      undefined,
-      {
-        // IP는 로깅용으로만 저장, 클라이언트에는 노출하지 않음
-        ip,
-        reason,
-      }
-    );
+    super(ErrorCodes.IP_BLOCKED, undefined, {
+      // IP는 로깅용으로만 저장, 클라이언트에는 노출하지 않음
+      ip,
+      reason,
+    });
   }
 }
 

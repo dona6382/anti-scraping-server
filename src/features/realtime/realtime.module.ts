@@ -1,6 +1,8 @@
 import { Module, Global } from '@nestjs/common';
-import { RealtimeGateway } from './realtime.gateway';
+
 import { AuthModule } from '../auth/auth.module';
+
+import { RealtimeGateway } from './realtime.gateway';
 
 @Global()
 @Module({

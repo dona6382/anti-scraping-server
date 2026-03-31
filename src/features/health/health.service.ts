@@ -1,11 +1,12 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
 import * as os from 'os';
 
+import { Injectable, Inject, Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+
+import { HEALTH_THRESHOLDS } from '../../common/constants/threshold.constants';
+import { SystemUtils } from '../../common/utils/system.utils';
 import { ICacheService } from '../../core/cache/interfaces';
 import { AppConfigService } from '../../core/config/config.service';
-import { SystemUtils } from '../../common/utils/system.utils';
-import { HEALTH_THRESHOLDS } from '../../common/constants/threshold.constants';
 
 export interface HealthStatus {
   healthy: boolean;
@@ -39,7 +40,7 @@ export class HealthService {
 
   async getOverallHealth(): Promise<HealthStatus> {
     const checks = await this.runHealthChecks();
-    const healthy = checks.every(check => check.status !== 'unhealthy');
+    const healthy = checks.every((check) => check.status !== 'unhealthy');
 
     return {
       healthy,
@@ -73,7 +74,7 @@ export class HealthService {
 
   async isReady(): Promise<boolean> {
     const checks = await this.runHealthChecks();
-    return checks.every(check => check.status !== 'unhealthy');
+    return checks.every((check) => check.status !== 'unhealthy');
   }
 
   private async runHealthChecks(): Promise<HealthCheck[]> {
@@ -90,8 +91,11 @@ export class HealthService {
     const heapUsedPercent = (used.heapUsed / used.heapTotal) * 100;
 
     let status: HealthCheck['status'] = 'healthy';
-    if (heapUsedPercent > HEALTH_THRESHOLDS.MEMORY_UNHEALTHY_PCT) status = 'unhealthy';
-    else if (heapUsedPercent > HEALTH_THRESHOLDS.MEMORY_DEGRADED_PCT) status = 'degraded';
+    if (heapUsedPercent > HEALTH_THRESHOLDS.MEMORY_UNHEALTHY_PCT) {
+      status = 'unhealthy';
+    } else if (heapUsedPercent > HEALTH_THRESHOLDS.MEMORY_DEGRADED_PCT) {
+      status = 'degraded';
+    }
 
     return {
       name: 'memory',
@@ -110,13 +114,16 @@ export class HealthService {
     const avgLoad = loadAvg[0];
 
     let status: HealthCheck['status'] = 'healthy';
-    if (avgLoad > cores * HEALTH_THRESHOLDS.CPU_UNHEALTHY_FACTOR) status = 'unhealthy';
-    else if (avgLoad > cores * HEALTH_THRESHOLDS.CPU_DEGRADED_FACTOR) status = 'degraded';
+    if (avgLoad > cores * HEALTH_THRESHOLDS.CPU_UNHEALTHY_FACTOR) {
+      status = 'unhealthy';
+    } else if (avgLoad > cores * HEALTH_THRESHOLDS.CPU_DEGRADED_FACTOR) {
+      status = 'degraded';
+    }
 
     return {
       name: 'cpu',
       status,
-      metadata: { cores, loadAverage: loadAvg.map(v => Math.round(v * 100) / 100) },
+      metadata: { cores, loadAverage: loadAvg.map((v) => Math.round(v * 100) / 100) },
     };
   }
 

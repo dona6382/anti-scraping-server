@@ -1,6 +1,7 @@
 import { Module, Global } from '@nestjs/common';
-import { CoreConfigModule } from './config/config.module';
+
 import { CoreCacheModule } from './cache/cache.module';
+import { CoreConfigModule } from './config/config.module';
 import { CoreDatabaseModule } from './database/database.module';
 
 /**
@@ -13,15 +14,7 @@ import { CoreDatabaseModule } from './database/database.module';
  */
 @Global()
 @Module({
-  imports: [
-    CoreConfigModule,
-    CoreCacheModule,
-    CoreDatabaseModule,
-  ],
-  exports: [
-    CoreConfigModule,
-    CoreCacheModule,
-    CoreDatabaseModule,
-  ],
+  imports: [CoreConfigModule, CoreCacheModule, CoreDatabaseModule],
+  exports: [CoreConfigModule, CoreCacheModule, CoreDatabaseModule],
 })
 export class CoreModule {}

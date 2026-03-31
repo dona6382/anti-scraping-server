@@ -10,11 +10,13 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import { JwtAuthGuard, RolesGuard } from '../auth/guards/auth.guards';
-import { Roles } from '../auth/auth.decorators';
-import { ScoreboardService } from './scoreboard.service';
-import { ResponseBuilder } from '../../common/utils/response.builder';
+
 import { RequestUtils } from '../../common/utils/request.utils';
+import { ResponseBuilder } from '../../common/utils/response.builder';
+import { Roles } from '../auth/auth.decorators';
+import { JwtAuthGuard, RolesGuard } from '../auth/guards/auth.guards';
+
+import { ScoreboardService } from './scoreboard.service';
 
 function validateIp(ip: string): string {
   if (!RequestUtils.isValidIpAddress(ip)) {
@@ -35,9 +37,7 @@ export class ScoreboardController {
   @Get('summary')
   @ApiOperation({ summary: 'Get overall defense/attack score summary' })
   @ApiQuery({ name: 'hours', required: false, type: Number, example: 1 })
-  async getSummary(
-    @Query('hours', new DefaultValuePipe(1), ParseIntPipe) hours: number,
-  ) {
+  async getSummary(@Query('hours', new DefaultValuePipe(1), ParseIntPipe) hours: number) {
     return ResponseBuilder.success(
       await this.scoreboardService.getSummary(Math.max(1, Math.min(hours, 720))),
     );
@@ -46,9 +46,7 @@ export class ScoreboardController {
   @Get('layers')
   @ApiOperation({ summary: 'Get guard layer contribution breakdown' })
   @ApiQuery({ name: 'hours', required: false, type: Number, example: 1 })
-  async getLayers(
-    @Query('hours', new DefaultValuePipe(1), ParseIntPipe) hours: number,
-  ) {
+  async getLayers(@Query('hours', new DefaultValuePipe(1), ParseIntPipe) hours: number) {
     return ResponseBuilder.success(
       await this.scoreboardService.getLayers(Math.max(1, Math.min(hours, 720))),
     );
@@ -73,9 +71,7 @@ export class ScoreboardController {
   @Get('timeline')
   @ApiOperation({ summary: 'Get blocked/success timeline in 5-minute intervals' })
   @ApiQuery({ name: 'hours', required: false, type: Number, example: 1 })
-  async getTimeline(
-    @Query('hours', new DefaultValuePipe(1), ParseIntPipe) hours: number,
-  ) {
+  async getTimeline(@Query('hours', new DefaultValuePipe(1), ParseIntPipe) hours: number) {
     return ResponseBuilder.success(
       await this.scoreboardService.getTimeline(Math.max(1, Math.min(hours, 720))),
     );
@@ -84,9 +80,7 @@ export class ScoreboardController {
   @Get('recommendations')
   @ApiOperation({ summary: 'Get defense and attack improvement recommendations' })
   @ApiQuery({ name: 'hours', required: false, type: Number, example: 1 })
-  async getRecommendations(
-    @Query('hours', new DefaultValuePipe(1), ParseIntPipe) hours: number,
-  ) {
+  async getRecommendations(@Query('hours', new DefaultValuePipe(1), ParseIntPipe) hours: number) {
     return ResponseBuilder.success(
       await this.scoreboardService.getRecommendations(Math.max(1, Math.min(hours, 720))),
     );

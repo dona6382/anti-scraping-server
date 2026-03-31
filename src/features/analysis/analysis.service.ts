@@ -1,11 +1,15 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
-import { SecurityEvent } from '../../core/database/entities';
+
+import {
+  RequestLogEntry,
+  REQUEST_LOG_PREFIX,
+} from '../../common/middleware/request-logger.middleware';
+import { FingerprintData } from '../../common/services/challenge.service';
 import { RequestUtils } from '../../common/utils/request.utils';
 import { ICacheService } from '../../core/cache/interfaces/cache.interface';
-import { RequestLogEntry, REQUEST_LOG_PREFIX } from '../../common/middleware/request-logger.middleware';
-import { FingerprintData } from '../../common/services/challenge.service';
+import { SecurityEvent } from '../../core/database/entities';
 
 @Injectable()
 export class AnalysisService {
@@ -29,7 +33,7 @@ export class AnalysisService {
       .orderBy('hour', 'ASC')
       .getRawMany();
 
-    return result.map(r => ({
+    return result.map((r) => ({
       hour: r.hour,
       eventType: r.eventType,
       count: parseInt(r.count),
@@ -49,7 +53,7 @@ export class AnalysisService {
       .limit(limit)
       .getRawMany();
 
-    return result.map(r => ({
+    return result.map((r) => ({
       ip: r.ip ? RequestUtils.hashIp(r.ip, 'analysis') : 'unknown',
       count: parseInt(r.count),
       lastSeen: r.lastSeen,
@@ -68,7 +72,7 @@ export class AnalysisService {
       .limit(limit)
       .getRawMany();
 
-    return result.map(r => ({
+    return result.map((r) => ({
       userAgent: (r.userAgent || '').substring(0, 100),
       count: parseInt(r.count),
     }));
@@ -89,7 +93,7 @@ export class AnalysisService {
       .orderBy('count', 'DESC')
       .getRawMany();
 
-    return result.map(r => ({
+    return result.map((r) => ({
       endpoint: r.endpoint,
       method: r.method,
       eventType: r.eventType,
@@ -107,7 +111,12 @@ export class AnalysisService {
     });
 
     if (events.length < 3) {
-      return { ip: RequestUtils.hashIp(ip, 'analysis'), sampleSize: events.length, isBot: false, confidence: 0 };
+      return {
+        ip: RequestUtils.hashIp(ip, 'analysis'),
+        sampleSize: events.length,
+        isBot: false,
+        confidence: 0,
+      };
     }
 
     const intervals: number[] = [];
@@ -152,7 +161,7 @@ export class AnalysisService {
       .orderBy('count', 'DESC')
       .getRawMany();
 
-    return result.map(r => ({
+    return result.map((r) => ({
       eventType: r.eventType,
       severity: r.severity,
       count: parseInt(r.count),
@@ -175,7 +184,8 @@ export class AnalysisService {
       return { ip: RequestUtils.hashIp(ip, 'analysis'), similarIps: [] };
     }
 
-    const dominantType = targetPattern.sort((a, b) => parseInt(b.count) - parseInt(a.count))[0].eventType;
+    const dominantType = targetPattern.sort((a, b) => parseInt(b.count) - parseInt(a.count))[0]
+      .eventType;
 
     // Step 2: Find other IPs with the same dominant event type
     const similar = await this.eventRepo
@@ -193,7 +203,7 @@ export class AnalysisService {
     return {
       ip: RequestUtils.hashIp(ip, 'analysis'),
       dominantEventType: dominantType,
-      similarIps: similar.map(s => ({
+      similarIps: similar.map((s) => ({
         ip: s.ip ? RequestUtils.hashIp(s.ip, 'analysis') : 'unknown',
         count: parseInt(s.count),
       })),
@@ -213,7 +223,8 @@ export class AnalysisService {
     logs: RequestLogEntry[];
   }> {
     const normalizedIp = RequestUtils.normalizeIp(ip);
-    const logs = await this.cache.get<RequestLogEntry[]>(`${REQUEST_LOG_PREFIX}${normalizedIp}`) || [];
+    const logs =
+      (await this.cache.get<RequestLogEntry[]>(`${REQUEST_LOG_PREFIX}${normalizedIp}`)) || [];
     return {
       ip: RequestUtils.hashIp(ip, 'analysis'),
       totalRequests: logs.length,
@@ -241,29 +252,42 @@ export class AnalysisService {
     confidence: number;
   }> {
     const normalizedIp = RequestUtils.normalizeIp(ip);
-    const logs = await this.cache.get<RequestLogEntry[]>(`${REQUEST_LOG_PREFIX}${normalizedIp}`) || [];
+    const logs =
+      (await this.cache.get<RequestLogEntry[]>(`${REQUEST_LOG_PREFIX}${normalizedIp}`)) || [];
 
     const result = {
       ip: RequestUtils.hashIp(ip, 'analysis'),
       totalRequests: logs.length,
       windowMinutes: 0,
       requestsPerMinute: 0,
-      intervalAnalysis: null as { meanMs: number; stdDevMs: number; cv: number; isRegular: boolean } | null,
+      intervalAnalysis: null as {
+        meanMs: number;
+        stdDevMs: number;
+        cv: number;
+        isRegular: boolean;
+      } | null,
       endpointDistribution: [] as Array<{ endpoint: string; count: number; percentage: number }>,
       methodDistribution: {} as Record<string, number>,
-      verdict: 'INSUFFICIENT_DATA' as 'BOT_SUSPECTED' | 'INCONCLUSIVE' | 'LIKELY_HUMAN' | 'INSUFFICIENT_DATA',
+      verdict: 'INSUFFICIENT_DATA' as
+        | 'BOT_SUSPECTED'
+        | 'INCONCLUSIVE'
+        | 'LIKELY_HUMAN'
+        | 'INSUFFICIENT_DATA',
       confidence: 0,
     };
 
-    if (logs.length < 3) return result;
+    if (logs.length < 3) {
+      return result;
+    }
 
     // 시간 윈도우
     const firstTs = logs[0].t;
     const lastTs = logs[logs.length - 1].t;
-    result.windowMinutes = Math.round((lastTs - firstTs) / 60000 * 10) / 10;
-    result.requestsPerMinute = result.windowMinutes > 0
-      ? Math.round(logs.length / result.windowMinutes * 10) / 10
-      : logs.length;
+    result.windowMinutes = Math.round(((lastTs - firstTs) / 60000) * 10) / 10;
+    result.requestsPerMinute =
+      result.windowMinutes > 0
+        ? Math.round((logs.length / result.windowMinutes) * 10) / 10
+        : logs.length;
 
     // 요청 간격 분석
     const intervals: number[] = [];
@@ -292,7 +316,7 @@ export class AnalysisService {
       .map(([endpoint, count]) => ({
         endpoint,
         count,
-        percentage: Math.round(count / logs.length * 1000) / 10,
+        percentage: Math.round((count / logs.length) * 1000) / 10,
       }))
       .sort((a, b) => b.count - a.count);
 
@@ -353,7 +377,7 @@ export class AnalysisService {
       uniqueSubnets: data.subnets.length,
       totalRequests: data.count,
       isSuspicious: data.subnets.length > 3,
-      ips: data.ips.map(hashedIp => ({ ip: hashedIp, count: 1 })),
+      ips: data.ips.map((hashedIp) => ({ ip: hashedIp, count: 1 })),
     };
   }
 }

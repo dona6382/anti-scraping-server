@@ -179,9 +179,13 @@ export class AuthService {
 
   async validateToken(token: string): Promise<User> {
     try {
-      const decoded = this.jwtService.verify(token) as { sub: string; tokenVersion?: number };
+      const decoded = this.jwtService.verify(token) as { sub: string; type?: string; tokenVersion?: number };
       if (!decoded?.sub) {
         throw new UnauthorizedException('Invalid token payload');
+      }
+      // Refresh Token을 Access Token으로 사용 방지 (7일 vs 15분)
+      if (decoded.type === 'refresh') {
+        throw new UnauthorizedException('Refresh tokens cannot be used for authentication');
       }
 
       const user = await this.userRepository.findOne({

@@ -58,8 +58,14 @@ export class ChallengeController {
       throw new ForbiddenException('Challenge failed');
     }
 
-    // Puzzle CAPTCHA verification (if puzzle fields are present)
-    if (dto.puzzleId !== undefined && dto.puzzleAnswer !== undefined) {
+    // Puzzle CAPTCHA verification — THRESHOLD=0이므로 항상 필수
+    // puzzleId/puzzleAnswer 생략 시 CAPTCHA bypass 방지
+    const needsPuzzle = await this.puzzleCaptchaService.shouldShowPuzzle(ip);
+    if (needsPuzzle) {
+      if (!dto.puzzleId || !dto.puzzleAnswer) {
+        this.logger.warn(`CAPTCHA fields missing from IP: ${RequestUtils.hashIp(ip, 'log')}`);
+        throw new ForbiddenException('CAPTCHA verification required');
+      }
       const puzzleValid = await this.puzzleCaptchaService.verifyPuzzle(
         dto.puzzleId,
         dto.puzzleAnswer,
@@ -71,16 +77,18 @@ export class ChallengeController {
       }
     }
 
-    // PoW 풀이 속도 체크 — 토큰 발급~검증 시간이 100ms 미만이면 봇 의심
+    // PoW 풀이 속도 체크 — 토큰 발급~검증 시간이 100ms 미만이면 봇 의심 → threat score 반영
     try {
       const decoded = Buffer.from(dto.token, 'base64').toString();
-      const tokenTimestamp = parseInt(decoded.split('|')[0]);
+      const tokenTimestamp = parseInt(decoded.split('|')[0], 10);
       const solveTime = Date.now() - tokenTimestamp;
       if (solveTime < 100) {
         this.logger.warn(`Suspiciously fast PoW solve: ${solveTime}ms from IP: ${RequestUtils.hashIp(ip, 'log')}`);
+        // 위협 점수에 반영 (GPU 봇 탐지)
+        await this.challengeService.recordFastSolve(ip);
       }
     } catch {
-      // token decode failure — non-critical, log at debug level
+      // token decode failure — non-critical
     }
 
     // 핑거프린트 저장 (추적용)

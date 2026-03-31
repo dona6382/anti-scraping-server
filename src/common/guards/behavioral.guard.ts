@@ -23,8 +23,8 @@ export const SkipBehavioral = () => SetMetadata(SKIP_BEHAVIORAL_KEY, true);
 const CV_THRESHOLD = 0.5;
 /** 분당 최대 요청 수 — 초과 시 봇 의심 */
 const MAX_RPM = 30;
-/** 분석에 필요한 최소 요청 수 */
-const MIN_REQUESTS = 10;
+/** 분석에 필요한 최소 요청 수 (낮을수록 빠른 탐지, IP 로테이션 회피 방지) */
+const MIN_REQUESTS = 5;
 
 /**
  * Behavioral Analysis Guard

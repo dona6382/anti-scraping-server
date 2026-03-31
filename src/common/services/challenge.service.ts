@@ -155,8 +155,16 @@ export class ChallengeService {
    * 일률적으로 4 (65K 해시, 브라우저 ~30ms)
    * 위협 점수 높을 때는 PoW가 아닌 퍼즐 캡챠가 핵심 방어
    */
-  async getDifficulty(_ip: string): Promise<number> {
-    return 4; // ~65K hashes — 브라우저 ~30ms
+  async getDifficulty(ip: string): Promise<number> {
+    try {
+      const score = await this.threatScoreService.getScore(ip);
+      const totalScore = score?.totalScore ?? 0;
+      if (totalScore >= 70) return 6; // ~16M hashes — 브라우저 ~5s (고위협)
+      if (totalScore >= 30) return 5; // ~1M hashes — 브라우저 ~500ms (중위협)
+      return 4; // ~65K hashes — 브라우저 ~30ms (기본)
+    } catch {
+      return 4;
+    }
   }
 
   /**
@@ -210,6 +218,14 @@ export class ChallengeService {
         ).catch(err => this.logger.error('Failed to record threat violation', err?.message));
       }
     }
+  }
+
+  /**
+   * GPU 봇 의심 — PoW 풀이 100ms 미만 시 위협 점수 기록
+   */
+  async recordFastSolve(ip: string): Promise<void> {
+    this.threatScoreService.recordViolation(ip, 'FAST_POW_SOLVE', 'MEDIUM')
+      .catch(err => this.logger.error('Failed to record fast solve violation', err?.message));
   }
 
   /**

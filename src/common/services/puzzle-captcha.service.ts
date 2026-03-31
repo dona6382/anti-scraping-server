@@ -36,9 +36,12 @@ interface CaptchaCacheData {
  * 봇: OCR 또는 Vision AI 필요 (비용 + 시간)
  * 사람: 5글자 읽고 입력 (10초 여유)
  */
+const MAX_CONCURRENT_RENDERS = 20; // Canvas CPU 고갈 방지
+
 @Injectable()
 export class PuzzleCaptchaService {
   private readonly logger = new Logger(PuzzleCaptchaService.name);
+  private activeRenders = 0;
 
   constructor(
     @Inject('ICacheService') private readonly cache: ICacheService,
@@ -65,6 +68,14 @@ export class PuzzleCaptchaService {
     gridImage: string;
     options: string[];
   }> {
+    // Canvas CPU 고갈 방지 — 동시 렌더링 제한
+    if (this.activeRenders >= MAX_CONCURRENT_RENDERS) {
+      this.logger.warn('CAPTCHA render limit reached, skipping puzzle');
+      return { id: '', gridImage: '', options: [] };
+    }
+    this.activeRenders++;
+
+    try {
     // Generate random text
     const answer = this.generateRandomText();
 
@@ -96,6 +107,9 @@ export class PuzzleCaptchaService {
       gridImage: `data:image/png;base64,${imageBase64}`,
       options: [], // empty — text input mode
     };
+    } finally {
+      this.activeRenders--;
+    }
   }
 
   /**

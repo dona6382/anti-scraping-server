@@ -98,9 +98,8 @@ describe('BehavioralGuard', () => {
       expect(await guard.canActivate(context)).toBe(true);
     });
 
-    it('로그 10개 이하 → 통과 (MIN_REQUESTS+1=11 필요)', async () => {
-      // 10개: MIN_REQUESTS와 같으므로 < MIN_REQUESTS + 1 조건에 해당
-      const logs = createLogs(10, 1000);
+    it('로그 5개 이하 → 통과 (MIN_REQUESTS+1=6 필요)', async () => {
+      const logs = createLogs(5, 1000);
       mockCache.get.mockResolvedValue(logs);
       const context = createMockContext();
 

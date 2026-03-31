@@ -89,7 +89,9 @@ export class ChallengeGuard extends BaseSecurityGuard {
       try {
         const needsPuzzle = await this.puzzleCaptchaService.shouldShowPuzzle(ip);
         if (needsPuzzle) {
-          puzzleData = await this.puzzleCaptchaService.generatePuzzle(ip);
+          const puzzle = await this.puzzleCaptchaService.generatePuzzle(ip);
+          // 빈 puzzle (렌더링 한도 초과 시) → undefined 처리 (bypass 방지)
+          puzzleData = puzzle?.id ? puzzle : undefined;
         }
       } catch (puzzleError) {
         // fail-open: if puzzle generation fails, proceed without puzzle

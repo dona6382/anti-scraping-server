@@ -6,13 +6,14 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
+import { Repository } from 'typeorm';
 
-import { User } from '../../core/database/entities';
-import { AuthDto, RegisterDto, ChangePasswordDto, RefreshTokenDto } from './dto/auth.dto';
 import { ResponseBuilder } from '../../common/utils/response.builder';
+import { User } from '../../core/database/entities';
+
+import { AuthDto, RegisterDto, ChangePasswordDto, RefreshTokenDto } from './dto/auth.dto';
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
@@ -39,7 +40,12 @@ export class AuthService {
       ...(clientIp && { lastLoginIp: clientIp }),
     });
 
-    const basePayload = { sub: user.id, username: user.username, role: user.role, tokenVersion: user.tokenVersion };
+    const basePayload = {
+      sub: user.id,
+      username: user.username,
+      role: user.role,
+      tokenVersion: user.tokenVersion,
+    };
     const accessToken = this.jwtService.sign(basePayload, { expiresIn: '15m' });
     const refreshToken = this.jwtService.sign(
       { sub: user.id, type: 'refresh', tokenVersion: user.tokenVersion },
@@ -60,10 +66,7 @@ export class AuthService {
 
   async register(registerDto: RegisterDto) {
     const existingUser = await this.userRepository.findOne({
-      where: [
-        { username: registerDto.username },
-        { email: registerDto.email },
-      ],
+      where: [{ username: registerDto.username }, { email: registerDto.email }],
     });
 
     if (existingUser) {
@@ -110,12 +113,19 @@ export class AuthService {
         throw new UnauthorizedException('Token has been revoked');
       }
 
-      const payload = { sub: user.id, username: user.username, role: user.role, tokenVersion: user.tokenVersion };
+      const payload = {
+        sub: user.id,
+        username: user.username,
+        role: user.role,
+        tokenVersion: user.tokenVersion,
+      };
       return {
         access_token: this.jwtService.sign(payload, { expiresIn: '15m' }),
       };
     } catch (error) {
-      if (error instanceof UnauthorizedException) throw error;
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
   }
@@ -169,7 +179,9 @@ export class AuthService {
 
     if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
       updateData.lockedUntil = new Date(Date.now() + LOCK_DURATION_MS);
-      this.logger.warn(`Account locked for user: ${username} after ${failedAttempts} failed attempts`);
+      this.logger.warn(
+        `Account locked for user: ${username} after ${failedAttempts} failed attempts`,
+      );
     }
 
     await this.userRepository.update(user.id, updateData);
@@ -179,7 +191,11 @@ export class AuthService {
 
   async validateToken(token: string): Promise<User> {
     try {
-      const decoded = this.jwtService.verify(token) as { sub: string; type?: string; tokenVersion?: number };
+      const decoded = this.jwtService.verify(token) as {
+        sub: string;
+        type?: string;
+        tokenVersion?: number;
+      };
       if (!decoded?.sub) {
         throw new UnauthorizedException('Invalid token payload');
       }
@@ -202,9 +218,10 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      if (error instanceof UnauthorizedException) throw error;
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       throw new UnauthorizedException('Invalid or expired token');
     }
   }
-
 }

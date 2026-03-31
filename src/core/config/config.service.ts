@@ -1,6 +1,7 @@
 // src/core/config/config.service.ts
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
+
 import { AppConfig } from './config.schema';
 
 @Injectable()
@@ -66,5 +67,4 @@ export class AppConfigService {
   get databaseConfig() {
     return this.configService.get('database', { infer: true });
   }
-
 }

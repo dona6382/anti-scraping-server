@@ -8,13 +8,19 @@ export class CidrUtils {
    */
   static isInRange(ip: string, cidr: string): boolean {
     const [rangeIp, prefixStr] = cidr.split('/');
-    if (!rangeIp || !prefixStr) return false;
+    if (!rangeIp || !prefixStr) {
+      return false;
+    }
     const prefix = parseInt(prefixStr, 10);
-    if (isNaN(prefix) || prefix < 0 || prefix > 32) return false;
+    if (isNaN(prefix) || prefix < 0 || prefix > 32) {
+      return false;
+    }
 
     const ipNum = this.ipToNumber(ip);
     const rangeNum = this.ipToNumber(rangeIp);
-    if (ipNum === null || rangeNum === null) return false;
+    if (ipNum === null || rangeNum === null) {
+      return false;
+    }
 
     const mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0;
     return (ipNum & mask) === (rangeNum & mask);
@@ -32,11 +38,17 @@ export class CidrUtils {
    */
   static isValidCidr(cidr: string): boolean {
     const parts = cidr.split('/');
-    if (parts.length !== 2) return false;
+    if (parts.length !== 2) {
+      return false;
+    }
     const prefix = parseInt(parts[1], 10);
-    if (isNaN(prefix) || prefix < 16 || prefix > 32) return false;  // min /16
+    if (isNaN(prefix) || prefix < 16 || prefix > 32) {
+      return false;
+    } // min /16
     const octets = parts[0].split('.');
-    if (octets.length !== 4) return false;
+    if (octets.length !== 4) {
+      return false;
+    }
     return octets.every((o) => {
       const n = parseInt(o, 10);
       return !isNaN(n) && n >= 0 && n <= 255;
@@ -48,11 +60,15 @@ export class CidrUtils {
    */
   private static ipToNumber(ip: string): number | null {
     const parts = ip.split('.');
-    if (parts.length !== 4) return null;
+    if (parts.length !== 4) {
+      return null;
+    }
     let num = 0;
     for (const part of parts) {
       const octet = parseInt(part, 10);
-      if (isNaN(octet) || octet < 0 || octet > 255) return null;
+      if (isNaN(octet) || octet < 0 || octet > 255) {
+        return null;
+      }
       num = (num << 8) + octet;
     }
     return num >>> 0;

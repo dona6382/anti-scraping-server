@@ -1,10 +1,12 @@
 import { Injectable, Logger, ExecutionContext, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { BaseSecurityGuard } from './base-security.guard';
-import { SecurityEventService } from '../services/security-event.service';
+
 import { ExtendedRequest } from '../../core/types';
-import { HeadlessBrowserException } from '../exceptions';
 import { HEADLESS_SCORES } from '../constants/threshold.constants';
+import { HeadlessBrowserException } from '../exceptions';
+import { SecurityEventService } from '../services/security-event.service';
+
+import { BaseSecurityGuard } from './base-security.guard';
 
 /**
  * Headless Browser 체크를 건너뛰는 데코레이터
@@ -33,13 +35,15 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (skip) return true;
+    if (skip) {
+      return true;
+    }
 
     const request = context.switchToHttp().getRequest<ExtendedRequest>();
 
     try {
       const detectionResult = this.detectHeadlessBrowser(request);
-      
+
       if (detectionResult.isHeadless) {
         this.logSecurityViolation(
           request,
@@ -62,17 +66,17 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
 
         throw new HeadlessBrowserException(detectionResult.factors);
       }
-      
+
       return true;
     } catch (error) {
       // 이미 우리의 예외인 경우 그대로 전달
       if (error instanceof HeadlessBrowserException) {
         throw error;
       }
-      
+
       // 예상치 못한 에러
       this.logger.error(`Unexpected error in headless browser detection:`, error);
-      
+
       // 에러 시 허용 (fail-open)
       return true;
     }
@@ -92,21 +96,16 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
     const userAgent = this.getUserAgent(request).toLowerCase();
 
     // 1. User-Agent 기반 감지
-    const headlessIndicators = [
-      'headless',
-      'phantomjs',
-      'slimerjs',
-      'chrome-lighthouse',
-    ];
+    const headlessIndicators = ['headless', 'phantomjs', 'slimerjs', 'chrome-lighthouse'];
 
-    if (headlessIndicators.some(indicator => userAgent.includes(indicator))) {
+    if (headlessIndicators.some((indicator) => userAgent.includes(indicator))) {
       factors.push('User-Agent contains headless indicator');
       confidenceScore += HEADLESS_SCORES.UA_HEADLESS_INDICATOR;
     }
 
     // 2. Chrome DevTools Protocol
     const chromeDevToolsPatterns = ['headlesschrome', 'chrome-lighthouse'];
-    if (chromeDevToolsPatterns.some(p => userAgent.includes(p))) {
+    if (chromeDevToolsPatterns.some((p) => userAgent.includes(p))) {
       factors.push('Chrome DevTools Protocol detected');
       confidenceScore += HEADLESS_SCORES.DEVTOOLS_PROTOCOL;
     }
@@ -127,8 +126,9 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
     }
 
     // 4. Missing required headers
-    const missingHeaders = ['accept-language', 'accept-encoding', 'accept']
-      .filter(h => !request.headers[h]);
+    const missingHeaders = ['accept-language', 'accept-encoding', 'accept'].filter(
+      (h) => !request.headers[h],
+    );
     if (missingHeaders.length > 0) {
       factors.push(`Missing headers: ${missingHeaders.join(', ')}`);
       confidenceScore += missingHeaders.length * HEADLESS_SCORES.MISSING_HEADER;
@@ -186,7 +186,11 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
     }
 
     // 11. 비정상적 헤더 조합 — accept 있는데 accept-encoding 없으면 의심
-    if (this.getHeader(request, 'accept') && !this.getHeader(request, 'accept-encoding') && !userAgent.includes('curl')) {
+    if (
+      this.getHeader(request, 'accept') &&
+      !this.getHeader(request, 'accept-encoding') &&
+      !userAgent.includes('curl')
+    ) {
       factors.push('Incomplete header set (accept without accept-encoding)');
       confidenceScore += 10;
     }
@@ -194,7 +198,9 @@ export class HeadlessBrowserGuard extends BaseSecurityGuard {
     const isHeadless = confidenceScore >= HEADLESS_SCORES.THRESHOLD;
 
     if (factors.length > 0) {
-      this.logger.debug(`Headless detection - Score: ${confidenceScore}, Factors: ${factors.join(', ')}`);
+      this.logger.debug(
+        `Headless detection - Score: ${confidenceScore}, Factors: ${factors.join(', ')}`,
+      );
     }
 
     return {

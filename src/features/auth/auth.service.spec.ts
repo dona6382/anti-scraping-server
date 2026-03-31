@@ -1,11 +1,12 @@
+import { UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { JwtService } from '@nestjs/jwt';
-import { UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 
-import { AuthService } from './auth.service';
 import { User } from '../../core/database/entities';
+
+import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -44,7 +45,9 @@ describe('AuthService', () => {
           provide: JwtService,
           useValue: {
             sign: jest.fn().mockReturnValue('mock-jwt-token'),
-            verify: jest.fn().mockReturnValue({ sub: 'user-uuid-1', username: 'testuser', tokenVersion: 0 }),
+            verify: jest
+              .fn()
+              .mockReturnValue({ sub: 'user-uuid-1', username: 'testuser', tokenVersion: 0 }),
           },
         },
       ],
@@ -76,9 +79,9 @@ describe('AuthService', () => {
     it('존재하지 않는 사용자로 UnauthorizedException', async () => {
       userRepository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.login({ username: 'nobody', password: 'password123' }),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.login({ username: 'nobody', password: 'password123' })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('잠긴 계정으로 로그인 시 UnauthorizedException', async () => {
@@ -259,9 +262,9 @@ describe('AuthService', () => {
       const userWithNewVersion = { ...mockUser, tokenVersion: 1 };
       userRepository.findOne.mockResolvedValue(userWithNewVersion);
 
-      await expect(
-        service.refreshToken({ refreshToken: 'old-refresh-token' }),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken({ refreshToken: 'old-refresh-token' })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('비활성 사용자의 refresh token으로 UnauthorizedException', async () => {
@@ -272,9 +275,9 @@ describe('AuthService', () => {
       });
       userRepository.findOne.mockResolvedValue({ ...mockUser, isActive: false });
 
-      await expect(
-        service.refreshToken({ refreshToken: 'valid-refresh-token' }),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken({ refreshToken: 'valid-refresh-token' })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('만료된 refresh token으로 UnauthorizedException', async () => {
@@ -282,9 +285,9 @@ describe('AuthService', () => {
         throw new Error('jwt expired');
       });
 
-      await expect(
-        service.refreshToken({ refreshToken: 'expired-token' }),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken({ refreshToken: 'expired-token' })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 
@@ -320,9 +323,9 @@ describe('AuthService', () => {
       });
       userRepository.findOne.mockResolvedValue({ ...mockUser, tokenVersion: 1 });
 
-      await expect(
-        service.refreshToken({ refreshToken: 'old-refresh-token' }),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken({ refreshToken: 'old-refresh-token' })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 

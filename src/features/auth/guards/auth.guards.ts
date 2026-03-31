@@ -1,9 +1,15 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 
-import { AuthService } from '../auth.service';
 import { User } from '../../../core/database/entities';
+import { AuthService } from '../auth.service';
 
 /**
  * Extended Request with User

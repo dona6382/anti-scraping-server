@@ -1,9 +1,11 @@
 import { ExecutionContext } from '@nestjs/common';
-import { BehavioralGuard } from './behavioral.guard';
-import { SecurityEventService } from '../services/security-event.service';
-import { ThreatScoreService } from '../services/threat-score.service';
+
 import { SecurityException } from '../exceptions/application.exception';
 import { RequestLogEntry } from '../middleware/request-logger.middleware';
+import { SecurityEventService } from '../services/security-event.service';
+import { ThreatScoreService } from '../services/threat-score.service';
+
+import { BehavioralGuard } from './behavioral.guard';
 
 describe('BehavioralGuard', () => {
   let guard: BehavioralGuard;
@@ -50,16 +52,9 @@ describe('BehavioralGuard', () => {
    * @param intervalMs 요청 간격 (ms)
    * @param jitterMs 간격의 랜덤 변동폭 (ms)
    */
-  function createLogs(
-    count: number,
-    intervalMs: number,
-    jitterMs = 0,
-  ): RequestLogEntry[] {
+  function createLogs(count: number, intervalMs: number, jitterMs = 0): RequestLogEntry[] {
     return Array.from({ length: count }, (_, i) => ({
-      t:
-        1000000 +
-        i * intervalMs +
-        Math.round((Math.random() - 0.5) * jitterMs),
+      t: 1000000 + i * intervalMs + Math.round((Math.random() - 0.5) * jitterMs),
       e: '/api/public/data',
       m: 'GET',
       s: 200,
@@ -114,9 +109,7 @@ describe('BehavioralGuard', () => {
       mockCache.get.mockResolvedValue(logs);
       const context = createMockContext();
 
-      await expect(guard.canActivate(context)).rejects.toThrow(
-        SecurityException,
-      );
+      await expect(guard.canActivate(context)).rejects.toThrow(SecurityException);
     });
 
     it('SecurityEvent 로그 호출 확인', async () => {
@@ -194,9 +187,7 @@ describe('BehavioralGuard', () => {
       mockCache.get.mockResolvedValue(logs);
       const context = createMockContext();
 
-      await expect(guard.canActivate(context)).rejects.toThrow(
-        SecurityException,
-      );
+      await expect(guard.canActivate(context)).rejects.toThrow(SecurityException);
 
       expect(mockSecurityEvent.log).toHaveBeenCalledWith(
         expect.objectContaining({

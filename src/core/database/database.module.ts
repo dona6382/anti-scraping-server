@@ -1,8 +1,9 @@
 import { Module, Global, Logger } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { createDatabaseConfig } from './database.config';
 import { AppConfigService } from '../config/config.service';
+
+import { createDatabaseConfig } from './database.config';
 
 const logger = new Logger('CoreDatabaseModule');
 

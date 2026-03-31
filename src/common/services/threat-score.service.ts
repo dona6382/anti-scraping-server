@@ -1,4 +1,5 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
+
 import { ICacheService } from '../../core/cache/interfaces/cache.interface';
 import { RequestUtils } from '../utils/request.utils';
 
@@ -25,15 +26,9 @@ const SCORE_DECAY_RATE = 0.7; // 캐시 만료 후 재계산 시 30% 감쇠 (70�
 export class ThreatScoreService {
   private readonly logger = new Logger(ThreatScoreService.name);
 
-  constructor(
-    @Inject('ICacheService') private readonly cache: ICacheService,
-  ) {}
+  constructor(@Inject('ICacheService') private readonly cache: ICacheService) {}
 
-  async recordViolation(
-    ip: string,
-    eventType: string,
-    severity: string,
-  ): Promise<ThreatScore> {
+  async recordViolation(ip: string, eventType: string, severity: string): Promise<ThreatScore> {
     const key = `threat:${RequestUtils.normalizeIp(ip)}`;
     const existing = await this.cache.get<ThreatScore>(key);
     const weight = SCORE_WEIGHTS[severity] ?? 10;
@@ -44,8 +39,7 @@ export class ThreatScoreService {
       lastViolation: eventType,
       eventTypes: {
         ...(existing?.eventTypes ?? {}),
-        [eventType]:
-          ((existing?.eventTypes ?? {})[eventType] ?? 0) + 1,
+        [eventType]: ((existing?.eventTypes ?? {})[eventType] ?? 0) + 1,
       },
       updatedAt: new Date().toISOString(),
     };
@@ -64,7 +58,9 @@ export class ThreatScoreService {
   async getScore(ip: string): Promise<ThreatScore | null> {
     const key = `threat:${RequestUtils.normalizeIp(ip)}`;
     const cached = await this.cache.get<ThreatScore>(key);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
 
     // 캐시 미스 시 최근 블랙리스트 이력 확인 (감쇠된 기저 점수)
     const recentBlockKey = `blocked_history:${RequestUtils.normalizeIp(ip)}`;

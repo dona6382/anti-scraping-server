@@ -1,8 +1,10 @@
 import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { HeadlessBrowserGuard } from './headless-browser.guard';
-import { SecurityEventService } from '../services/security-event.service';
+
 import { HeadlessBrowserException } from '../exceptions';
+import { SecurityEventService } from '../services/security-event.service';
+
+import { HeadlessBrowserGuard } from './headless-browser.guard';
 
 describe('HeadlessBrowserGuard', () => {
   let guard: HeadlessBrowserGuard;
@@ -33,8 +35,9 @@ describe('HeadlessBrowserGuard', () => {
   }
 
   const normalBrowserHeaders = {
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'user-agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'accept-language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
     'accept-encoding': 'gzip, deflate, br',
     'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
@@ -61,7 +64,8 @@ describe('HeadlessBrowserGuard', () => {
   it('HeadlessChrome UA 차단', async () => {
     const context = createMockContext({
       ...normalBrowserHeaders,
-      'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 HeadlessChrome/120.0.0.0 Safari/537.36',
+      'user-agent':
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 HeadlessChrome/120.0.0.0 Safari/537.36',
     });
     await expect(guard.canActivate(context)).rejects.toThrow(HeadlessBrowserException);
   });
@@ -69,7 +73,8 @@ describe('HeadlessBrowserGuard', () => {
   it('PhantomJS UA 차단', async () => {
     const context = createMockContext({
       ...normalBrowserHeaders,
-      'user-agent': 'Mozilla/5.0 (Unknown; Linux x86_64) AppleWebKit/538.1 (KHTML, like Gecko) PhantomJS/2.1.1 Safari/538.1',
+      'user-agent':
+        'Mozilla/5.0 (Unknown; Linux x86_64) AppleWebKit/538.1 (KHTML, like Gecko) PhantomJS/2.1.1 Safari/538.1',
     });
     await expect(guard.canActivate(context)).rejects.toThrow(HeadlessBrowserException);
   });
@@ -113,10 +118,11 @@ describe('HeadlessBrowserGuard', () => {
       'x-custom-2': 'val',
       'x-custom-3': 'val',
       'x-custom-4': 'val',
-      'host': 'example.com',
+      host: 'example.com',
       'x-custom-5': 'val',
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'accept': 'text/html,application/xhtml+xml',
+      'user-agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      accept: 'text/html,application/xhtml+xml',
       'accept-language': 'ko-KR,ko;q=0.9',
       'accept-encoding': 'gzip, deflate, br',
       'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
@@ -137,10 +143,11 @@ describe('HeadlessBrowserGuard', () => {
       'x-custom-2': 'val',
       'x-custom-3': 'val',
       'x-custom-4': 'val',
-      'host': 'example.com',
+      host: 'example.com',
       'x-custom-5': 'val',
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'accept': '*/*',
+      'user-agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      accept: '*/*',
       'accept-language': 'ko-KR,ko;q=0.9',
       'accept-encoding': 'gzip, deflate, br',
       // missing sec-ch-ua → +25, missing sec-fetch-site → +20, generic accept → +10, header order → +15 = 70

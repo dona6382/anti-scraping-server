@@ -12,23 +12,17 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiParam,
-  ApiQuery,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 
 import { IpBlacklistService } from '../../../common/services/ip-blacklist.service';
-import { JwtAuthGuard, RolesGuard } from '../../auth/guards/auth.guards';
-import { Roles } from '../../auth/auth.decorators';
-import { BlockIpDto, CidrBlockDto } from '../dto/security-admin.dto';
-import { ResponseBuilder } from '../../../common/utils/response.builder';
+import { CidrUtils } from '../../../common/utils/cidr.utils';
 import { PaginationUtils } from '../../../common/utils/pagination.utils';
 import { RequestUtils } from '../../../common/utils/request.utils';
-import { CidrUtils } from '../../../common/utils/cidr.utils';
+import { ResponseBuilder } from '../../../common/utils/response.builder';
+import { Roles } from '../../auth/auth.decorators';
+import { JwtAuthGuard, RolesGuard } from '../../auth/guards/auth.guards';
+import { BlockIpDto, CidrBlockDto } from '../dto/security-admin.dto';
 
 /**
  * Security Admin Controller
@@ -54,7 +48,9 @@ export class SecurityAdminController {
   @ApiOperation({ summary: 'Block an IP address' })
   async blockIp(@Body() dto: BlockIpDto) {
     await this.ipBlacklistService.blockIp(dto.ip, dto.reason, dto.ttl);
-    this.logger.log(`Admin blocked IP: ${RequestUtils.hashIp(dto.ip, 'log')} for reason: ${dto.reason}`);
+    this.logger.log(
+      `Admin blocked IP: ${RequestUtils.hashIp(dto.ip, 'log')} for reason: ${dto.reason}`,
+    );
     return ResponseBuilder.success(null, 'IP has been blocked');
   }
 
@@ -81,10 +77,7 @@ export class SecurityAdminController {
   @ApiOperation({ summary: 'Get all blocked IPs' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  async getBlockedIps(
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 50,
-  ) {
+  async getBlockedIps(@Query('page') page: number = 1, @Query('limit') limit: number = 50) {
     const allEntries = await this.ipBlacklistService.getBlocklist();
     const { page: p, limit: l, skip } = PaginationUtils.parse(page, limit);
     const entries = allEntries.slice(skip, skip + l);
@@ -147,8 +140,6 @@ export class SecurityAdminController {
   @Get('statistics')
   @ApiOperation({ summary: 'Get IP blocking statistics' })
   async getStatistics() {
-    return ResponseBuilder.success(
-      await this.ipBlacklistService.getStatistics(),
-    );
+    return ResponseBuilder.success(await this.ipBlacklistService.getStatistics());
   }
 }

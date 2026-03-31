@@ -1,11 +1,12 @@
 import { Controller, Get, Req, Logger, Query, UseGuards } from '@nestjs/common';
-import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Request } from 'express';
 
-import { ClientInfoService, ClientInfo } from './client-info.service';
 import { RequestUtils } from '../../common/utils/request.utils';
 import { ExtendedRequest } from '../../core/types';
 import { JwtAuthGuard } from '../auth/guards/auth.guards';
+
+import { ClientInfoService, ClientInfo } from './client-info.service';
 
 @ApiTags('Client Info')
 @Controller('api/client')
@@ -19,15 +20,17 @@ export class ClientInfoController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get client information' })
   async getClientInfo(@Req() request: Request, @Query('detailed') detailed?: boolean) {
-    this.logger.log(`Client info requested from ${RequestUtils.hashIp(RequestUtils.extractClientIp(request as ExtendedRequest), 'log')}`);
-    
+    this.logger.log(
+      `Client info requested from ${RequestUtils.hashIp(RequestUtils.extractClientIp(request as ExtendedRequest), 'log')}`,
+    );
+
     try {
       const clientInfo = await this.clientInfoService.getClientInfo(request);
-      
+
       if (detailed === false) {
         return this.getSimplifiedInfo(clientInfo);
       }
-      
+
       return clientInfo;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

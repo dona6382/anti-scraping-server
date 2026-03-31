@@ -1,5 +1,5 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, MaxLength, IsOptional } from 'class-validator';
 
 export class VerifyChallengeDto {
   @ApiProperty({ description: 'Challenge token' })

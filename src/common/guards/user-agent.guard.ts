@@ -1,11 +1,13 @@
 import { Injectable, Logger, ExecutionContext, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+
 import { AppConfigService } from '../../core/config/config.service';
-import { BaseSecurityGuard } from './base-security.guard';
-import { SecurityEventService } from '../services/security-event.service';
 import { ExtendedRequest } from '../../core/types';
-import { InvalidUserAgentException } from '../exceptions';
 import { SUSPICIOUS_UA_PATTERNS, ALLOWED_BOTS } from '../constants/security.constants';
+import { InvalidUserAgentException } from '../exceptions';
+import { SecurityEventService } from '../services/security-event.service';
+
+import { BaseSecurityGuard } from './base-security.guard';
 
 /**
  * User-Agent 체크를 건너뛰는 데코레이터
@@ -32,12 +34,14 @@ export class UserAgentGuard extends BaseSecurityGuard {
 
     const userAgentConfig = this.configService.userAgentConfig;
     this.blockedUserAgents = userAgentConfig.blockedAgents
-      .map(agent => agent.trim().toLowerCase())
-      .filter(agent => agent.length > 0);
+      .map((agent) => agent.trim().toLowerCase())
+      .filter((agent) => agent.length > 0);
 
     this.strictMode = userAgentConfig.strictMode;
 
-    this.logger.log(`Initialized with ${this.blockedUserAgents.length} blocked agents, strict mode: ${this.strictMode}`);
+    this.logger.log(
+      `Initialized with ${this.blockedUserAgents.length} blocked agents, strict mode: ${this.strictMode}`,
+    );
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -46,7 +50,9 @@ export class UserAgentGuard extends BaseSecurityGuard {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (skip) return true;
+    if (skip) {
+      return true;
+    }
 
     const request = context.switchToHttp().getRequest<ExtendedRequest>();
     const userAgent = this.getUserAgent(request);
@@ -55,7 +61,10 @@ export class UserAgentGuard extends BaseSecurityGuard {
       const isValid = this.isValidUserAgent(request);
 
       if (!isValid) {
-        this.logSecurityViolation(request, `Invalid User-Agent detected: ${userAgent.substring(0, 100)}`);
+        this.logSecurityViolation(
+          request,
+          `Invalid User-Agent detected: ${userAgent.substring(0, 100)}`,
+        );
 
         this.securityEventService.log({
           eventType: 'USER_AGENT_BLOCKED',
@@ -92,17 +101,19 @@ export class UserAgentGuard extends BaseSecurityGuard {
     }
 
     // ALLOWED_BOTS 체크를 먼저! (Googlebot 등 검색엔진 보호)
-    const isAllowedBot = ALLOWED_BOTS.some(bot => userAgent.includes(bot));
-    if (isAllowedBot) return true;
+    const isAllowedBot = ALLOWED_BOTS.some((bot) => userAgent.includes(bot));
+    if (isAllowedBot) {
+      return true;
+    }
 
     // 그 다음 blockedAgents 체크
-    if (this.blockedUserAgents.some(blocked => userAgent.includes(blocked))) {
+    if (this.blockedUserAgents.some((blocked) => userAgent.includes(blocked))) {
       return false;
     }
 
     // strict mode 패턴 체크
     if (this.strictMode) {
-      const isSuspicious = SUSPICIOUS_UA_PATTERNS.some(pattern => pattern.test(userAgent));
+      const isSuspicious = SUSPICIOUS_UA_PATTERNS.some((pattern) => pattern.test(userAgent));
       if (isSuspicious) {
         this.logger.warn(`Suspicious User-Agent pattern detected: ${userAgent.substring(0, 100)}`);
         return false;

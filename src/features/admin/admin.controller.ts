@@ -9,18 +9,13 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 
-import { AdminService } from './admin.service';
-import { JwtAuthGuard, RolesGuard } from '../auth/guards/auth.guards';
 import { Roles } from '../auth/auth.decorators';
+import { JwtAuthGuard, RolesGuard } from '../auth/guards/auth.guards';
+
+import { AdminService } from './admin.service';
 
 /**
  * Admin Controller
@@ -43,9 +38,9 @@ export class AdminController {
    */
   @Get('system/info')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get system information',
-    description: 'Retrieve comprehensive system information and statistics.'
+    description: 'Retrieve comprehensive system information and statistics.',
   })
   @ApiResponse({ status: 200, description: 'System information retrieved successfully' })
   async getSystemInfo() {
@@ -58,9 +53,9 @@ export class AdminController {
    */
   @Get('system/stats')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get system statistics',
-    description: 'Retrieve system performance and usage statistics.'
+    description: 'Retrieve system performance and usage statistics.',
   })
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
   async getSystemStats() {
@@ -73,9 +68,9 @@ export class AdminController {
    */
   @Get('security/events')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get security events',
-    description: 'Retrieve recent security events and violations.'
+    description: 'Retrieve recent security events and violations.',
   })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
@@ -84,7 +79,7 @@ export class AdminController {
   async getSecurityEvents(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 50,
-    @Query('severity') severity?: string
+    @Query('severity') severity?: string,
   ) {
     this.logger.log('Admin: Security events requested');
     return await this.adminService.getSecurityEvents({ page, limit, severity });
@@ -95,9 +90,9 @@ export class AdminController {
    */
   @Get('config')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get system configuration',
-    description: 'Retrieve current system configuration (sensitive values masked).'
+    description: 'Retrieve current system configuration (sensitive values masked).',
   })
   @ApiResponse({ status: 200, description: 'Configuration retrieved successfully' })
   async getSystemConfig() {
@@ -110,9 +105,9 @@ export class AdminController {
    */
   @Delete('cache')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Clear system cache',
-    description: 'Clear all system caches.'
+    description: 'Clear all system caches.',
   })
   @ApiResponse({ status: 200, description: 'Cache cleared successfully' })
   async clearCache() {
@@ -125,9 +120,9 @@ export class AdminController {
    */
   @Post('system/health-check')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Force health check',
-    description: 'Force execute a comprehensive system health check.'
+    description: 'Force execute a comprehensive system health check.',
   })
   @ApiResponse({ status: 200, description: 'Health check completed' })
   async forceHealthCheck() {

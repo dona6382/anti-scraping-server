@@ -1,14 +1,15 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
 import * as os from 'os';
 
-import { AppConfigService } from '../../core/config/config.service';
+import { Injectable, Inject, Logger } from '@nestjs/common';
+
+import { APP_VERSION } from '../../common/constants/app.constants';
 import { IpBlacklistService } from '../../common/services/ip-blacklist.service';
 import { SecurityEventService } from '../../common/services/security-event.service';
-import { HealthService } from '../health/health.service';
-import { ICacheService } from '../../core/cache/interfaces';
 import { ResponseBuilder } from '../../common/utils/response.builder';
 import { SystemUtils } from '../../common/utils/system.utils';
-import { APP_VERSION } from '../../common/constants/app.constants';
+import { ICacheService } from '../../core/cache/interfaces';
+import { AppConfigService } from '../../core/config/config.service';
+import { HealthService } from '../health/health.service';
 
 @Injectable()
 export class AdminService {
@@ -70,9 +71,7 @@ export class AdminService {
   }
 
   async getSecurityEvents(params: { page: number; limit: number; severity?: string }) {
-    return ResponseBuilder.success(
-      await this.securityEventService.findAll(params),
-    );
+    return ResponseBuilder.success(await this.securityEventService.findAll(params));
   }
 
   async getSystemConfig() {
@@ -110,7 +109,7 @@ export class AdminService {
 
     // 보안 키가 아닌 것만 삭제
     const keysToDelete = allKeys.filter(
-      key => !securityPrefixes.some(prefix => key.startsWith(prefix)),
+      (key) => !securityPrefixes.some((prefix) => key.startsWith(prefix)),
     );
 
     if (keysToDelete.length > 0) {
@@ -129,8 +128,6 @@ export class AdminService {
 
   async forceHealthCheck() {
     this.logger.log('Force health check requested');
-    return ResponseBuilder.success(
-      await this.healthService.getDetailedHealth(),
-    );
+    return ResponseBuilder.success(await this.healthService.getDetailedHealth());
   }
 }

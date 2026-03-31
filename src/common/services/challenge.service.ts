@@ -1,28 +1,35 @@
-import { Injectable, Inject, Logger, forwardRef } from '@nestjs/common';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
+
+import { Injectable, Inject, Logger, forwardRef } from '@nestjs/common';
+
 import { ICacheService } from '../../core/cache/interfaces/cache.interface';
 import { RequestUtils } from '../utils/request.utils';
-import { ThreatScoreService } from './threat-score.service';
-import { SecurityEventService } from './security-event.service';
 
-const CHALLENGE_SECRET = process.env.CHALLENGE_SECRET || (() => {
-  const fallback = randomBytes(32).toString('hex');
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('CHALLENGE_SECRET environment variable is required in production');
-  }
-  return fallback;
-})();
+import { SecurityEventService } from './security-event.service';
+import { ThreatScoreService } from './threat-score.service';
+
+const CHALLENGE_SECRET =
+  process.env.CHALLENGE_SECRET ||
+  (() => {
+    const fallback = randomBytes(32).toString('hex');
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('CHALLENGE_SECRET environment variable is required in production');
+    }
+    return fallback;
+  })();
 // 쿠키 서명에는 별도 파생 키 사용 (키 분리 원칙)
-const COOKIE_SIGN_KEY = createHmac('sha256', CHALLENGE_SECRET).update('cookie-signing-key').digest('hex');
+const COOKIE_SIGN_KEY = createHmac('sha256', CHALLENGE_SECRET)
+  .update('cookie-signing-key')
+  .digest('hex');
 const TOKEN_TTL = 30; // 30 seconds
 export const COOKIE_TTL = 900; // 15분 (봇이 자주 PoW를 다시 풀도록)
 const PROXY_ROTATION_SUBNET_THRESHOLD = 3; // >3 unique subnets triggers alert
 
 export interface FingerprintData {
-  ips: string[];       // hashed IPs
-  subnets: string[];   // /24 subnets (plain, for comparison)
-  rawIps: string[];    // raw IPs (for threat score recording)
-  count: number;       // total request count
+  ips: string[]; // hashed IPs
+  subnets: string[]; // /24 subnets (plain, for comparison)
+  rawIps: string[]; // raw IPs (for threat score recording)
+  count: number; // total request count
 }
 
 /**
@@ -35,8 +42,10 @@ export class ChallengeService {
 
   constructor(
     @Inject('ICacheService') private readonly cache: ICacheService,
-    @Inject(forwardRef(() => ThreatScoreService)) private readonly threatScoreService: ThreatScoreService,
-    @Inject(forwardRef(() => SecurityEventService)) private readonly securityEventService: SecurityEventService,
+    @Inject(forwardRef(() => ThreatScoreService))
+    private readonly threatScoreService: ThreatScoreService,
+    @Inject(forwardRef(() => SecurityEventService))
+    private readonly securityEventService: SecurityEventService,
   ) {}
 
   /**
@@ -47,9 +56,7 @@ export class ChallengeService {
     const random = randomBytes(16).toString('hex');
     const normalizedIp = RequestUtils.normalizeIp(ip);
     const data = `${timestamp}|${normalizedIp}|${random}`;
-    const signature = createHmac('sha256', CHALLENGE_SECRET)
-      .update(data)
-      .digest('hex');
+    const signature = createHmac('sha256', CHALLENGE_SECRET).update(data).digest('hex');
     const token = Buffer.from(`${data}|${signature}`).toString('base64');
 
     // 토큰을 pending 상태로 캐시에 저장 (TTL 30s)
@@ -60,41 +67,40 @@ export class ChallengeService {
   /**
    * PoW 솔루션 검증
    */
-  async verifyChallenge(
-    token: string,
-    nonce: string,
-    ip: string,
-  ): Promise<boolean> {
+  async verifyChallenge(token: string, nonce: string, ip: string): Promise<boolean> {
     try {
       const decoded = Buffer.from(token, 'base64').toString();
       const parts = decoded.split('|');
-      if (parts.length < 4) return false;
+      if (parts.length < 4) {
+        return false;
+      }
 
-      const [timestamp, tokenIp, random, signature] = [
-        parts[0],
-        parts[1],
-        parts[2],
-        parts[3],
-      ];
+      const [timestamp, tokenIp, random, signature] = [parts[0], parts[1], parts[2], parts[3]];
 
       // 서명 검증 (timing-safe)
       const data = `${timestamp}|${tokenIp}|${random}`;
-      const expectedSig = createHmac('sha256', CHALLENGE_SECRET)
-        .update(data)
-        .digest('hex');
-      if (!this.safeCompare(signature, expectedSig)) return false;
+      const expectedSig = createHmac('sha256', CHALLENGE_SECRET).update(data).digest('hex');
+      if (!this.safeCompare(signature, expectedSig)) {
+        return false;
+      }
 
       // TTL 검증 (30s)
-      if (Date.now() - parseInt(timestamp) > TOKEN_TTL * 1000) return false;
+      if (Date.now() - parseInt(timestamp) > TOKEN_TTL * 1000) {
+        return false;
+      }
 
       // IP 서브넷 검증 (같은 /24)
       const normalizedIp = RequestUtils.normalizeIp(ip);
-      if (!this.isSameSubnet(tokenIp, normalizedIp)) return false;
+      if (!this.isSameSubnet(tokenIp, normalizedIp)) {
+        return false;
+      }
 
       // 일회용 검증 (atomic getAndDelete로 TOCTOU 방지)
       const key = `challenge:${signature}`;
       const status = await this.cache.getAndDelete<string>(key);
-      if (status !== 'pending') return false;
+      if (status !== 'pending') {
+        return false;
+      }
 
       // PoW 검증
       const hash = createHash('sha256')
@@ -117,9 +123,7 @@ export class ChallengeService {
     // 쿠키 크기 최적화: 64자 → 32자 (verifyCookie에서도 동일하게 비교하므로 안전)
     const fpTruncated = fingerprint.substring(0, 32);
     const data = `${Date.now()}:${subnet}:${fpTruncated}`;
-    const signature = createHmac('sha256', COOKIE_SIGN_KEY)
-      .update(data)
-      .digest('hex');
+    const signature = createHmac('sha256', COOKIE_SIGN_KEY).update(data).digest('hex');
     return `${data}:${signature}`;
   }
 
@@ -129,19 +133,23 @@ export class ChallengeService {
   verifyCookie(cookieValue: string, ip: string): boolean {
     try {
       const parts = cookieValue.split(':');
-      if (parts.length !== 4) return false;
+      if (parts.length !== 4) {
+        return false;
+      }
 
       const [timestamp, subnet, fp, signature] = parts;
 
       // 서명 검증 (timing-safe, 쿠키 전용 파생 키 사용)
       const data = `${timestamp}:${subnet}:${fp}`;
-      const expectedSig = createHmac('sha256', COOKIE_SIGN_KEY)
-        .update(data)
-        .digest('hex');
-      if (!this.safeCompare(signature, expectedSig)) return false;
+      const expectedSig = createHmac('sha256', COOKIE_SIGN_KEY).update(data).digest('hex');
+      if (!this.safeCompare(signature, expectedSig)) {
+        return false;
+      }
 
       // 만료 검증 (1h)
-      if (Date.now() - parseInt(timestamp) > COOKIE_TTL * 1000) return false;
+      if (Date.now() - parseInt(timestamp) > COOKIE_TTL * 1000) {
+        return false;
+      }
 
       // 같은 /24 서브넷 검증
       return this.getSubnet(ip) === subnet;
@@ -159,8 +167,12 @@ export class ChallengeService {
     try {
       const score = await this.threatScoreService.getScore(ip);
       const totalScore = score?.totalScore ?? 0;
-      if (totalScore >= 70) return 6; // ~16M hashes — 브라우저 ~5s (고위협)
-      if (totalScore >= 30) return 5; // ~1M hashes — 브라우저 ~500ms (중위협)
+      if (totalScore >= 70) {
+        return 6;
+      } // ~16M hashes — 브라우저 ~5s (고위협)
+      if (totalScore >= 30) {
+        return 5;
+      } // ~1M hashes — 브라우저 ~500ms (중위협)
       return 4; // ~65K hashes — 브라우저 ~30ms (기본)
     } catch {
       return 4;
@@ -178,11 +190,17 @@ export class ChallengeService {
     const subnets = existing?.subnets || [];
     const rawIps = existing?.rawIps || [];
     const hashedIp = RequestUtils.hashIp(ip, 'fp');
-    if (!ips.includes(hashedIp)) ips.push(hashedIp);
+    if (!ips.includes(hashedIp)) {
+      ips.push(hashedIp);
+    }
 
     const subnet = this.getSubnet(ip);
-    if (!subnets.includes(subnet)) subnets.push(subnet);
-    if (!rawIps.includes(ip)) rawIps.push(ip);
+    if (!subnets.includes(subnet)) {
+      subnets.push(subnet);
+    }
+    if (!rawIps.includes(ip)) {
+      rawIps.push(ip);
+    }
 
     await this.cache.set(
       key,
@@ -196,26 +214,26 @@ export class ChallengeService {
         `Proxy rotation detected for fingerprint ${fingerprint.substring(0, 8)}...: ${subnets.length} subnets`,
       );
 
-      this.securityEventService.log({
-        eventType: 'SUSPICIOUS_ACTIVITY',
-        severity: 'HIGH',
-        ip,
-        description: 'Same fingerprint from multiple subnets',
-        eventData: {
-          fingerprint: fingerprint.substring(0, 16),
-          uniqueSubnets: subnets.length,
-          uniqueIps: ips.length,
-          totalRequests: (existing?.count || 0) + 1,
-        },
-      }).catch(err => this.logger.error('Failed to log proxy rotation event', err?.message));
+      this.securityEventService
+        .log({
+          eventType: 'SUSPICIOUS_ACTIVITY',
+          severity: 'HIGH',
+          ip,
+          description: 'Same fingerprint from multiple subnets',
+          eventData: {
+            fingerprint: fingerprint.substring(0, 16),
+            uniqueSubnets: subnets.length,
+            uniqueIps: ips.length,
+            totalRequests: (existing?.count || 0) + 1,
+          },
+        })
+        .catch((err) => this.logger.error('Failed to log proxy rotation event', err?.message));
 
       // Record threat score violation for all associated IPs
       for (const associatedIp of rawIps) {
-        this.threatScoreService.recordViolation(
-          associatedIp,
-          'SUSPICIOUS_ACTIVITY',
-          'HIGH',
-        ).catch(err => this.logger.error('Failed to record threat violation', err?.message));
+        this.threatScoreService
+          .recordViolation(associatedIp, 'SUSPICIOUS_ACTIVITY', 'HIGH')
+          .catch((err) => this.logger.error('Failed to record threat violation', err?.message));
       }
     }
   }
@@ -224,8 +242,9 @@ export class ChallengeService {
    * GPU 봇 의심 — PoW 풀이 100ms 미만 시 위협 점수 기록
    */
   async recordFastSolve(ip: string): Promise<void> {
-    this.threatScoreService.recordViolation(ip, 'FAST_POW_SOLVE', 'MEDIUM')
-      .catch(err => this.logger.error('Failed to record fast solve violation', err?.message));
+    this.threatScoreService
+      .recordViolation(ip, 'FAST_POW_SOLVE', 'MEDIUM')
+      .catch((err) => this.logger.error('Failed to record fast solve violation', err?.message));
   }
 
   /**
@@ -238,9 +257,7 @@ export class ChallengeService {
     puzzleData?: { id: string; gridImage: string; options: string[] },
   ): string {
     const hasPuzzle = !!puzzleData;
-    const puzzleJson = hasPuzzle
-      ? JSON.stringify(puzzleData).replace(/</g, '\\u003c')
-      : 'null';
+    const puzzleJson = hasPuzzle ? JSON.stringify(puzzleData).replace(/</g, '\\u003c') : 'null';
 
     return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Security Check</title>
@@ -426,7 +443,9 @@ export class ChallengeService {
    */
   private getSubnet(ip: string): string {
     const parts = RequestUtils.normalizeIp(ip).split('.');
-    if (parts.length === 4) return parts.slice(0, 3).join('.');
+    if (parts.length === 4) {
+      return parts.slice(0, 3).join('.');
+    }
     return ip; // IPv6 fallback
   }
 

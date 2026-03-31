@@ -70,11 +70,9 @@ describe('RequestLoggerMiddleware', () => {
 
     // Wait for async logRequest to complete
     // The set call is within the async callback
-    await new Promise(resolve => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
 
-    expect(mockCache.get).toHaveBeenCalledWith(
-      expect.stringContaining(REQUEST_LOG_PREFIX),
-    );
+    expect(mockCache.get).toHaveBeenCalledWith(expect.stringContaining(REQUEST_LOG_PREFIX));
     expect(mockCache.set).toHaveBeenCalledWith(
       expect.stringContaining(REQUEST_LOG_PREFIX),
       expect.arrayContaining([
@@ -118,15 +116,15 @@ describe('RequestLoggerMiddleware', () => {
       s: 200,
     }));
     mockCache.get
-      .mockResolvedValueOnce(existingLogs)  // req_log:{ip}
-      .mockResolvedValueOnce(null);          // active_ips
+      .mockResolvedValueOnce(existingLogs) // req_log:{ip}
+      .mockResolvedValueOnce(null); // active_ips
 
     const req = createMockReq('/api/new');
     const res = createMockRes(201);
 
     middleware.use(req, res, next);
     await finishCallback!();
-    await new Promise(resolve => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(mockCache.set).toHaveBeenCalledTimes(2); // logs + active_ips
     const savedLogs = mockCache.set.mock.calls[0][1];
@@ -149,10 +147,8 @@ describe('RequestLoggerMiddleware', () => {
 
     // Trigger finish and wait for the async error handling
     await finishCallback!();
-    await new Promise(resolve => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
 
-    expect(debugSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Request log failed'),
-    );
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('Request log failed'));
   });
 });

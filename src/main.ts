@@ -1,11 +1,13 @@
+import { timingSafeEqual } from 'crypto';
 import { join } from 'path';
-import { NestFactory } from '@nestjs/core';
+
 import { Logger, ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as express from 'express';
 import helmet from 'helmet';
-import { timingSafeEqual } from 'crypto';
+
 import { AppModule } from './app.module';
 
 /**
@@ -29,7 +31,6 @@ interface StartupInfo {
   docsEnabled: boolean;
   redisConfigured: boolean;
   strictMode: boolean;
-
 }
 
 /**
@@ -86,7 +87,6 @@ async function bootstrap(): Promise<void> {
     // Log startup information
     const startupInfo = createStartupInfo(config);
     logStartupMessage(logger, startupInfo);
-
   } catch (error) {
     logger.error('Failed to start application', error);
     process.exit(1);
@@ -99,9 +99,9 @@ async function bootstrap(): Promise<void> {
 function getApplicationConfiguration(): AppConfiguration {
   const port = parseInt(process.env.PORT || '3000', 10);
   const nodeEnv = process.env.NODE_ENV || 'development';
-  
+
   const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+    ? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
     : [];
 
   return {
@@ -144,25 +144,24 @@ function setupCors(app: NestExpressApplication, config: AppConfiguration): void 
   }
 
   const corsOptions: Parameters<typeof app.enableCors>[0] = {
-    origin: config.nodeEnv === 'production' 
-      ? config.allowedOrigins.length > 0 ? config.allowedOrigins : false
-      : true,
+    origin:
+      config.nodeEnv === 'production'
+        ? config.allowedOrigins.length > 0
+          ? config.allowedOrigins
+          : false
+        : true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: [
-      'Content-Type', 
-      'Authorization', 
-      'X-Requested-With', 
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
 
       'Accept',
       'Origin',
       'User-Agent',
     ],
-    exposedHeaders: [
-      'X-RateLimit-Limit',
-      'X-RateLimit-Remaining',
-      'X-RateLimit-Reset',
-    ],
+    exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
     maxAge: 86400, // 24 hours
   };
 
@@ -174,13 +173,16 @@ function setupCors(app: NestExpressApplication, config: AppConfiguration): void 
  */
 function setupStaticFiles(app: NestExpressApplication): void {
   const staticPath = join(__dirname, '..', 'public');
-  
-  app.use('/public', express.static(staticPath, {
-    maxAge: '1d', // Cache for 1 day
-    etag: true,
-    lastModified: true,
-    index: ['index.html'],
-  }));
+
+  app.use(
+    '/public',
+    express.static(staticPath, {
+      maxAge: '1d', // Cache for 1 day
+      etag: true,
+      lastModified: true,
+      index: ['index.html'],
+    }),
+  );
 }
 
 /**
@@ -192,7 +194,10 @@ function setupSwagger(app: NestExpressApplication): void {
   const swaggerPass = process.env.SWAGGER_PASSWORD;
   if (!swaggerPass || swaggerPass === 'changeme') {
     if (process.env.NODE_ENV === 'production') {
-      Logger.warn('Swagger disabled in production: SWAGGER_PASSWORD not set or is default', 'Swagger');
+      Logger.warn(
+        'Swagger disabled in production: SWAGGER_PASSWORD not set or is default',
+        'Swagger',
+      );
       return; // 프로덕션에서 기본 비밀번호면 Swagger 비활성화
     }
   }
@@ -204,8 +209,13 @@ function setupSwagger(app: NestExpressApplication): void {
       const decoded = Buffer.from(encoded || '', 'base64').toString();
       const [user, pass] = decoded.split(':');
       // timing-safe comparison
-      const userMatch = user.length === swaggerUser.length && timingSafeEqual(Buffer.from(user), Buffer.from(swaggerUser));
-      const passMatch = pass && pass.length === finalPass.length && timingSafeEqual(Buffer.from(pass), Buffer.from(finalPass));
+      const userMatch =
+        user.length === swaggerUser.length &&
+        timingSafeEqual(Buffer.from(user), Buffer.from(swaggerUser));
+      const passMatch =
+        pass &&
+        pass.length === finalPass.length &&
+        timingSafeEqual(Buffer.from(pass), Buffer.from(finalPass));
       if (userMatch && passMatch) {
         return next();
       }
@@ -233,12 +243,12 @@ function setupSwagger(app: NestExpressApplication): void {
         description: 'Enter JWT token',
         in: 'header',
       },
-      'JWT-auth'
+      'JWT-auth',
     )
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {
-    operationIdFactory: (controllerKey: string, methodKey: string) => 
+    operationIdFactory: (controllerKey: string, methodKey: string) =>
       `${controllerKey}_${methodKey}`,
     ignoreGlobalPrefix: false,
   });
@@ -253,7 +263,7 @@ function setupSwagger(app: NestExpressApplication): void {
       tryItOutEnabled: true,
       syntaxHighlight: {
         activated: true,
-        theme: 'agate'
+        theme: 'agate',
       },
       defaultModelsExpandDepth: 2,
       defaultModelExpandDepth: 2,
@@ -261,9 +271,7 @@ function setupSwagger(app: NestExpressApplication): void {
     customSiteTitle: 'Anti-Scraping Server API Documentation',
     customfavIcon: '/public/favicon.ico',
     customCss: getSwaggerCustomCss(),
-    customJs: [
-      '/public/swagger-custom.js'
-    ],
+    customJs: ['/public/swagger-custom.js'],
   });
 }
 
@@ -358,7 +366,6 @@ function createStartupInfo(config: AppConfiguration): StartupInfo {
     docsEnabled: config.swaggerEnabled,
     redisConfigured: !!process.env.REDIS_HOST,
     strictMode: process.env.SECURITY_STRICT_MODE === 'true',
-
   };
 }
 
@@ -367,7 +374,7 @@ function createStartupInfo(config: AppConfiguration): StartupInfo {
  */
 function logStartupMessage(logger: Logger, info: StartupInfo): void {
   const isProduction = info.environment === 'production';
-  
+
   logger.log(`
 ╔═══════════════════════════════════════════════════════════════╗
 ║                                                               ║
@@ -395,19 +402,23 @@ ${info.docsEnabled ? `║  📚 API Docs:     http://localhost:${info.port}/api-
 
   // 환경별 추가 로그
   if (isProduction) {
-    logger.warn('🚨 Running in PRODUCTION mode - ensure all security configurations are properly set!');
+    logger.warn(
+      '🚨 Running in PRODUCTION mode - ensure all security configurations are properly set!',
+    );
   } else {
     logger.log('🔧 Running in DEVELOPMENT mode - additional debugging enabled');
   }
 
   // 보안 설정 확인
   if (!info.redisConfigured) {
-    logger.warn('⚠️  Redis not configured - using in-memory cache (not recommended for production)');
+    logger.warn(
+      '⚠️  Redis not configured - using in-memory cache (not recommended for production)',
+    );
   }
 
   // 성능 팁
   logger.log('💡 Performance tip: Enable Redis for better caching and IP blacklist persistence');
-  
+
   if (info.docsEnabled) {
     logger.log('📚 API documentation available at /api-docs');
   }

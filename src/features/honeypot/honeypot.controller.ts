@@ -1,10 +1,10 @@
 import { Controller, Get, Req, Logger, HttpCode, HttpStatus } from '@nestjs/common';
 
-import { SkipChallenge } from '../../common/guards/challenge.guard';
-import { SkipUserAgent } from '../../common/guards/user-agent.guard';
-import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
 import { SkipBehavioral } from '../../common/guards/behavioral.guard';
+import { SkipChallenge } from '../../common/guards/challenge.guard';
+import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
 import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
+import { SkipUserAgent } from '../../common/guards/user-agent.guard';
 import { SecurityEventService } from '../../common/services/security-event.service';
 import { ThreatScoreService } from '../../common/services/threat-score.service';
 import { RequestUtils } from '../../common/utils/request.utils';
@@ -95,9 +95,7 @@ export class HoneypotController {
     const ip = RequestUtils.extractClientIp(req);
     const userAgent = RequestUtils.extractUserAgent(req);
 
-    this.logger.warn(
-      `Honeypot triggered: ${endpoint} from IP ${RequestUtils.hashIp(ip, 'log')}`,
-    );
+    this.logger.warn(`Honeypot triggered: ${endpoint} from IP ${RequestUtils.hashIp(ip, 'log')}`);
 
     await Promise.all([
       this.securityEventService.log({

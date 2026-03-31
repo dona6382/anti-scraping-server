@@ -7,10 +7,11 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+
+import { ExtendedRequest } from '../../core/types';
 import { SecurityException } from '../exceptions';
 import { RequestUtils } from '../utils/request.utils';
 import { SystemUtils } from '../utils/system.utils';
-import { ExtendedRequest } from '../../core/types';
 
 interface ExceptionInfo {
   statusCode: number;
@@ -60,9 +61,7 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
     // 클라이언트 응답 (안전한 정보만)
     const clientResponse = this.createClientResponse(exceptionInfo, request);
 
-    response
-      .status(exceptionInfo.statusCode)
-      .json(clientResponse);
+    response.status(exceptionInfo.statusCode).json(clientResponse);
   }
 
   /**
@@ -79,7 +78,7 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
           guardName: exception.guardName,
           reason: exception.reason,
           ip: exception.ip,
-          metadata: exception.metadata
+          metadata: exception.metadata,
         },
         stack: exception.stack,
       };
@@ -140,10 +139,7 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
   /**
    * 예외 로깅
    */
-  private logException(
-    exceptionInfo: ExceptionInfo,
-    request: Request
-  ): void {
+  private logException(exceptionInfo: ExceptionInfo, request: Request): void {
     const logContext = {
       statusCode: exceptionInfo.statusCode,
       method: request.method,
@@ -155,22 +151,15 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
 
     // 4xx 에러는 경고, 5xx 에러는 에러로 로깅
     if (exceptionInfo.statusCode >= 500) {
-      this.logger.error(
-        `${exceptionInfo.message}`,
-        exceptionInfo.stack,
-        {
-          ...logContext,
-          details: exceptionInfo.details,
-        }
-      );
+      this.logger.error(`${exceptionInfo.message}`, exceptionInfo.stack, {
+        ...logContext,
+        details: exceptionInfo.details,
+      });
     } else if (exceptionInfo.statusCode >= 400) {
-      this.logger.warn(
-        `${exceptionInfo.message}`,
-        {
-          ...logContext,
-          details: exceptionInfo.details,
-        }
-      );
+      this.logger.warn(`${exceptionInfo.message}`, {
+        ...logContext,
+        details: exceptionInfo.details,
+      });
     }
   }
 
@@ -179,7 +168,7 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
    */
   private createClientResponse(
     exceptionInfo: ExceptionInfo,
-    request: Request
+    request: Request,
   ): Record<string, unknown> {
     const baseResponse = {
       statusCode: exceptionInfo.statusCode,
@@ -219,14 +208,16 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
       message: exceptionInfo.message,
       error: exceptionInfo.error,
       // SecurityException의 경우 공개 가능한 정보만
-      ...(exceptionInfo.details && 
-        !(exceptionInfo.details.guardName) && {
+      ...(exceptionInfo.details &&
+        !exceptionInfo.details.guardName && {
           details: exceptionInfo.details,
         }),
       // 스택 트레이스는 개발 환경에서만
-      ...(this.isDevelopment && exceptionInfo.statusCode >= 500 && exceptionInfo.stack && {
-        stack: exceptionInfo.stack.split('\n').slice(0, 5),
-      }),
+      ...(this.isDevelopment &&
+        exceptionInfo.statusCode >= 500 &&
+        exceptionInfo.stack && {
+          stack: exceptionInfo.stack.split('\n').slice(0, 5),
+        }),
     };
   }
 
@@ -237,4 +228,3 @@ export class UnifiedExceptionFilter implements ExceptionFilter {
     return RequestUtils.extractClientIp(request as ExtendedRequest);
   }
 }
-

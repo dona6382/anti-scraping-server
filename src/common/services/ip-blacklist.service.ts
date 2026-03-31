@@ -1,8 +1,9 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { ICacheService, BlacklistEntry, SecurityReason, IpStatistics } from '../../core/types';
+
 import { AppConfigService } from '../../core/config/config.service';
-import { RequestUtils } from '../utils/request.utils';
+import { ICacheService, BlacklistEntry, SecurityReason, IpStatistics } from '../../core/types';
 import { CidrUtils } from '../utils/cidr.utils';
+import { RequestUtils } from '../utils/request.utils';
 
 /**
  * CIDR 차단 항목 인터페이스
@@ -38,7 +39,7 @@ export class IpBlacklistService {
   async blockIp(ip: string, reason: SecurityReason, ttl?: number): Promise<void> {
     const key = this.getKey(ip);
     const existingEntry = await this.cache.get<BlacklistEntry>(key);
-    
+
     const expiresAt = ttl ? new Date(Date.now() + ttl * 1000) : undefined;
     const entry: BlacklistEntry = {
       ip,
@@ -47,10 +48,12 @@ export class IpBlacklistService {
       ...(expiresAt && { expiresAt }),
       count: existingEntry ? existingEntry.count + 1 : 1,
     };
-    
+
     await this.cache.set(key, entry, ttl || this.ttl);
-    
-    this.logger.warn(`Blocked IP: ${RequestUtils.hashIp(ip, 'log')}, Reason: ${reason}, Count: ${entry.count}`);
+
+    this.logger.warn(
+      `Blocked IP: ${RequestUtils.hashIp(ip, 'log')}, Reason: ${reason}, Count: ${entry.count}`,
+    );
   }
 
   /**
@@ -93,12 +96,16 @@ export class IpBlacklistService {
     const pattern = `${this.keyPrefix}:*`;
     const keys = await this.cache.keys(pattern);
 
-    if (keys.length === 0) return [];
+    if (keys.length === 0) {
+      return [];
+    }
 
     // CIDR 키 제외
     const cidrPrefix = `${this.keyPrefix}:cidr:`;
     const ipKeys = keys.filter((key) => !key.startsWith(cidrPrefix));
-    if (ipKeys.length === 0) return [];
+    if (ipKeys.length === 0) {
+      return [];
+    }
 
     // Batch fetch로 N+1 쿼리 제거
     const entries = await this.cache.getMany<BlacklistEntry>(ipKeys);
@@ -112,19 +119,19 @@ export class IpBlacklistService {
     const entries = await this.getBlocklist();
     const now = Date.now();
     const dayAgo = now - 86400000; // 24시간 전
-    
+
     const recentBlocks = entries.filter(
-      entry => new Date(entry.blockedAt).getTime() > dayAgo
+      (entry) => new Date(entry.blockedAt).getTime() > dayAgo,
     ).length;
-    
+
     const topReasons: Record<string, number> = {};
-    entries.forEach(entry => {
+    entries.forEach((entry) => {
       topReasons[entry.reason] = (topReasons[entry.reason] || 0) + 1;
     });
-    
+
     // Redis 연결 상태 확인
     const redisConnected = await this.isRedisConnected();
-    
+
     return {
       totalBlocked: entries.length,
       recentBlocks,
@@ -158,7 +165,9 @@ export class IpBlacklistService {
   async isIpInBlockedCidr(ip: string): Promise<{ blocked: boolean; cidr?: string }> {
     const pattern = `${this.keyPrefix}:cidr:*`;
     const keys = await this.cache.keys(pattern);
-    if (keys.length === 0) return { blocked: false };
+    if (keys.length === 0) {
+      return { blocked: false };
+    }
 
     const prefixLen = `${this.keyPrefix}:cidr:`.length;
     for (const key of keys) {
@@ -176,7 +185,9 @@ export class IpBlacklistService {
   async getBlockedCidrs(): Promise<CidrBlockEntry[]> {
     const pattern = `${this.keyPrefix}:cidr:*`;
     const keys = await this.cache.keys(pattern);
-    if (keys.length === 0) return [];
+    if (keys.length === 0) {
+      return [];
+    }
 
     const entries = await this.cache.getMany<CidrBlockEntry>(keys);
     return entries.filter((entry): entry is CidrBlockEntry => entry !== null);

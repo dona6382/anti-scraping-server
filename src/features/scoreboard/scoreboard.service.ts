@@ -1,11 +1,16 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual, In } from 'typeorm';
-import { SecurityEvent } from '../../core/database/entities';
-import { ICacheService } from '../../core/cache/interfaces/cache.interface';
-import { RequestLogEntry, REQUEST_LOG_PREFIX, ACTIVE_IPS_KEY } from '../../common/middleware/request-logger.middleware';
+
+import {
+  RequestLogEntry,
+  REQUEST_LOG_PREFIX,
+  ACTIVE_IPS_KEY,
+} from '../../common/middleware/request-logger.middleware';
 import { ThreatScoreService } from '../../common/services/threat-score.service';
 import { RequestUtils } from '../../common/utils/request.utils';
+import { ICacheService } from '../../core/cache/interfaces/cache.interface';
+import { SecurityEvent } from '../../core/database/entities';
 
 /** Blocked event types used for defense scoring */
 const BLOCKED_EVENT_TYPES = [
@@ -64,7 +69,9 @@ export class ScoreboardService {
   async getSummary(hours = 1) {
     const cacheKey = `scoreboard:summary:${hours}`;
     const cached = await this.cache.get<object>(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
 
     const since = new Date(Date.now() - hours * 3600000);
     const now = new Date();
@@ -81,9 +88,7 @@ export class ScoreboardService {
     const successCount = await this.countSuccessRequests(since);
 
     const total = blockedCount + successCount;
-    const defenseScore = total > 0
-      ? Math.round((blockedCount / total) * 1000) / 10
-      : 0;
+    const defenseScore = total > 0 ? Math.round((blockedCount / total) * 1000) / 10 : 0;
     const attackScore = Math.round((100 - defenseScore) * 10) / 10;
 
     // Top attacker IP
@@ -137,9 +142,7 @@ export class ScoreboardService {
         from: since.toISOString(),
         to: now.toISOString(),
       },
-      topAttackerIp: topAttacker?.ip
-        ? RequestUtils.hashIp(topAttacker.ip, 'scoreboard')
-        : null,
+      topAttackerIp: topAttacker?.ip ? RequestUtils.hashIp(topAttacker.ip, 'scoreboard') : null,
       topTargetEndpoint: topEndpoint?.endpoint || null,
       activeThreats: parseInt(activeThreatsResult?.count || '0'),
     };
@@ -171,11 +174,8 @@ export class ScoreboardService {
     }
 
     let totalBlocked = 0;
-    const layers = GUARD_LAYERS.map(layer => {
-      const blocked = layer.eventTypes.reduce(
-        (sum, et) => sum + (countMap[et] || 0),
-        0,
-      );
+    const layers = GUARD_LAYERS.map((layer) => {
+      const blocked = layer.eventTypes.reduce((sum, et) => sum + (countMap[et] || 0), 0);
       totalBlocked += blocked;
       return {
         name: layer.name,
@@ -187,9 +187,8 @@ export class ScoreboardService {
 
     // Calculate percentages
     for (const layer of layers) {
-      layer.percentage = totalBlocked > 0
-        ? Math.round((layer.blocked / totalBlocked) * 1000) / 10
-        : 0;
+      layer.percentage =
+        totalBlocked > 0 ? Math.round((layer.blocked / totalBlocked) * 1000) / 10 : 0;
     }
 
     return { layers, totalBlocked };
@@ -211,19 +210,18 @@ export class ScoreboardService {
       order: { createdAt: 'ASC' },
     });
 
-    const blockedEvents = events.filter(e =>
+    const blockedEvents = events.filter((e) =>
       (BLOCKED_EVENT_TYPES as readonly string[]).includes(e.eventType),
     );
 
     // Success requests from cache
     const normalizedIp = RequestUtils.normalizeIp(ip);
-    const logs = await this.cache.get<RequestLogEntry[]>(
-      `${REQUEST_LOG_PREFIX}${normalizedIp}`,
-    ) || [];
+    const logs =
+      (await this.cache.get<RequestLogEntry[]>(`${REQUEST_LOG_PREFIX}${normalizedIp}`)) || [];
 
     const sinceTs = since.getTime();
-    const recentLogs = logs.filter(l => l.t >= sinceTs);
-    const successLogs = recentLogs.filter(l => l.s === 200);
+    const recentLogs = logs.filter((l) => l.t >= sinceTs);
+    const successLogs = recentLogs.filter((l) => l.s === 200);
 
     const blockedCount = blockedEvents.length;
     const successCount = successLogs.length;
@@ -260,9 +258,7 @@ export class ScoreboardService {
       totalRequests,
       blockedCount,
       successCount,
-      successRate: totalRequests > 0
-        ? Math.round((successCount / totalRequests) * 1000) / 10
-        : 0,
+      successRate: totalRequests > 0 ? Math.round((successCount / totalRequests) * 1000) / 10 : 0,
       threatScore: threatScore?.totalScore ?? 0,
       eventBreakdown,
       targetEndpoints,
@@ -333,16 +329,16 @@ export class ScoreboardService {
         blocked,
         success,
         total,
-        defenseScore: total > 0
-          ? Math.round((blocked / total) * 1000) / 10
-          : 0,
+        defenseScore: total > 0 ? Math.round((blocked / total) * 1000) / 10 : 0,
       });
     }
 
     // Deduplicate by time key (alignment may produce duplicates)
     const seen = new Set<string>();
-    const dedupedIntervals = intervals.filter(i => {
-      if (seen.has(i.time)) return false;
+    const dedupedIntervals = intervals.filter((i) => {
+      if (seen.has(i.time)) {
+        return false;
+      }
       seen.add(i.time);
       return true;
     });
@@ -419,7 +415,7 @@ export class ScoreboardService {
     }
 
     // Honeypot not triggered
-    const honeypotLayer = layersData.layers.find(l => l.name === 'Honeypot');
+    const honeypotLayer = layersData.layers.find((l) => l.name === 'Honeypot');
     if (honeypotLayer && honeypotLayer.blocked === 0 && blockedCount > 0) {
       defense.push({
         priority: 'MEDIUM',
@@ -501,13 +497,15 @@ export class ScoreboardService {
    */
   private async countSuccessRequests(since: Date): Promise<number> {
     const sinceTs = since.getTime();
-    const activeIps = await this.cache.get<string[]>(ACTIVE_IPS_KEY) || [];
-    const keys = activeIps.map(ip => `${REQUEST_LOG_PREFIX}${ip}`);
+    const activeIps = (await this.cache.get<string[]>(ACTIVE_IPS_KEY)) || [];
+    const keys = activeIps.map((ip) => `${REQUEST_LOG_PREFIX}${ip}`);
 
     let count = 0;
     for (const key of keys) {
       const logs = await this.cache.get<RequestLogEntry[]>(key);
-      if (!logs) continue;
+      if (!logs) {
+        continue;
+      }
       for (const log of logs) {
         if (log.t >= sinceTs && log.s === 200) {
           count++;
@@ -525,20 +523,20 @@ export class ScoreboardService {
     intervalMinutes: number,
   ): Promise<Map<string, number>> {
     const sinceTs = since.getTime();
-    const activeIps = await this.cache.get<string[]>(ACTIVE_IPS_KEY) || [];
-    const keys = activeIps.map(ip => `${REQUEST_LOG_PREFIX}${ip}`);
+    const activeIps = (await this.cache.get<string[]>(ACTIVE_IPS_KEY)) || [];
+    const keys = activeIps.map((ip) => `${REQUEST_LOG_PREFIX}${ip}`);
     const map = new Map<string, number>();
 
     for (const key of keys) {
       const logs = await this.cache.get<RequestLogEntry[]>(key);
-      if (!logs) continue;
+      if (!logs) {
+        continue;
+      }
       for (const log of logs) {
         if (log.t >= sinceTs && log.s === 200) {
           const d = new Date(log.t);
           d.setSeconds(0, 0);
-          d.setMinutes(
-            Math.floor(d.getMinutes() / intervalMinutes) * intervalMinutes,
-          );
+          d.setMinutes(Math.floor(d.getMinutes() / intervalMinutes) * intervalMinutes);
           const bucketKey = d.toISOString();
           map.set(bucketKey, (map.get(bucketKey) || 0) + 1);
         }
@@ -565,22 +563,23 @@ export class ScoreboardService {
     }
 
     const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const variance =
-      intervals.reduce((sum, v) => sum + (v - mean) ** 2, 0) / intervals.length;
+    const variance = intervals.reduce((sum, v) => sum + (v - mean) ** 2, 0) / intervals.length;
     const stdDev = Math.sqrt(variance);
     const cv = mean > 0 ? Math.round((stdDev / mean) * 1000) / 1000 : 0;
 
     const firstTs = logs[0].t;
     const lastTs = logs[logs.length - 1].t;
     const windowMinutes = (lastTs - firstTs) / 60000;
-    const requestsPerMinute = windowMinutes > 0
-      ? Math.round((logs.length / windowMinutes) * 10) / 10
-      : logs.length;
+    const requestsPerMinute =
+      windowMinutes > 0 ? Math.round((logs.length / windowMinutes) * 10) / 10 : logs.length;
 
     let verdict = 'LIKELY_HUMAN';
     if (intervals.length >= 5) {
-      if (cv < 0.3) verdict = 'BOT_SUSPECTED';
-      else if (cv < 0.5) verdict = 'INCONCLUSIVE';
+      if (cv < 0.3) {
+        verdict = 'BOT_SUSPECTED';
+      } else if (cv < 0.5) {
+        verdict = 'INCONCLUSIVE';
+      }
     } else {
       verdict = 'INSUFFICIENT_DATA';
     }
@@ -599,7 +598,9 @@ export class ScoreboardService {
       },
     });
 
-    if (totalBlocked === 0) return null;
+    if (totalBlocked === 0) {
+      return null;
+    }
 
     const topIp = await this.eventRepo
       .createQueryBuilder('e')
@@ -613,7 +614,9 @@ export class ScoreboardService {
       .limit(1)
       .getRawOne();
 
-    if (!topIp) return null;
+    if (!topIp) {
+      return null;
+    }
 
     return (parseInt(topIp.count) / totalBlocked) * 100;
   }
@@ -621,19 +624,21 @@ export class ScoreboardService {
   /**
    * Detect if any IP has regular request intervals (CV < 0.3)
    */
-  private async detectRegularIntervals(
-    since: Date,
-  ): Promise<{ cv: number } | null> {
+  private async detectRegularIntervals(since: Date): Promise<{ cv: number } | null> {
     const sinceTs = since.getTime();
-    const activeIps = await this.cache.get<string[]>(ACTIVE_IPS_KEY) || [];
-    const keys = activeIps.map(ip => `${REQUEST_LOG_PREFIX}${ip}`);
+    const activeIps = (await this.cache.get<string[]>(ACTIVE_IPS_KEY)) || [];
+    const keys = activeIps.map((ip) => `${REQUEST_LOG_PREFIX}${ip}`);
 
     for (const key of keys) {
       const logs = await this.cache.get<RequestLogEntry[]>(key);
-      if (!logs || logs.length < 6) continue;
+      if (!logs || logs.length < 6) {
+        continue;
+      }
 
-      const recentLogs = logs.filter(l => l.t >= sinceTs);
-      if (recentLogs.length < 6) continue;
+      const recentLogs = logs.filter((l) => l.t >= sinceTs);
+      if (recentLogs.length < 6) {
+        continue;
+      }
 
       const intervals: number[] = [];
       for (let i = 1; i < recentLogs.length; i++) {
@@ -641,9 +646,10 @@ export class ScoreboardService {
       }
 
       const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-      if (mean === 0) continue;
-      const variance =
-        intervals.reduce((sum, v) => sum + (v - mean) ** 2, 0) / intervals.length;
+      if (mean === 0) {
+        continue;
+      }
+      const variance = intervals.reduce((sum, v) => sum + (v - mean) ** 2, 0) / intervals.length;
       const cv = Math.sqrt(variance) / mean;
 
       if (cv < 0.3) {

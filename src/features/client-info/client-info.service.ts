@@ -1,5 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { Request } from 'express';
+
 import { RequestUtils } from '../../common/utils/request.utils';
 import { ExtendedRequest, ICacheService } from '../../core/types';
 
@@ -15,7 +16,7 @@ export interface ClientInfo {
     isVpn: boolean;
     isTor: boolean;
   };
-  
+
   proxy: {
     detected: boolean;
     type: string | null;
@@ -23,7 +24,7 @@ export interface ClientInfo {
     suspicionLevel: 'none' | 'low' | 'medium' | 'high';
     indicators: string[];
   };
-  
+
   location: {
     country: string | null;
     countryCode: string | null;
@@ -31,7 +32,7 @@ export interface ClientInfo {
     city: string | null;
     isp: string | null;
   };
-  
+
   client: {
     userAgent: string;
     browser: string | null;
@@ -43,20 +44,20 @@ export interface ClientInfo {
     isBot: boolean;
     isCrawler: boolean;
   };
-  
+
   network: {
     hostname: string | null;
     port: number | null;
     protocol: string;
     secure: boolean;
   };
-  
+
   headers: {
     all: Record<string, string | string[]>;
     suspicious: string[];
     missing: string[];
   };
-  
+
   security: {
     riskScore: number; // 0-100
     threats: string[];
@@ -70,9 +71,7 @@ export interface ClientInfo {
  */
 @Injectable()
 export class ClientInfoService {
-  constructor(
-    @Inject('ICacheService') private readonly cacheService: ICacheService,
-  ) {}
+  constructor(@Inject('ICacheService') private readonly cacheService: ICacheService) {}
 
   /**
    * 전체 클라이언트 정보 수집
@@ -80,7 +79,7 @@ export class ClientInfoService {
   async getClientInfo(request: Request): Promise<ClientInfo> {
     const ip = RequestUtils.extractClientIp(request as ExtendedRequest);
     const userAgent = RequestUtils.extractUserAgent(request as ExtendedRequest);
-    
+
     return {
       ip: this.analyzeIp(ip),
       proxy: this.detectProxy(request),
@@ -115,27 +114,27 @@ export class ClientInfoService {
    */
   private isDatacenterIp(ip: string): boolean {
     const datacenterRanges = [
-      /^13\.(52|56|57|250|251)\./,    // AWS
-      /^18\.(144|188|216|236)\./,     // AWS
-      /^34\.(8[0-9]|9[0-9]|1[0-6][0-9])\./,  // GCP
-      /^35\.(1[5-9][0-9]|2[0-4][0-9])\./,    // GCP
-      /^104\.(1[6-9]|2[0-9]|3[0-1])\./,      // DigitalOcean
-      /^159\.(65|89|203)\./,          // DigitalOcean
-      /^167\.(71|172|99)\./,          // DigitalOcean
-      /^64\.225\./,                   // DigitalOcean
-      /^5\.161\./,                    // Hetzner
-      /^49\.12\./,                    // Hetzner
-      /^135\.181\./,                  // Hetzner
-      /^23\.(88|92|94|95|96)\./,      // Hetzner
-      /^45\.(33|56|79)\./,           // Linode
-      /^172\.(104|105)\./,           // Linode
-      /^139\.(162)\./,               // Linode
-      /^51\.(38|77|79|83|89|91)\./,  // OVH
-      /^198\.211\./,                  // Vultr
-      /^45\.(32|63|76|77)\./,        // Vultr
+      /^13\.(52|56|57|250|251)\./, // AWS
+      /^18\.(144|188|216|236)\./, // AWS
+      /^34\.(8[0-9]|9[0-9]|1[0-6][0-9])\./, // GCP
+      /^35\.(1[5-9][0-9]|2[0-4][0-9])\./, // GCP
+      /^104\.(1[6-9]|2[0-9]|3[0-1])\./, // DigitalOcean
+      /^159\.(65|89|203)\./, // DigitalOcean
+      /^167\.(71|172|99)\./, // DigitalOcean
+      /^64\.225\./, // DigitalOcean
+      /^5\.161\./, // Hetzner
+      /^49\.12\./, // Hetzner
+      /^135\.181\./, // Hetzner
+      /^23\.(88|92|94|95|96)\./, // Hetzner
+      /^45\.(33|56|79)\./, // Linode
+      /^172\.(104|105)\./, // Linode
+      /^139\.(162)\./, // Linode
+      /^51\.(38|77|79|83|89|91)\./, // OVH
+      /^198\.211\./, // Vultr
+      /^45\.(32|63|76|77)\./, // Vultr
     ];
 
-    return datacenterRanges.some(range => range.test(ip));
+    return datacenterRanges.some((range) => range.test(ip));
   }
 
   /**
@@ -143,14 +142,14 @@ export class ClientInfoService {
    */
   private isKnownVpnRange(ip: string): boolean {
     const vpnRanges = [
-      /^185\.156\.(4[0-7])\./,       // NordVPN
-      /^146\.70\./,                   // Mullvad
-      /^193\.138\.(218|219)\./,       // ProtonVPN
-      /^103\.(86|231)\./,             // ExpressVPN
-      /^91\.108\./,                   // Surfshark
+      /^185\.156\.(4[0-7])\./, // NordVPN
+      /^146\.70\./, // Mullvad
+      /^193\.138\.(218|219)\./, // ProtonVPN
+      /^103\.(86|231)\./, // ExpressVPN
+      /^91\.108\./, // Surfshark
     ];
 
-    return vpnRanges.some(range => range.test(ip));
+    return vpnRanges.some((range) => range.test(ip));
   }
 
   /**
@@ -165,23 +164,21 @@ export class ClientInfoService {
       'forwarded',
       'via',
     ];
-    
+
     const detectedHeaders: Record<string, string> = {};
     const indicators: string[] = [];
-    
-    proxyHeaders.forEach(header => {
+
+    proxyHeaders.forEach((header) => {
       const value = request.headers[header];
       if (value) {
         detectedHeaders[header] = Array.isArray(value) ? value.join(', ') : value;
         indicators.push(header);
       }
     });
-    
+
     const detected = indicators.length > 0;
-    const suspicionLevel = detected 
-      ? indicators.length > 2 ? 'high' : 'medium'
-      : 'none';
-    
+    const suspicionLevel = detected ? (indicators.length > 2 ? 'high' : 'medium') : 'none';
+
     return {
       detected,
       type: detected ? 'HTTP_PROXY' : null,
@@ -205,7 +202,9 @@ export class ClientInfoService {
     try {
       // Check cache first
       const cached = await this.cacheService.get<ClientInfo['location']>('geo:' + ip);
-      if (cached) return cached;
+      if (cached) {
+        return cached;
+      }
 
       // ip-api.com (무료, 분당 45회 제한) with 3s timeout
       const controller = new AbortController();
@@ -216,10 +215,14 @@ export class ClientInfoService {
           `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=country,countryCode,regionName,city,isp,status`,
           { signal: controller.signal },
         );
-        if (!response.ok) return nullLocation;
+        if (!response.ok) {
+          return nullLocation;
+        }
 
         const data = await response.json();
-        if (data.status !== 'success') return nullLocation;
+        if (data.status !== 'success') {
+          return nullLocation;
+        }
 
         const result: ClientInfo['location'] = {
           country: data.country ?? null,
@@ -248,7 +251,7 @@ export class ClientInfoService {
     const isBot = RequestUtils.isBotUserAgent(userAgent);
     const isCrawler = RequestUtils.isCrawlerUserAgent(userAgent);
     const deviceType = RequestUtils.detectDeviceType(userAgent);
-    
+
     return {
       userAgent,
       browser: this.extractBrowser(userAgent),
@@ -278,13 +281,19 @@ export class ClientInfoService {
    * 헤더 분석
    */
   private analyzeHeaders(request: Request): ClientInfo['headers'] {
-    const SENSITIVE_HEADERS = ['authorization', 'cookie', 'x-api-key', 'x-real-ip', 'x-forwarded-for'];
+    const SENSITIVE_HEADERS = [
+      'authorization',
+      'cookie',
+      'x-api-key',
+      'x-real-ip',
+      'x-forwarded-for',
+    ];
     const suspiciousHeaders: string[] = [];
     const requiredHeaders = ['accept', 'accept-language', 'user-agent'];
-    const missing = requiredHeaders.filter(header => !request.headers[header]);
+    const missing = requiredHeaders.filter((header) => !request.headers[header]);
 
     // 의심스러운 헤더 패턴 확인
-    Object.keys(request.headers).forEach(header => {
+    Object.keys(request.headers).forEach((header) => {
       const value = request.headers[header];
       if (typeof value === 'string' && value.includes('bot')) {
         suspiciousHeaders.push(header);
@@ -292,7 +301,9 @@ export class ClientInfoService {
     });
 
     const filteredHeaders = Object.fromEntries(
-      Object.entries(request.headers).filter(([key]) => !SENSITIVE_HEADERS.includes(key.toLowerCase()))
+      Object.entries(request.headers).filter(
+        ([key]) => !SENSITIVE_HEADERS.includes(key.toLowerCase()),
+      ),
     );
 
     return {
@@ -309,9 +320,9 @@ export class ClientInfoService {
     let riskScore = 0;
     const threats: string[] = [];
     const recommendations: string[] = [];
-    
+
     const userAgent = RequestUtils.extractUserAgent(request as ExtendedRequest);
-    
+
     // User-Agent 기반 위험도
     if (!userAgent) {
       riskScore += 30;
@@ -321,17 +332,17 @@ export class ClientInfoService {
       riskScore += 50;
       threats.push('Bot User-Agent detected');
     }
-    
+
     // 헤더 기반 위험도
     const requiredHeaders = ['accept', 'accept-language'];
-    const missingHeaders = requiredHeaders.filter(header => !request.headers[header]);
+    const missingHeaders = requiredHeaders.filter((header) => !request.headers[header]);
     riskScore += missingHeaders.length * 10;
-    
+
     if (missingHeaders.length > 0) {
       threats.push(`Missing headers: ${missingHeaders.join(', ')}`);
       recommendations.push('Include standard browser headers');
     }
-    
+
     return {
       riskScore: Math.min(riskScore, 100),
       threats,

@@ -58,11 +58,19 @@ export class InitialSchema1711900000000 implements MigrationInterface {
         CONSTRAINT "PK_security_events" PRIMARY KEY ("id")
       )
     `);
-    await queryRunner.query(`CREATE INDEX "IDX_security_events_createdAt" ON "security_events" ("createdAt")`);
-    await queryRunner.query(`CREATE INDEX "IDX_security_events_eventType" ON "security_events" ("eventType")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_security_events_createdAt" ON "security_events" ("createdAt")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_security_events_eventType" ON "security_events" ("eventType")`,
+    );
     await queryRunner.query(`CREATE INDEX "IDX_security_events_ip" ON "security_events" ("ip")`);
-    await queryRunner.query(`CREATE INDEX "IDX_security_events_severity_createdAt" ON "security_events" ("severity", "createdAt")`);
-    await queryRunner.query(`CREATE INDEX "IDX_security_events_eventType_severity" ON "security_events" ("eventType", "severity")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_security_events_severity_createdAt" ON "security_events" ("severity", "createdAt")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_security_events_eventType_severity" ON "security_events" ("eventType", "severity")`,
+    );
 
     // Enable uuid-ossp extension
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);

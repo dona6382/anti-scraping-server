@@ -1,9 +1,11 @@
 import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+
 import { AppConfigService } from '../../core/config/config.service';
-import { UserAgentGuard } from './user-agent.guard';
-import { SecurityEventService } from '../services/security-event.service';
 import { InvalidUserAgentException } from '../exceptions';
+import { SecurityEventService } from '../services/security-event.service';
+
+import { UserAgentGuard } from './user-agent.guard';
 
 describe('UserAgentGuard', () => {
   let guard: UserAgentGuard;

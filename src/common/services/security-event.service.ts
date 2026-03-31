@@ -2,13 +2,14 @@ import { Injectable, Inject, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
 
+import { ICacheService } from '../../core/cache/interfaces/cache.interface';
 import { SecurityEvent } from '../../core/database/entities';
+import { RealtimeGateway } from '../../features/realtime/realtime.gateway';
 import { PaginationUtils } from '../utils/pagination.utils';
 import { RequestUtils } from '../utils/request.utils';
-import { ICacheService } from '../../core/cache/interfaces/cache.interface';
+
 import { IpBlacklistService } from './ip-blacklist.service';
 import { ThreatScoreService } from './threat-score.service';
-import { RealtimeGateway } from '../../features/realtime/realtime.gateway';
 
 type SecurityEventType =
   | 'IP_BLOCKED'
@@ -47,11 +48,11 @@ interface LogSecurityEventDto {
  * 위반 횟수에 따른 단계별 차단
  */
 const AUTO_BLOCK_POLICY = {
-  WINDOW_MS: 15 * 60 * 1000,      // 15분 윈도우
+  WINDOW_MS: 15 * 60 * 1000, // 15분 윈도우
   THRESHOLDS: [
-    { violations: 10, blockTtl: 1800 },    // 10회 → 30분
-    { violations: 20, blockTtl: 3600 },    // 20회 → 1시간
-    { violations: 50, blockTtl: 86400 },   // 50회 → 24시간
+    { violations: 10, blockTtl: 1800 }, // 10회 → 30분
+    { violations: 20, blockTtl: 3600 }, // 20회 → 1시간
+    { violations: 50, blockTtl: 86400 }, // 50회 → 24시간
   ],
 } as const;
 
@@ -107,7 +108,9 @@ export class SecurityEventService {
 
       // Update threat score
       if (dto.ip && dto.severity) {
-        this.threatScoreService.recordViolation(dto.ip, dto.eventType, dto.severity).catch(err => this.logger.error('Failed to record violation', err?.message));
+        this.threatScoreService
+          .recordViolation(dto.ip, dto.eventType, dto.severity)
+          .catch((err) => this.logger.error('Failed to record violation', err?.message));
       }
 
       // 자동 차단 체크 (IP가 있고, 이미 차단 이벤트가 아닌 경우)
@@ -129,7 +132,7 @@ export class SecurityEventService {
     const key = `auto_block:${RequestUtils.normalizeIp(ip)}`;
 
     try {
-      const current = await this.cacheService.get<number>(key) ?? 0;
+      const current = (await this.cacheService.get<number>(key)) ?? 0;
       const newCount = current + 1;
 
       const windowSeconds = AUTO_BLOCK_POLICY.WINDOW_MS / 1000;
@@ -165,7 +168,9 @@ export class SecurityEventService {
               description: `Auto-blocked after ${newCount} violations (${eventType}). TTL: ${threshold.blockTtl}s`,
               actions: { blocked: true, notified: false, escalated: false, autoResolved: false },
             });
-            this.securityEventRepository.save(autoBlockEvent).catch(err => this.logger.error('Failed to save auto-block event', err?.message));
+            this.securityEventRepository
+              .save(autoBlockEvent)
+              .catch((err) => this.logger.error('Failed to save auto-block event', err?.message));
           }
           break;
         }
@@ -175,17 +180,16 @@ export class SecurityEventService {
     }
   }
 
-  async findAll(options: {
-    page?: number;
-    limit?: number;
-    severity?: string;
-    eventType?: string;
-  }) {
+  async findAll(options: { page?: number; limit?: number; severity?: string; eventType?: string }) {
     const { page, limit, skip } = PaginationUtils.parse(options.page, options.limit);
 
     const where: Record<string, unknown> = {};
-    if (options.severity) where.severity = options.severity;
-    if (options.eventType) where.eventType = options.eventType;
+    if (options.severity) {
+      where.severity = options.severity;
+    }
+    if (options.eventType) {
+      where.eventType = options.eventType;
+    }
 
     const [events, total] = await this.securityEventRepository.findAndCount({
       where,
@@ -233,10 +237,7 @@ export class SecurityEventService {
       total,
       last24h: last24hCount,
       last7d: last7dCount,
-      byType: byType.reduce(
-        (acc, row) => ({ ...acc, [row.eventType]: parseInt(row.count) }),
-        {},
-      ),
+      byType: byType.reduce((acc, row) => ({ ...acc, [row.eventType]: parseInt(row.count) }), {}),
       bySeverity: bySeverity.reduce(
         (acc, row) => ({ ...acc, [row.severity]: parseInt(row.count) }),
         {},

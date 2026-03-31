@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+
 import { ChallengeService, COOKIE_TTL } from './challenge.service';
 
 describe('ChallengeService', () => {
@@ -38,7 +39,11 @@ describe('ChallengeService', () => {
     mockSecurityEvent = {
       log: jest.fn().mockResolvedValue(undefined),
     };
-    service = new ChallengeService(mockCache as any, mockThreatScore as any, mockSecurityEvent as any);
+    service = new ChallengeService(
+      mockCache as any,
+      mockThreatScore as any,
+      mockSecurityEvent as any,
+    );
     jest.clearAllMocks();
   });
 
@@ -54,7 +59,9 @@ describe('ChallengeService', () => {
       const hash = createHash('sha256')
         .update(token + nonce)
         .digest('hex');
-      if (hash.startsWith(prefix)) return nonce.toString();
+      if (hash.startsWith(prefix)) {
+        return nonce.toString();
+      }
       nonce++;
     }
   }
@@ -345,10 +352,14 @@ describe('ChallengeService', () => {
       // Should record violation for all associated IPs
       expect(mockThreatScore.recordViolation).toHaveBeenCalledTimes(4);
       expect(mockThreatScore.recordViolation).toHaveBeenCalledWith(
-        '10.0.0.1', 'SUSPICIOUS_ACTIVITY', 'HIGH',
+        '10.0.0.1',
+        'SUSPICIOUS_ACTIVITY',
+        'HIGH',
       );
       expect(mockThreatScore.recordViolation).toHaveBeenCalledWith(
-        '172.16.0.1', 'SUSPICIOUS_ACTIVITY', 'HIGH',
+        '172.16.0.1',
+        'SUSPICIOUS_ACTIVITY',
+        'HIGH',
       );
     });
 

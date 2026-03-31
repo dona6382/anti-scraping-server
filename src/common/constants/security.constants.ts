@@ -22,13 +22,7 @@ export const BOT_PATTERNS: RegExp[] = [
 /**
  * 크롤러 전용 탐지 패턴
  */
-export const CRAWLER_PATTERNS: RegExp[] = [
-  /crawl/i,
-  /spider/i,
-  /scrape/i,
-  /harvest/i,
-  /extract/i,
-];
+export const CRAWLER_PATTERNS: RegExp[] = [/crawl/i, /spider/i, /scrape/i, /harvest/i, /extract/i];
 
 /**
  * 의심스러운 User-Agent 패턴들 (strict mode 전용)
@@ -78,8 +72,4 @@ export const MOBILE_PATTERNS: RegExp[] = [
 /**
  * 태블릿 디바이스 패턴
  */
-export const TABLET_PATTERNS: RegExp[] = [
-  /tablet/i,
-  /ipad/i,
-];
-
+export const TABLET_PATTERNS: RegExp[] = [/tablet/i, /ipad/i];

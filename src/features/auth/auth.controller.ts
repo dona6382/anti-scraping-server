@@ -1,23 +1,16 @@
-import {
-  Controller,
-  Post,
-  Body,
-  HttpCode,
-  HttpStatus,
-  UseGuards,
-  Req,
-} from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+
+import { SkipBehavioral } from '../../common/guards/behavioral.guard';
+import { SkipChallenge } from '../../common/guards/challenge.guard';
+import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
+import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
+import { SkipUserAgent } from '../../common/guards/user-agent.guard';
 
 import { AuthService } from './auth.service';
 import { AuthDto, RegisterDto, ChangePasswordDto, RefreshTokenDto } from './dto/auth.dto';
 import { JwtAuthGuard, AuthenticatedRequest } from './guards/auth.guards';
-import { SkipBehavioral } from '../../common/guards/behavioral.guard';
-import { SkipIpBlacklist } from '../../common/guards/ip-blacklist.guard';
-import { SkipUserAgent } from '../../common/guards/user-agent.guard';
-import { SkipHeadlessBrowser } from '../../common/guards/headless-browser.guard';
-import { SkipChallenge } from '../../common/guards/challenge.guard';
 
 @ApiTags('Authentication')
 @Controller('auth')
